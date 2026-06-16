@@ -1,26 +1,301 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
+/* =============================================================
+   @theme inline — mapea CSS variables a utilities de Tailwind.
+   Las clases generadas (bg-brand, text-primary, etc.) usan
+   var() en lugar de valores literales, lo que permite theming
+   en runtime (dark mode, overrides por contexto).
+   ============================================================= */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* --- Tipografías (next/font inyecta las variables en <html>) --- */
+  --font-sans:    var(--font-sans);
+  --font-mono:    var(--font-data);
+  --font-heading: var(--font-heading);
+  --font-data:    var(--font-data);
+
+  /* --- Colores semánticos de shadcn/ui --- */
+  --color-background:         var(--background);
+  --color-foreground:         var(--foreground);
+  --color-card:               var(--card);
+  --color-card-foreground:    var(--card-foreground);
+  --color-popover:            var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary:            var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary:            var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:            var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent:            var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input:  var(--input);
+  --color-ring:   var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar:                   var(--sidebar);
+  --color-sidebar-foreground:        var(--sidebar-foreground);
+  --color-sidebar-primary:           var(--sidebar-primary);
+  --color-sidebar-primary-foreground:var(--sidebar-primary-foreground);
+  --color-sidebar-accent:            var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:            var(--sidebar-border);
+  --color-sidebar-ring:              var(--sidebar-ring);
+
+  /* --- Marca (azul institucional) --- */
+  --color-brand:     var(--brand);
+  --color-brand-dark:  var(--brand-dark);
+  --color-brand-light: var(--brand-light);
+  --color-brand-50:  var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+
+  /* --- Neutrales (escala slate) --- */
+  --color-slate-50:  var(--slate-50);
+  --color-slate-100: var(--slate-100);
+  --color-slate-200: var(--slate-200);
+  --color-slate-300: var(--slate-300);
+  --color-slate-400: var(--slate-400);
+  --color-slate-500: var(--slate-500);
+  --color-slate-600: var(--slate-600);
+  --color-slate-700: var(--slate-700);
+  --color-slate-800: var(--slate-800);
+  --color-slate-900: var(--slate-900);
+
+  /* --- Aliases semánticos de texto --- */
+  --color-ink-primary:   var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted:     var(--ink-muted);
+  --color-ink-disabled:  var(--ink-disabled);
+
+  /* --- Feedback semántico --- */
+  --color-success:       var(--success);
+  --color-success-light: var(--success-light);
+  --color-success-dark:  var(--success-dark);
+  --color-error:         var(--error);
+  --color-error-light:   var(--error-light);
+  --color-error-soft:    var(--error-soft);
+  --color-error-dark:    var(--error-dark);
+  --color-warning:        var(--warning);
+  --color-warning-light:  var(--warning-light);
+  --color-warning-accent: var(--warning-accent);
+  --color-warning-dark:   var(--warning-dark);
+  --color-info:       var(--info);
+  --color-info-light: var(--info-light);
+  --color-info-dark:  var(--info-dark);
+
+  /* --- Colores de programa --- */
+  --color-program-educa:          var(--program-educa);
+  --color-program-familia:        var(--program-familia);
+  --color-program-familia-light:  var(--program-familia-light);
+  --color-program-familia-dark:   var(--program-familia-dark);
+  --color-program-accion:         var(--program-accion);
+  --color-program-campamentos:    var(--program-campamentos);
+  --color-program-missions:       var(--program-missions);
+
+  /* --- Overlays --- */
+  --color-overlay-white08: var(--overlay-white08);
+  --color-overlay-white15: var(--overlay-white15);
+  --color-overlay-white40: var(--overlay-white40);
+  --color-overlay-white60: var(--overlay-white60);
+  --color-overlay-white82: var(--overlay-white82);
+  --color-overlay-scrim40: var(--overlay-scrim40);
+  --color-overlay-scrim78: var(--overlay-scrim78);
+  --color-overlay-black25: var(--overlay-black25);
+  --color-overlay-black40: var(--overlay-black40);
+  --color-overlay-brand10: var(--overlay-brand10);
+  --color-overlay-brand25: var(--overlay-brand25);
+
+  /* --- Escala tipográfica Cruz Blanca (override de defaults Tailwind) --- */
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 15px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-4xl:  36px;
+
+  /* --- Radio de borde (valores exactos del design system) --- */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-2xl:  16px;
+  --radius-3xl:  20px;
+  --radius-4xl:  24px;
+  --radius-full: 9999px;
+
+  /* --- Sombras --- */
+  --shadow-card:     var(--shadow-card);
+  --shadow-dropdown: var(--shadow-dropdown);
+  --shadow-modal:    var(--shadow-modal);
+  --shadow-sidebar:  var(--shadow-sidebar);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* =============================================================
+   :root — valores concretos de todos los tokens.
+   Aquí se cambia un color para que se propague a toda la app.
+   ============================================================= */
+:root {
+  /* --- Variables semánticas de shadcn/ui → paleta Cruz Blanca --- */
+  --background:         #F4F6F9;
+  --foreground:         #1A2332;
+  --card:               #FFFFFF;
+  --card-foreground:    #1A2332;
+  --popover:            #FFFFFF;
+  --popover-foreground: #1A2332;
+  --primary:            #0C529B;
+  --primary-foreground: #FFFFFF;
+  --secondary:            #E6EEF8;
+  --secondary-foreground: #0C529B;
+  --muted:            #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent:            #EEF5FF;
+  --accent-foreground: #0C529B;
+  --destructive: #C83C3E;
+  --border: #E2E8F0;
+  --input:  #E2E8F0;
+  --ring:   #0C529B;
+
+  --chart-1: #0C529B;
+  --chart-2: #6CAB5F;
+  --chart-3: #D98831;
+  --chart-4: #C83C3E;
+  --chart-5: #5292B5;
+
+  --sidebar:                    #0C529B;
+  --sidebar-foreground:         #FFFFFF;
+  --sidebar-primary:            #FFFFFF;
+  --sidebar-primary-foreground: #0C529B;
+  --sidebar-accent:             rgba(255,255,255,0.15);
+  --sidebar-accent-foreground:  #FFFFFF;
+  --sidebar-border:             rgba(255,255,255,0.15);
+  --sidebar-ring:               rgba(255,255,255,0.40);
+
+  /* --- Marca --- */
+  --brand:       #0C529B;
+  --brand-dark:  #094480;
+  --brand-light: #1A6EC4;
+  --brand-50:    #F4F8FD;
+  --brand-100:   #EEF5FF;
+  --brand-200:   #E6EEF8;
+  --brand-300:   #D6E4F6;
+
+  /* --- Neutrales --- */
+  --slate-50:  #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-200: #E2E8F0;
+  --slate-300: #CBD5E1;
+  --slate-400: #94A3B8;
+  --slate-500: #64748B;
+  --slate-600: #4A5568;
+  --slate-700: #374151;
+  --slate-800: #1A2332;
+  --slate-900: #0F172A;
+
+  /* --- Aliases de tinta --- */
+  --ink-primary:   #1A2332;
+  --ink-secondary: #4A5568;
+  --ink-muted:     #718096;
+  --ink-disabled:  #A0AEC0;
+
+  /* --- Feedback semántico --- */
+  --success:       #6CAB5F;
+  --success-light: #EBF5E9;
+  --success-dark:  #4E8B42;
+  --error:         #C83C3E;
+  --error-light:   #FDEAEA;
+  --error-soft:    #FCA5A5;
+  --error-dark:    #A62E30;
+  --warning:        #D98831;
+  --warning-light:  #FDF3E3;
+  --warning-accent: #FCD34D;
+  --warning-dark:   #B56E1F;
+  --info:       #5292B5;
+  --info-light: #E8F2F8;
+  --info-dark:  #3A7499;
+
+  /* --- Programas --- */
+  --program-educa:         #C83C3E;
+  --program-familia:       #625696;
+  --program-familia-light: #EEEAF7;
+  --program-familia-dark:  #4A3B78;
+  --program-accion:        #D98831;
+  --program-campamentos:   #5292B5;
+  --program-missions:      #6CAB5F;
+
+  /* --- Overlays --- */
+  --overlay-white08: rgba(255,255,255,0.08);
+  --overlay-white15: rgba(255,255,255,0.15);
+  --overlay-white40: rgba(255,255,255,0.40);
+  --overlay-white60: rgba(255,255,255,0.60);
+  --overlay-white82: rgba(255,255,255,0.82);
+  --overlay-scrim40: rgba(15,23,42,0.40);
+  --overlay-scrim78: rgba(15,23,42,0.78);
+  --overlay-black25: rgba(0,0,0,0.25);
+  --overlay-black40: rgba(0,0,0,0.40);
+  --overlay-brand10: rgba(12,82,155,0.10);
+  --overlay-brand25: rgba(12,82,155,0.25);
+
+  /* --- Sombras --- */
+  --shadow-card:     0 1px 3px rgba(12,82,155,0.08);
+  --shadow-dropdown: 0 2px 8px rgba(12,82,155,0.12);
+  --shadow-modal:    0 4px 16px rgba(12,82,155,0.14);
+  --shadow-sidebar:  2px 0 8px rgba(0,0,0,0.08);
+}
+
+.dark {
+  --background:         #0F172A;
+  --foreground:         #F8FAFC;
+  --card:               #1A2332;
+  --card-foreground:    #F8FAFC;
+  --popover:            #1A2332;
+  --popover-foreground: #F8FAFC;
+  --primary:            #1A6EC4;
+  --primary-foreground: #FFFFFF;
+  --secondary:            #374151;
+  --secondary-foreground: #F8FAFC;
+  --muted:            #374151;
+  --muted-foreground: #94A3B8;
+  --accent:            #1E3A5F;
+  --accent-foreground: #F8FAFC;
+  --destructive: #C83C3E;
+  --border: rgba(255,255,255,0.10);
+  --input:  rgba(255,255,255,0.15);
+  --ring:   #1A6EC4;
+
+  --sidebar:                    #094480;
+  --sidebar-foreground:         #FFFFFF;
+  --sidebar-primary:            #FFFFFF;
+  --sidebar-primary-foreground: #094480;
+  --sidebar-accent:             rgba(255,255,255,0.15);
+  --sidebar-accent-foreground:  #FFFFFF;
+  --sidebar-border:             rgba(255,255,255,0.15);
+  --sidebar-ring:               rgba(255,255,255,0.40);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
