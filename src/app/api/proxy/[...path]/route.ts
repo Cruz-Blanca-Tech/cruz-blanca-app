@@ -39,7 +39,7 @@ export async function DELETE(
   return handleRequest(request, await params, 'DELETE');
 }
 
-const PUBLIC_BACKEND_PATHS = ['security/login'];
+const PUBLIC_BACKEND_PATHS = ['auth/login'];
 
 async function handleRequest(
   request: NextRequest,

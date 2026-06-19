@@ -11,7 +11,7 @@ export async function POST() {
   if (BACKEND_BASE_URL && refreshToken) {
     try {
       await axios.post(
-        `${BACKEND_BASE_URL.replace(/\/$/, '')}/security/logout`,
+        `${BACKEND_BASE_URL.replace(/\/$/, '')}/auth/logout`,
         null,
         {
           headers: {

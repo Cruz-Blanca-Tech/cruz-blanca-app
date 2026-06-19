@@ -18,6 +18,6 @@ export const authService = {
   },
 
   async getCurrentUser(): Promise<AuthUser> {
-    return apiClient.get<AuthUser>('/security/me');
+    return apiClient.get<AuthUser>('/auth/users/me');
   },
 };

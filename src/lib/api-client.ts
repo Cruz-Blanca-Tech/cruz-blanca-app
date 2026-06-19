@@ -23,7 +23,9 @@ class ApiClient {
           const statusCode = error.response.status;
           const errorData = error.response.data;
 
-          if (statusCode === 401 || statusCode === 403) {
+          // Solo 401 indica sesión inválida/expirada → cerrar sesión y redirigir.
+          // 403 es "autenticado pero sin permisos": se trata como error normal.
+          if (statusCode === 401) {
             if (typeof window !== 'undefined') {
               window.dispatchEvent(
                 new CustomEvent(AUTH_TOKEN_EXPIRED_EVENT, { detail: { statusCode } })
@@ -35,7 +37,10 @@ class ApiClient {
             throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
           }
 
-          let errorMessage = 'Error en la solicitud';
+          let errorMessage =
+            statusCode === 403
+              ? 'No tienes permisos para realizar esta acción.'
+              : 'Error en la solicitud';
           if (errorData?.errors && errorData.errors.length > 0) {
             errorMessage = errorData.errors[0]?.msg ?? errorData.errors[0]?.message ?? errorMessage;
           } else if (errorData?.message) {
