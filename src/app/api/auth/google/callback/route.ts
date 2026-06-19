@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const backendUrl = `${BACKEND_BASE_URL.replace(/\/$/, '')}/security/login`;
+    const backendUrl = `${BACKEND_BASE_URL.replace(/\/$/, '')}/auth/login`;
 
     const backendResponse = await axios.post(
       backendUrl,

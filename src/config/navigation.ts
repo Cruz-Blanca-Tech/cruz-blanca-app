@@ -52,3 +52,9 @@ export function getNavItemsForRole(role: Role | null): NavItem[] {
   if (!role) return [];
   return NAV_ITEMS.filter((item) => item.allowedRoles.includes(role));
 }
+
+export function getActiveNavItem(pathname: string): NavItem | undefined {
+  return NAV_ITEMS.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
+  );
+}
