@@ -1,31 +1,61 @@
 'use client';
 
-import { useMemo } from 'react';
-import { ArrowLeft, ScanLine, Upload } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { ArrowLeft, Loader2, ScanLine, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 import {
   useActivities,
+  useCreateBatch,
   useDocumentCatalog,
   usePrograms,
 } from '../../hooks/use-carga-datos-queries';
 import { useCargaDatosStore } from '../../stores/carga-datos-store';
-import type { ExpectedDocument } from '../../types';
+import type {
+  BatchSummary,
+  CreateBatchResponse,
+  ExpectedDocument,
+  PickedFile,
+} from '../../types';
 
-import { DocumentDropzone } from './document-dropzone';
 import { ExpectedDocuments } from './expected-documents';
+import { GoogleDrivePicker } from './google-drive-picker';
 import { FileNamingHelp } from './file-naming-help';
 import { OcrHelpNote } from './ocr-help-note';
 import { OcrStepper } from './ocr-stepper';
 import { ProgramActivityStep } from './program-activity-step';
 
-export function OcrUploadStep() {
+interface OcrUploadStepProps {
+  /**
+   * Notifica al wizard que el batch se creó correctamente para avanzar al
+   * Paso 2. El `summary` lo arma este paso porque ya tiene los datos de lo
+   * enviado (programa, actividad y cantidad de archivos).
+   */
+  onBatchCreated: (result: CreateBatchResponse, summary: BatchSummary) => void;
+}
+
+export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   const selectedProgramId = useCargaDatosStore((s) => s.selectedProgramId);
   const selectedActivityId = useCargaDatosStore((s) => s.selectedActivityId);
-  const selectedFile = useCargaDatosStore((s) => s.selectedFile);
-  const setSelectedFile = useCargaDatosStore((s) => s.setSelectedFile);
+
+  const [files, setFiles] = useState<PickedFile[]>([]);
+  const createBatch = useCreateBatch();
+
+  const handlePick = useCallback((picked: PickedFile[]) => {
+    // Fusiona y deduplica por source_id (el Picker puede reabrirse varias veces).
+    setFiles((prev) => {
+      const bySourceId = new Map(prev.map((f) => [f.source_id, f]));
+      for (const file of picked) bySourceId.set(file.source_id, file);
+      return Array.from(bySourceId.values());
+    });
+  }, []);
+
+  const handleRemove = useCallback((sourceId: string) => {
+    setFiles((prev) => prev.filter((f) => f.source_id !== sourceId));
+  }, []);
 
   const programs = usePrograms();
   const activities = useActivities(
@@ -65,14 +95,58 @@ export function OcrUploadStep() {
   const documentsLoading =
     hasActivity && (activities.isLoading || documentCatalog.isLoading);
 
-  const canProceed = Boolean(
-    selectedFile && selectedProgramId && selectedActivityId
-  );
+  const hasFiles = files.length > 0;
+  const canProceed = Boolean(selectedActivityId) && hasFiles;
 
   const missing: string[] = [];
-  if (!selectedFile) missing.push('archivo');
-  if (!selectedProgramId) missing.push('programa');
+  if (!hasFiles) missing.push('archivos');
   if (!selectedActivityId) missing.push('actividad');
+
+  const handleSubmit = useCallback(() => {
+    if (!selectedActivityId) {
+      toast.error('Selecciona una actividad antes de iniciar la extracción.');
+      return;
+    }
+    if (!hasFiles) {
+      toast.error('Selecciona al menos un archivo de Google Drive.');
+      return;
+    }
+
+    // Capturamos el resumen de lo enviado: el frontend es la fuente de verdad
+    // del conteo de archivos (no se pide al backend).
+    const summary: BatchSummary = {
+      programLabel: programLabel ?? '—',
+      activityLabel: activity?.name ?? '—',
+      filesCount: files.length,
+      submittedAt: new Date(),
+    };
+
+    createBatch.mutate(
+      { activity_id: selectedActivityId, files },
+      {
+        onSuccess: (result) => {
+          // En vez de toast+reset, avanzamos al Paso 2 con el response del batch
+          // y el resumen de la carga. El detalle de fallidos se muestra allí.
+          onBatchCreated(result, summary);
+        },
+        onError: (err) => {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : 'No se pudo iniciar la extracción.'
+          );
+        },
+      }
+    );
+  }, [
+    activity,
+    createBatch,
+    files,
+    hasFiles,
+    onBatchCreated,
+    programLabel,
+    selectedActivityId,
+  ]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -96,10 +170,11 @@ export function OcrUploadStep() {
             Subir documento
           </h2>
 
-          <DocumentDropzone
-            file={selectedFile}
-            onFile={setSelectedFile}
-            onRemove={() => setSelectedFile(null)}
+          <GoogleDrivePicker
+            files={files}
+            onPick={handlePick}
+            onRemove={handleRemove}
+            disabled={createBatch.isPending}
           />
 
           <ProgramActivityStep />
@@ -123,14 +198,22 @@ export function OcrUploadStep() {
             </Button>
 
             <div className="flex items-center gap-3">
-              {!canProceed && (
+              {!canProceed && !createBatch.isPending && (
                 <span className="hidden font-data text-xs text-muted-foreground sm:inline">
                   Falta seleccionar: {missing.join(', ')}
                 </span>
               )}
-              <Button size="lg" disabled={!canProceed}>
-                <ScanLine />
-                Iniciar extracción
+              <Button
+                size="lg"
+                onClick={handleSubmit}
+                disabled={!canProceed || createBatch.isPending}
+              >
+                {createBatch.isPending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <ScanLine />
+                )}
+                {createBatch.isPending ? 'Iniciando…' : 'Iniciar extracción'}
               </Button>
             </div>
           </footer>
