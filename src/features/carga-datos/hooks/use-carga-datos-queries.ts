@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cargaDatosService } from '../services/activities-service';
-import type { CreateActivityRequest } from '../types';
+import { batchesService } from '../services/batches-service';
+import type { CreateActivityRequest, CreateBatchRequest } from '../types';
 
 export const cargaDatosKeys = {
   all: ['carga-datos'] as const,
@@ -58,5 +59,13 @@ export function useCreateActivity() {
         queryKey: cargaDatosKeys.activities(variables.program_id),
       });
     },
+  });
+}
+
+/** POST /batches/ — crea un batch de extracción con los archivos de Drive. */
+export function useCreateBatch() {
+  return useMutation({
+    mutationFn: (payload: CreateBatchRequest) =>
+      batchesService.createBatch(payload),
   });
 }

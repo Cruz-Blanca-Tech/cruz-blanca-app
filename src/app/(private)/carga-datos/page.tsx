@@ -1,5 +1,5 @@
-import { OcrUploadStep } from '@/features/carga-datos/components/ocr-upload/ocr-upload-step';
+import { OcrWizard } from '@/features/carga-datos/components/ocr-upload/ocr-wizard';
 
 export default function CargaDatosPage() {
-  return <OcrUploadStep />;
+  return <OcrWizard />;
 }
