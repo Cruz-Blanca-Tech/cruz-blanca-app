@@ -2,6 +2,7 @@ import {
   Home,
   Users,
   Upload,
+  Inbox,
   BarChart3,
   UserCog,
   type LucideIcon,
@@ -32,6 +33,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Carga de datos',
     href: '/carga-datos',
     icon: Upload,
+    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR],
+  },
+  {
+    label: 'Triaje',
+    href: '/triaje',
+    icon: Inbox,
     allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR],
   },
   {

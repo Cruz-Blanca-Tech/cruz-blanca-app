@@ -15,7 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
-import type { BatchSummary, CreateBatchResponse } from '../../types';
+import type { CreateBatchResponse } from '../../schemas/create-batch-schema';
+import type { BatchSummary } from '../../types';
 import { OcrStepper } from './ocr-stepper';
 
 interface OcrProcesandoStepProps {

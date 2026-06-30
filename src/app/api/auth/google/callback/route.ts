@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { serverEnv } from '@/lib/env.server';
 
 export async function POST(request: NextRequest) {
   try {
-    const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+    const BACKEND_BASE_URL = serverEnv.backendBaseUrl;
     if (!BACKEND_BASE_URL) {
       return NextResponse.json(
         { error: 'Configuración del backend ausente.' },

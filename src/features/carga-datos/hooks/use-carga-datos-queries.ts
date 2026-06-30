@@ -1,28 +1,21 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { intakeKeys } from '@/shared/hooks/use-intake-queries';
 import { cargaDatosService } from '../services/activities-service';
 import { batchesService } from '../services/batches-service';
 import type { CreateActivityRequest, CreateBatchRequest } from '../types';
 
+/**
+ * Query keys propias de `carga-datos`. El dominio de lectura compartido
+ * (programas y actividades) usa `intakeKeys` de `@/shared/hooks`.
+ */
 export const cargaDatosKeys = {
   all: ['carga-datos'] as const,
-  programs: ['carga-datos', 'programs'] as const,
   documentCatalog: ['carga-datos', 'document-catalog'] as const,
-  activities: (programId: string | null) =>
-    ['carga-datos', 'activities', programId] as const,
 };
 
 const FIVE_MINUTES = 1000 * 60 * 5;
-
-/** GET /programs/ con cache. */
-export function usePrograms() {
-  return useQuery({
-    queryKey: cargaDatosKeys.programs,
-    queryFn: cargaDatosService.getPrograms,
-    staleTime: FIVE_MINUTES,
-  });
-}
 
 /**
  * GET /document-catalog/ con cache.
@@ -37,17 +30,10 @@ export function useDocumentCatalog(enabled = true) {
   });
 }
 
-/** GET /activities/?program_id= con cache. */
-export function useActivities(programId: string | null, enabled = true) {
-  return useQuery({
-    queryKey: cargaDatosKeys.activities(programId),
-    queryFn: () => cargaDatosService.getActivities(programId),
-    staleTime: FIVE_MINUTES,
-    enabled,
-  });
-}
-
-/** POST /activities/ — invalida la lista de actividades del programa al crear. */
+/**
+ * POST /activities/ — invalida la lista de actividades del programa al crear.
+ * La lista vive en el dominio compartido, así que se invalida con `intakeKeys`.
+ */
 export function useCreateActivity() {
   const queryClient = useQueryClient();
 
@@ -56,7 +42,7 @@ export function useCreateActivity() {
       cargaDatosService.createActivity(payload),
     onSuccess: (_activity, variables) => {
       queryClient.invalidateQueries({
-        queryKey: cargaDatosKeys.activities(variables.program_id),
+        queryKey: intakeKeys.activities(variables.program_id),
       });
     },
   });

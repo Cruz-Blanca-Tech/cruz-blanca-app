@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { clientEnv } from '@/lib/env';
 import { useAuthStore } from '../stores/auth-store';
 
 interface GoogleCredentialResponse {
@@ -38,7 +39,7 @@ declare global {
   }
 }
 
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID = clientEnv.googleClientId;
 
 const GSI_SCRIPT_ID = 'google-identity-services-script';
 const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';

@@ -3,7 +3,8 @@
 import { useCallback, useState } from 'react';
 
 import { useCargaDatosStore } from '../../stores/carga-datos-store';
-import type { BatchSummary, CreateBatchResponse } from '../../types';
+import type { CreateBatchResponse } from '../../schemas/create-batch-schema';
+import type { BatchSummary } from '../../types';
 
 import { OcrProcesandoStep } from './ocr-procesando-step';
 import { OcrUploadStep } from './ocr-upload-step';

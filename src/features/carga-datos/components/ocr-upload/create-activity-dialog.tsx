@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import {
   Controller,
   useFieldArray,
@@ -39,18 +40,16 @@ import {
   DEFAULT_CONFIDENCE_THRESHOLD,
   type CreateActivityFormValues,
 } from '../../schemas/create-activity-schema';
+import { usePrograms } from '@/shared/hooks/use-intake-queries';
 import {
   useCreateActivity,
   useDocumentCatalog,
-  usePrograms,
 } from '../../hooks/use-carga-datos-queries';
 import { useCargaDatosStore } from '../../stores/carga-datos-store';
 import { useIsAdmin } from '@/features/auth/hooks/use-permissions';
-import type {
-  Activity,
-  CreateActivityRequest,
-  DocumentType,
-} from '../../types';
+import type { Activity } from '@/shared/schemas/activity-schema';
+import type { DocumentType } from '../../schemas/document-catalog-schema';
+import type { CreateActivityRequest } from '../../types';
 
 interface CreateActivityDialogProps {
   open: boolean;
@@ -338,12 +337,15 @@ export function CreateActivityDialog({
           </DialogHeader>
           <div className="flex max-h-[70vh] items-center justify-center bg-slate-900">
             {zoom?.previewImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- preview remoto del backend
-              <img
-                src={zoom.previewImageUrl}
-                alt={zoom.name}
-                className="max-h-[70vh] w-auto object-contain"
-              />
+              <div className="relative h-[70vh] w-full">
+                <Image
+                  src={zoom.previewImageUrl}
+                  alt={zoom.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 768px"
+                  className="object-contain"
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
                 <ImageOff className="size-8" />
@@ -421,11 +423,12 @@ function DocumentRow({
               className="relative h-11 w-9 shrink-0 overflow-hidden rounded-md border border-border bg-slate-100"
             >
               {previewImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- preview remoto del backend
-                <img
+                <Image
                   src={previewImageUrl}
                   alt={name}
-                  className="size-full object-cover object-top"
+                  fill
+                  sizes="36px"
+                  className="object-cover object-top"
                 />
               ) : (
                 <span className="flex size-full items-center justify-center text-slate-400">

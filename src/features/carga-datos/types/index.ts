@@ -1,54 +1,29 @@
 /**
- * Tipos del feature de carga de datos (OCR), alineados con el backend
+ * Tipos propios del feature de carga de datos (OCR), alineados con el backend
  * (contexto document_intake_ocr, montado en `/api/v1/intake`).
- * Endpoints: GET /programs/, GET /document-catalog/, GET/POST /activities/
+ *
+ * Aquí viven SOLO tipos puros (compile-time): las requests de ESCRITURA (crear
+ * actividad / crear lote) y los tipos de vista derivados para la UI del wizard.
+ * Son interfaces escritas a mano porque no derivan de ningún schema Zod.
+ *
+ * Los schemas Zod del feature (validación de runtime en la frontera de la API y
+ * de los formularios) viven en `../schemas`: el catálogo de documentos en
+ * `document-catalog-schema` y el batch en `create-batch-schema`. El dominio de
+ * LECTURA compartido con otros features vive en `@/shared/schemas`.
  */
 
-/** Programa institucional (GET /programs/ → ProgramResponse). */
-export interface Program {
-  id: string;
-  name: string;
-  description: string | null;
-  is_active: boolean;
-}
+import type { ActivityRequirement } from '@/shared/schemas/activity-schema';
 
 /**
- * Tipo de documento del catálogo (GET /document-catalog/ → DocumentTypeConfigResponse).
- * Su `id` es el `document_type_config_id` que se envía al crear una actividad.
+ * Body para crear una actividad (POST /activities/ → ActivityCreateRequest).
+ * Es escritura exclusiva de `carga-datos`; reutiliza `ActivityRequirement` del
+ * dominio compartido.
  */
-export interface DocumentType {
-  id: string;
-  code: string;
-  name: string;
-  year: number;
-  model_id: string;
-  version: number;
-  preview_image_url: string | null;
-  is_active: boolean;
-}
-
-/** Requisito de documento enviado al crear una actividad (ActivityRequirementRequest). */
-export interface ActivityRequirement {
-  document_type_config_id: string;
-  is_required: boolean;
-  confidence_threshold: number;
-}
-
-/** Body para crear una actividad (POST /activities/ → ActivityCreateRequest). */
 export interface CreateActivityRequest {
   name: string;
   is_active: boolean;
   program_id: string;
   requirements: ActivityRequirement[];
-}
-
-/** Actividad retornada por el backend (ActivityResponse). */
-export interface Activity {
-  id: string;
-  program_id: string;
-  name: string;
-  requirements: ActivityRequirement[];
-  is_active: boolean;
 }
 
 /**
@@ -65,22 +40,7 @@ export interface PickedFile {
 export interface CreateBatchRequest {
   activity_id: string;
   files: PickedFile[];
-}
-
-/** Archivo que el backend no pudo procesar dentro de un batch. */
-export interface BatchFailedFile {
-  file_name: string;
-  reason: string;
-}
-
-/** Respuesta de POST /api/v1/batches/. */
-export interface CreateBatchResponse {
-  batch_id: string;
-  batch_status: string;
-  total_dossiers: number;
-  total_failed_files: number;
-  failed_files: BatchFailedFile[];
-  message: string;
+  description: string;
 }
 
 /**

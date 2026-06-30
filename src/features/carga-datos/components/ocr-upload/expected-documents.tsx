@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { ImageOff, Images, Loader2, ZoomIn } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -134,11 +135,12 @@ export function ExpectedDocuments({
               )}
             >
               {doc.previewImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- preview remoto del backend
-                <img
+                <Image
                   src={doc.previewImageUrl}
                   alt={doc.name}
-                  className="size-full object-cover object-top"
+                  fill
+                  sizes="(max-width: 640px) 50vw, 200px"
+                  className="object-cover object-top"
                 />
               ) : (
                 <div className="flex size-full items-center justify-center text-slate-400">
@@ -183,12 +185,15 @@ export function ExpectedDocuments({
           </DialogHeader>
           <div className="flex max-h-[70vh] items-center justify-center bg-slate-900">
             {zoomDoc?.previewImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- preview remoto del backend
-              <img
-                src={zoomDoc.previewImageUrl}
-                alt={zoomDoc.name}
-                className="max-h-[70vh] w-auto object-contain"
-              />
+              <div className="relative h-[70vh] w-full">
+                <Image
+                  src={zoomDoc.previewImageUrl}
+                  alt={zoomDoc.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 768px"
+                  className="object-contain"
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
                 <ImageOff className="size-8" />

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import axios from 'axios';
+import { serverEnv } from '@/lib/env.server';
 
 export async function POST() {
-  const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+  const BACKEND_BASE_URL = serverEnv.backendBaseUrl;
   const cookieStore = await cookies();
   const refreshToken = cookieStore.get('refresh_token')?.value;
   const accessToken = cookieStore.get('access_token')?.value;

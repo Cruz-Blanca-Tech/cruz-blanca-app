@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { AlertCircle, FileText, FolderOpen, Loader2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { clientEnv } from '@/lib/env';
 import { cn } from '@/lib/utils';
 import type {
   GapiApi,
@@ -13,8 +14,8 @@ import type {
 } from '@/types/google-picker';
 import type { PickedFile } from '../../types';
 
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+const GOOGLE_CLIENT_ID = clientEnv.googleClientId;
+const GOOGLE_API_KEY = clientEnv.googleApiKey;
 
 /** Drive completo del usuario en modo lectura: suficiente para navegar y elegir. */
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';

@@ -14,6 +14,7 @@ export const activityDocumentSchema = z.object({
     .max(1, 'El umbral debe ser menor o igual a 1.'),
 });
 
+/** Esquema de validacion de input del usuario en creacion de actividad */
 export const createActivitySchema = z
   .object({
     name: z
