@@ -13,14 +13,21 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
-import { usePrograms, useActivities } from '../../hooks/use-carga-datos-queries';
+import { usePrograms, useActivities } from '@/shared/hooks/use-intake-queries';
 import { useCargaDatosStore } from '../../stores/carga-datos-store';
 import { useIsAdmin } from '@/features/auth/hooks/use-permissions';
 import { CreateActivityDialog } from './create-activity-dialog';
-import type { Activity } from '../../types';
+import type { Activity } from '@/shared/schemas/activity-schema';
 
 /** Valor sentinela para la opción "crear actividad" dentro del select. */
 const CREATE_ACTIVITY_VALUE = '__create_activity__';
+
+/**
+ * Flag temporal: oculta la opción de crear actividad dentro del select.
+ * Se implementará más adelante; mientras tanto la lógica (sentinela, diálogo,
+ * permisos) se conserva intacta detrás de este flag.
+ */
+const SHOW_CREATE_ACTIVITY = false;
 
 export function ProgramActivityStep() {
   const isAdmin = useIsAdmin();
@@ -133,7 +140,7 @@ export function ProgramActivityStep() {
                 {activity.name}
               </SelectItem>
             ))}
-            {isAdmin && (
+            {SHOW_CREATE_ACTIVITY && isAdmin && (
               <>
                 {(activities.data?.length ?? 0) > 0 && <SelectSeparator />}
                 <SelectItem value={CREATE_ACTIVITY_VALUE} className="text-primary">
@@ -153,7 +160,7 @@ export function ProgramActivityStep() {
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             {activities.isFetching && <Loader2 className="size-3 animate-spin" />}
             No hay actividades para este programa.
-            {isAdmin && ' Crea una nueva desde el menú.'}
+            {SHOW_CREATE_ACTIVITY && isAdmin && ' Crea una nueva desde el menú.'}
           </p>
         )}
       </div>

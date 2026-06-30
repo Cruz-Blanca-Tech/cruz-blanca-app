@@ -23,6 +23,10 @@ export const PRIVATE_ROUTES: RouteAccess[] = [
     allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR],
   },
   {
+    prefix: '/triaje',
+    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR],
+  },
+  {
     prefix: '/reportes',
     allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR, ROLES.VISUALIZADOR],
   },

@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    // El proxy de previews de Drive (`/api/drive-image`) recibe query dinámica
+    // (`?id=...&sz=...`). Next 16 bloquea imágenes locales con query string salvo
+    // que estén en esta allowlist. Omitimos `search` porque los params varían; la
+    // validación anti-SSRF vive en el propio route handler (regex sobre id/sz).
+    localPatterns: [{ pathname: '/api/drive-image' }],
+  },
 };
 
 export default nextConfig;

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { apiClient } from '@/lib/api-client';
-import type { AuthUser } from '../types';
+import { parseApiResponse } from '@/lib/parse-api-response';
+import { authUserSchema, type AuthUser } from '../types';
 
 const authAxios = axios.create({
   baseURL: '/api/auth',
@@ -18,6 +19,7 @@ export const authService = {
   },
 
   async getCurrentUser(): Promise<AuthUser> {
-    return apiClient.get<AuthUser>('/auth/users/me');
+    const data = await apiClient.get('/auth/users/me');
+    return parseApiResponse(authUserSchema, data, 'el usuario autenticado');
   },
 };

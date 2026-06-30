@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { id: 'inicio',        label: 'Inicio',          icon: 'home' },
   { id: 'beneficiarios', label: 'Beneficiarios',   icon: 'users' },
   { id: 'carga',         label: 'Carga de datos',  icon: 'upload-cloud', href: 'OCR Paso 1.html' },
+  { id: 'triaje',        label: 'Triaje',          icon: 'inbox', href: 'TriajeLotes.html' },
   { id: 'reportes',      label: 'Reportes',        icon: 'file-text' },
   { id: 'usuarios',      label: 'Usuarios',        icon: 'user-cog' },
 ];
@@ -115,6 +116,138 @@ function Card({ children, style = {}, padding = 20 }) {
   return <div style={{ background: 'white', borderRadius: 8, border: `1px solid ${CB_COLORS.border}`, boxShadow: '0 1px 3px rgba(12,82,155,0.08)', padding, ...style }}>{children}</div>;
 }
 
+function CancelarLoteButton({ loteLabel = 'este lote', returnHref = 'TriajeLotes.html' }) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <React.Fragment>
+      <button onClick={() => setOpen(true)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+        borderRadius: 6, border: `1.5px solid ${CB_COLORS.error}`, background: 'white',
+        fontFamily: "'Alegreya Sans', serif", fontSize: 13, fontWeight: 500, color: CB_COLORS.errorDark,
+        cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .15s',
+      }}
+        onMouseEnter={e => e.currentTarget.style.background = CB_COLORS.errorLight}
+        onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+        <Icon name="ban" size={13} color={CB_COLORS.errorDark} />
+        Rechazar lote
+      </button>
+
+      {open && (
+        <div onClick={() => setOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(1px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: 440, maxWidth: '100%', background: 'white', borderRadius: 12,
+            boxShadow: '0 20px 60px rgba(15,23,42,0.3)', overflow: 'hidden',
+          }}>
+            <div style={{ padding: '24px 24px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: CB_COLORS.errorLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="ban" size={20} color={CB_COLORS.errorDark} />
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Alegreya Sans SC', serif", fontSize: 19, fontWeight: 700, color: CB_COLORS.textPrimary }}>Rechazar todo el lote</div>
+                <div style={{ fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, color: CB_COLORS.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                  Se descartarán todos los registros de {loteLabel} y el lote quedará marcado como <strong style={{ color: CB_COLORS.errorDark }}>rechazado</strong>. Esta acción no se puede deshacer.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 24px', background: '#FAFBFC', borderTop: `1px solid ${CB_COLORS.border}`, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button onClick={() => setOpen(false)} style={{
+                padding: '9px 16px', borderRadius: 6, border: `1px solid ${CB_COLORS.border}`,
+                background: 'white', fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, color: CB_COLORS.textSecondary, cursor: 'pointer',
+              }}>
+                Volver
+              </button>
+              <button onClick={() => { window.location.href = returnHref; }} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 6, border: 'none',
+                background: CB_COLORS.error, color: 'white',
+                fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, fontWeight: 500,
+                cursor: 'pointer', transition: 'opacity .15s',
+              }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '.88'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                <Icon name="ban" size={13} color="white" />
+                Sí, rechazar lote
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+function RechazarExpedienteButton({ returnHref = 'TriajeDetalleLote.html', label = 'Rechazar expediente' }) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <React.Fragment>
+      <button onClick={() => setOpen(true)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px',
+        borderRadius: 6, border: `1.5px solid ${CB_COLORS.error}`, background: 'white',
+        fontFamily: "'Alegreya Sans', serif", fontSize: 13, fontWeight: 500, color: CB_COLORS.errorDark,
+        cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background .15s',
+      }}
+        onMouseEnter={e => e.currentTarget.style.background = CB_COLORS.errorLight}
+        onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+        <Icon name="x-circle" size={13} color={CB_COLORS.errorDark} />
+        {label}
+      </button>
+
+      {open && (
+        <div onClick={() => setOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(1px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: 440, maxWidth: '100%', background: 'white', borderRadius: 12,
+            boxShadow: '0 20px 60px rgba(15,23,42,0.3)', overflow: 'hidden',
+          }}>
+            <div style={{ padding: '24px 24px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: CB_COLORS.errorLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="x-circle" size={20} color={CB_COLORS.errorDark} />
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Alegreya Sans SC', serif", fontSize: 19, fontWeight: 700, color: CB_COLORS.textPrimary }}>Rechazar expediente</div>
+                <div style={{ fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, color: CB_COLORS.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                  El expediente se marcará como <strong style={{ color: CB_COLORS.errorDark }}>rechazado</strong> y no se incluirá en la aprobación del lote. Podrás reabrirlo desde el detalle del lote.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 24px', background: '#FAFBFC', borderTop: `1px solid ${CB_COLORS.border}`, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button onClick={() => setOpen(false)} style={{
+                padding: '9px 16px', borderRadius: 6, border: `1px solid ${CB_COLORS.border}`,
+                background: 'white', fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, color: CB_COLORS.textSecondary, cursor: 'pointer',
+              }}>
+                Volver
+              </button>
+              <button onClick={() => { window.location.href = returnHref; }} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 6, border: 'none',
+                background: CB_COLORS.error, color: 'white',
+                fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, fontWeight: 500,
+                cursor: 'pointer', transition: 'opacity .15s',
+              }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '.88'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                <Icon name="x-circle" size={13} color="white" />
+                Sí, rechazar expediente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
 function Sidebar({ active, onNavigate, user }) {
   return (
     <div style={layoutStyles.sidebar}>
@@ -181,4 +314,4 @@ function AppShell({ active, onNavigate, children, title, subtitle, topActions, u
   );
 }
 
-Object.assign(window, { CB_COLORS, PROGRAMS, Icon, Badge, Btn, Card, AppShell, Sidebar, Topbar });
+Object.assign(window, { CB_COLORS, PROGRAMS, Icon, Badge, Btn, Card, CancelarLoteButton, RechazarExpedienteButton, AppShell, Sidebar, Topbar });

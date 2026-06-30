@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios, { AxiosRequestConfig } from 'axios';
 import { cookies } from 'next/headers';
+import { serverEnv } from '@/lib/env.server';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -47,7 +48,7 @@ async function handleRequest(
   method: Method
 ) {
   try {
-    const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+    const BACKEND_BASE_URL = serverEnv.backendBaseUrl;
 
     if (!BACKEND_BASE_URL) {
       return NextResponse.json(
