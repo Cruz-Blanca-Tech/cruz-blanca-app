@@ -22,12 +22,18 @@ export const triajeKeys = {
 const FIVE_MINUTES = 1000 * 60 * 5;
 const THIRTY_SECONDS = 1000 * 30;
 
-/** GET /batches/summary con cache — totales por estado para las cards. */
+/**
+ * GET /batches/summary — totales por estado para las cards. Se refresca cada
+ * 30 s (como la tabla) para que los KPIs reflejen la cola en vivo; el
+ * `refetchInterval` dispara aunque la data esté "fresca", así que `staleTime`
+ * solo evita refetches extra al remontar o recuperar el foco entre intervalos.
+ */
 export function useBatchesSummary(filters?: BatchesSummaryFilters) {
   return useQuery({
     queryKey: triajeKeys.summary(filters ?? {}),
     queryFn: () => triajeBatchesService.getBatchesSummary(filters),
     staleTime: FIVE_MINUTES,
+    refetchInterval: THIRTY_SECONDS,
   });
 }
 
