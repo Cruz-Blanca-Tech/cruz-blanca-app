@@ -16,8 +16,6 @@ const count = z.number().int().nonnegative();
 
 export const batchesSummarySchema = z.object({
   total_batches: count,
-  // Clave enum → Zod 4 exige todas las claves de `BatchStatus` (record exhaustivo),
-  // que es justo lo que el backend garantiza al inicializarlas a 0.
   statuses: z.record(batchStatusSchema, count),
 });
 

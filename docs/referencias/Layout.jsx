@@ -116,8 +116,33 @@ function Card({ children, style = {}, padding = 20 }) {
   return <div style={{ background: 'white', borderRadius: 8, border: `1px solid ${CB_COLORS.border}`, boxShadow: '0 1px 3px rgba(12,82,155,0.08)', padding, ...style }}>{children}</div>;
 }
 
+function MotivoRechazo({ motivo, setMotivo }) {
+  return (
+    <div style={{ padding: '0 24px 4px' }}>
+      <div style={{ fontFamily: "'Alegreya Sans', serif", fontSize: 13, fontWeight: 600, color: CB_COLORS.textSecondary, marginBottom: 8 }}>
+        Motivo del rechazo <span style={{ color: CB_COLORS.errorDark }}>*</span>
+      </div>
+      <textarea
+        value={motivo}
+        onChange={e => setMotivo(e.target.value)}
+        placeholder="Describe el motivo del rechazo…"
+        rows={3}
+        style={{
+          width: '100%', boxSizing: 'border-box', resize: 'vertical',
+          padding: '9px 11px', borderRadius: 7, border: `1px solid ${CB_COLORS.border}`,
+          fontFamily: "'Alegreya Sans', serif", fontSize: 13, color: CB_COLORS.textPrimary,
+          outline: 'none', lineHeight: 1.45,
+        }}
+        onFocus={e => e.currentTarget.style.borderColor = CB_COLORS.primary}
+        onBlur={e => e.currentTarget.style.borderColor = CB_COLORS.border}
+      />
+    </div>
+  );
+}
+
 function CancelarLoteButton({ loteLabel = 'este lote', returnHref = 'TriajeLotes.html' }) {
   const [open, setOpen] = React.useState(false);
+  const [motivo, setMotivo] = React.useState('');
 
   return (
     <React.Fragment>
@@ -155,6 +180,8 @@ function CancelarLoteButton({ loteLabel = 'este lote', returnHref = 'TriajeLotes
               </div>
             </div>
 
+            <MotivoRechazo motivo={motivo} setMotivo={setMotivo} />
+
             <div style={{ padding: '14px 24px', background: '#FAFBFC', borderTop: `1px solid ${CB_COLORS.border}`, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button onClick={() => setOpen(false)} style={{
                 padding: '9px 16px', borderRadius: 6, border: `1px solid ${CB_COLORS.border}`,
@@ -162,15 +189,15 @@ function CancelarLoteButton({ loteLabel = 'este lote', returnHref = 'TriajeLotes
               }}>
                 Volver
               </button>
-              <button onClick={() => { window.location.href = returnHref; }} style={{
+              <button disabled={!motivo} onClick={() => { if (motivo) window.location.href = returnHref; }} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '9px 16px', borderRadius: 6, border: 'none',
                 background: CB_COLORS.error, color: 'white',
                 fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, fontWeight: 500,
-                cursor: 'pointer', transition: 'opacity .15s',
+                cursor: motivo ? 'pointer' : 'not-allowed', opacity: motivo ? 1 : 0.5, transition: 'opacity .15s',
               }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '.88'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                onMouseEnter={e => { if (motivo) e.currentTarget.style.opacity = '.88'; }}
+                onMouseLeave={e => { if (motivo) e.currentTarget.style.opacity = '1'; }}>
                 <Icon name="ban" size={13} color="white" />
                 Sí, rechazar lote
               </button>
@@ -184,6 +211,7 @@ function CancelarLoteButton({ loteLabel = 'este lote', returnHref = 'TriajeLotes
 
 function RechazarExpedienteButton({ returnHref = 'TriajeDetalleLote.html', label = 'Rechazar expediente' }) {
   const [open, setOpen] = React.useState(false);
+  const [motivo, setMotivo] = React.useState('');
 
   return (
     <React.Fragment>
@@ -221,6 +249,8 @@ function RechazarExpedienteButton({ returnHref = 'TriajeDetalleLote.html', label
               </div>
             </div>
 
+            <MotivoRechazo motivo={motivo} setMotivo={setMotivo} />
+
             <div style={{ padding: '14px 24px', background: '#FAFBFC', borderTop: `1px solid ${CB_COLORS.border}`, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button onClick={() => setOpen(false)} style={{
                 padding: '9px 16px', borderRadius: 6, border: `1px solid ${CB_COLORS.border}`,
@@ -228,15 +258,15 @@ function RechazarExpedienteButton({ returnHref = 'TriajeDetalleLote.html', label
               }}>
                 Volver
               </button>
-              <button onClick={() => { window.location.href = returnHref; }} style={{
+              <button disabled={!motivo} onClick={() => { if (motivo) window.location.href = returnHref; }} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '9px 16px', borderRadius: 6, border: 'none',
                 background: CB_COLORS.error, color: 'white',
                 fontFamily: "'Alegreya Sans', serif", fontSize: 13.5, fontWeight: 500,
-                cursor: 'pointer', transition: 'opacity .15s',
+                cursor: motivo ? 'pointer' : 'not-allowed', opacity: motivo ? 1 : 0.5, transition: 'opacity .15s',
               }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '.88'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                onMouseEnter={e => { if (motivo) e.currentTarget.style.opacity = '.88'; }}
+                onMouseLeave={e => { if (motivo) e.currentTarget.style.opacity = '1'; }}>
                 <Icon name="x-circle" size={13} color="white" />
                 Sí, rechazar expediente
               </button>

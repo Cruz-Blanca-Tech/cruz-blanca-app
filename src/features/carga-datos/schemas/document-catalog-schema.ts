@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { toDriveThumbnailUrl } from '../lib/drive-image';
+import { toDriveThumbnailUrl } from '@/lib/drive-image';
 
 /**
  * Tipo de documento del catálogo (GET /document-catalog/ → DocumentTypeConfigResponse).
