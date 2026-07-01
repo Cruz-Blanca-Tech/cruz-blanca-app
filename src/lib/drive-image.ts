@@ -1,5 +1,5 @@
 /**
- * Normaliza una URL de Google Drive para poder embeberla en un `<img>`.
+ * Normaliza una URL de Google Drive para poder embeberla en un `<img>`/`<Image>`.
  *
  * Embeber Drive directamente falla: `uc?export=view` responde 403 y el endpoint
  * `thumbnail` / `lh3.googleusercontent.com` es throttleado por Google con 429 al
@@ -7,6 +7,9 @@
  * (`/api/drive-image`), que baja la imagen del lado del servidor y la cachea.
  *
  * Si no se reconoce un file id de Drive, se devuelve la URL original intacta.
+ *
+ * Vive en `src/lib` (ubicación neutra) porque lo consumen dos features:
+ * `carga-datos` (catálogo de documentos) y `triaje` (visor de la corrección).
  */
 const DRIVE_ID_PATTERNS: RegExp[] = [
   /[?&]id=([\w-]+)/, // uc?export=view&id=ID  ·  thumbnail?id=ID

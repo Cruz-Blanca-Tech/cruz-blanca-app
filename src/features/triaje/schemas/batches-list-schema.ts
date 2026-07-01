@@ -11,18 +11,17 @@
  */
 import { z } from 'zod';
 import { batchStatusSchema } from './batch-status-schema';
+// Resumen de triaje extraído a su propio archivo: lo comparten este listado y el
+// detalle del lote. Se re-exporta para no romper a quien lo importa desde aquí.
+import {
+  batchTriageSummarySchema,
+  type BatchTriageSummary,
+} from './triage-summary-schema';
+
+export { batchTriageSummarySchema };
+export type { BatchTriageSummary };
 
 const count = z.number().int().nonnegative();
-
-/** Resumen de triaje embebido en cada lote. */
-export const batchTriageSummarySchema = z.object({
-  total_cases: count,
-  // Conteo por veredicto de triaje (claves = `TriageVerdict.name`). Las claves
-  // varían y en el fallback del backend puede venir `{}`, por eso es un record
-  // ABIERTO string→número y NO un enum exhaustivo (un enum fallaría con `{}`).
-  verdicts: z.record(z.string(), count),
-});
-export type BatchTriageSummary = z.infer<typeof batchTriageSummarySchema>;
 
 /** Lote tal como lo devuelve el listado. */
 export const batchListItemSchema = z.object({

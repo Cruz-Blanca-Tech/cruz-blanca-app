@@ -22,4 +22,22 @@ export const API_PATHS = {
    * statuses, listado), por eso se centraliza aquí en vez de repetir el literal.
    */
   batches: '/api/v1/intake/api/v1/batches',
+  /**
+   * Detalle de un lote en el contexto de Triaje (casos del lote, aprobación y
+   * rechazo masivos). OJO: aquí el prefijo es SIMPLE (`/api/v1/triage/batch`),
+   * a diferencia del doble `/api/v1` de `batches`. El `batch_router` del triaje
+   * (`APIRouter(prefix="/batch")`, singular) se incluye SIN prefijo extra en el
+   * `triage_app`, que se monta en `{API_V1_STR}/triage` (ver src/main.py:103 y
+   * data_quality_triage/presentation/api/routes.py). Lo consume `triaje`.
+   */
+  batch: '/api/v1/triage/batch',
+  /**
+   * Corrección de un expediente EDUCA en el contexto de Triaje (lectura del
+   * expediente, guardado de correcciones y rechazo). Prefijo SIMPLE, igual que
+   * `batch`: el `educa_router` (`APIRouter(prefix="/educa")`) se incluye SIN
+   * prefijo extra en el `triage_app`, montado en `{API_V1_STR}/triage` (ver
+   * src/main.py:103, data_quality_triage/presentation/api/__init__.py:15 y
+   * educa_router.py:20). Lo consume la pantalla TriajeCorreccion.
+   */
+  educa: '/api/v1/triage/educa',
 } as const;

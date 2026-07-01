@@ -1,22 +1,19 @@
 'use client';
 
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Check, Clock, Loader2, PencilLine, RefreshCw, XCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import type { BatchStatus } from '../schemas/batch-status-schema';
 
 interface BatchRowActionProps {
+  /** Id del lote, para navegar a su detalle (/triaje/[batchId]). */
+  batchId: string;
   status: BatchStatus;
   /** Expedientes que requieren triaje (REQUIRES_TRIAGE), para el contador del botón. */
   pendingReviewCount: number;
-}
-
-// TODO: la pantalla de detalle del lote aún no existe. "Revisar"/"Revisado"
-// navegarán a `/triaje/[batchId]` cuando esté disponible.
-function notifyDetailComingSoon() {
-  toast.info('La pantalla de detalle del lote estará disponible próximamente.');
 }
 
 // TODO: el endpoint de reintento de OCR aún no existe. Reemplazar por la mutación
@@ -26,11 +23,18 @@ function notifyRetryComingSoon() {
 }
 
 /** Acción de la fila según el estado del lote (réplica visual del mockup). */
-export function BatchRowAction({ status, pendingReviewCount }: BatchRowActionProps) {
+export function BatchRowAction({
+  batchId,
+  status,
+  pendingReviewCount,
+}: BatchRowActionProps) {
   switch (status) {
     case 'COMPLETED':
       return (
-        <Button size="sm" onClick={notifyDetailComingSoon}>
+        <Link
+          href={`/triaje/${batchId}`}
+          className={cn(buttonVariants({ size: 'sm' }))}
+        >
           <PencilLine />
           Revisar
           {pendingReviewCount > 0 && (
@@ -38,19 +42,21 @@ export function BatchRowAction({ status, pendingReviewCount }: BatchRowActionPro
               {pendingReviewCount}
             </span>
           )}
-        </Button>
+        </Link>
       );
 
     case 'FINALIZED':
       return (
-        <Button
-          size="sm"
-          onClick={notifyDetailComingSoon}
-          className="bg-success-light text-success-dark hover:bg-success-light/80"
+        <Link
+          href={`/triaje/${batchId}`}
+          className={cn(
+            buttonVariants({ size: 'sm' }),
+            'bg-success-light text-success-dark hover:bg-success-light/80'
+          )}
         >
           <Check />
           Revisado
-        </Button>
+        </Link>
       );
 
     case 'REJECTED':

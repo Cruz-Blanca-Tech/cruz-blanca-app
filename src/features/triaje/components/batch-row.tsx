@@ -69,6 +69,7 @@ export function BatchRow({ batch }: BatchRowProps) {
 
       <TableCell className="px-4 py-3.5 text-right align-middle">
         <BatchRowAction
+          batchId={batch.id}
           status={batch.status}
           pendingReviewCount={pendingReviewCount}
         />

@@ -69,3 +69,24 @@ export const TRIAGE_VERDICT_CONFIG: Record<TriageVerdictKey, TriageVerdictConfig
 
 export const TRIAGE_VERDICT_LIST: TriageVerdictConfig[] =
   TRIAGE_VERDICT_KEYS.map((key) => TRIAGE_VERDICT_CONFIG[key]);
+
+/** Veredictos que cuentan como "aprobado" (suman al botón del footer del detalle). */
+export const APPROVED_VERDICT_KEYS = [
+  'AUTO_APPROVED',
+  'MANUALLY_APPROVED',
+] as const satisfies readonly TriageVerdictKey[];
+
+function isVerdictKey(verdict: string): verdict is TriageVerdictKey {
+  return verdict in TRIAGE_VERDICT_CONFIG;
+}
+
+/**
+ * Resuelve la config de un veredicto que llega como string plano del backend
+ * (`verdict` del expediente). Devuelve `undefined` ante un veredicto nuevo o
+ * desconocido para que la UI use un tratamiento neutro y no rompa.
+ */
+export function getVerdictConfig(
+  verdict: string
+): TriageVerdictConfig | undefined {
+  return isVerdictKey(verdict) ? TRIAGE_VERDICT_CONFIG[verdict] : undefined;
+}

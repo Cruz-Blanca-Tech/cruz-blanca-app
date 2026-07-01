@@ -11,7 +11,9 @@ import {
 } from '../schemas/batch-status-schema';
 import {
   batchesListSchema,
+  batchListItemSchema,
   type BatchesList,
+  type BatchListItem,
 } from '../schemas/batches-list-schema';
 
 /**
@@ -77,5 +79,16 @@ export const triajeBatchesService = {
       params: Object.keys(params).length > 0 ? params : undefined,
     });
     return parseApiResponse(batchesListSchema, data, 'el listado de lotes');
+  },
+
+  /**
+   * GET /batches/{batchId} — metadata de un lote individual (para el header del
+   * detalle de triaje). Devuelve un elemento con la misma forma que cada item
+   * del listado (`BatchItemSchema` del backend), así que se valida con el mismo
+   * `batchListItemSchema`; sin body, solo el `batchId`.
+   */
+  async getBatch(batchId: string): Promise<BatchListItem> {
+    const data = await apiClient.get(`${API_PATHS.batches}/${batchId}`);
+    return parseApiResponse(batchListItemSchema, data, 'el lote');
   },
 };
