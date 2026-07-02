@@ -13,6 +13,7 @@ import type { TriageDiscrepancy } from '../schemas/triage-discrepancy-schema';
 import {
   relationshipLabel,
   resolveAdultIndices,
+  type AdultFormValue,
   type CorrectionGroup,
 } from './correction-form';
 
@@ -37,6 +38,13 @@ export const DISEASE_OPTIONS = [
 export interface SelectOption {
   value: string;
   label: string;
+  /**
+   * Texto a mostrar en el trigger cuando la opción está seleccionada, si debe
+   * diferir del `label` del listado (p. ej. el listado muestra el DNI para
+   * desambiguar, pero el trigger solo el nombre y el rol). Si se omite, el
+   * trigger usa `label`.
+   */
+  triggerLabel?: string;
 }
 
 export type FieldControl =
@@ -70,26 +78,57 @@ export interface CorrectionFieldDescriptor {
   placeholder?: string;
   /** Solo lectura (derivado de UI, no se envía). `age` = edad desde birth_date. */
   derive?: 'age';
+  /**
+   * Selector cuyas opciones son los adultos registrados (apoderado / contacto de
+   * emergencia). Las opciones NO se fijan aquí: se construyen en vivo desde los
+   * valores del formulario (`buildAdultRefOptions`), y el valor es el ÍNDICE del
+   * adulto, no su DNI, para que la referencia sobreviva a correcciones del DNI
+   * (el DNI se resuelve al guardar, ver `formValuesToDossier`).
+   */
+  adultRefSelect?: boolean;
   matchFieldNames?: string[];
   matchDocCodes?: string[];
+}
+
+/**
+ * Opciones de los selectores de rol (apoderado / contacto de emergencia) a partir
+ * de los adultos VIVOS del formulario. El `value` es el índice del adulto (estable
+ * ante correcciones del DNI); el listado muestra `nombre · rol — DNI` y el trigger
+ * solo `nombre · rol`. Se deduplica por DNI (mismo DNI = misma persona) quedándose
+ * con la primera aparición, consistente con el `findIndex` de `dossierToFormValues`.
+ */
+export function buildAdultRefOptions(adults: AdultFormValue[]): SelectOption[] {
+  const options: SelectOption[] = [];
+  const seenDni = new Set<string>();
+  adults.forEach((a, i) => {
+    const dni = a.dni.trim();
+    if (!dni || seenDni.has(dni)) return;
+    seenDni.add(dni);
+    const nameRole = `${a.full_name.trim() || 'Sin nombre'} · ${relationshipLabel(a.relationship)}`;
+    options.push({ value: String(i), label: `${nameRole} — ${dni}`, triggerLabel: nameRole });
+  });
+  return options;
 }
 
 /** Construye los descriptores a partir del expediente (indices de adultos incl.). */
 export function buildCorrectionFields(
   caseData: EducaCase
 ): CorrectionFieldDescriptor[] {
-  const { father, mother, guardian } = resolveAdultIndices(caseData);
+  const { father, mother } = resolveAdultIndices(caseData);
   const adults = caseData.dossier_data.related_adults.adults;
-  const guardianAdult = guardian >= 0 ? adults[guardian] : undefined;
-  const guardianNote = guardianAdult
-    ? `Apoderado de registro · ${relationshipLabel(guardianAdult.relationship)}`
-    : undefined;
 
-  // Los ids de campo son estables por grupo (`padre.*`, `madre.*`, `apoderado.*`),
-  // mientras que la ruta RHF (`name`) apunta al índice real del adulto en el
-  // array. Así, cuando el apoderado ES el padre o la madre (guardian_dni coincide),
-  // ambos grupos editan el MISMO adulto (sincronizado por `name`) sin colisionar
-  // en el `id` (que se usa para refs, saltos, conteos y estado de validación).
+  // Adultos que NO son padre ni madre (tutores, terceros): al pasar el apoderado
+  // a ser un rol asignable (y no una pestaña con sus campos), estos adultos
+  // perderían su única superficie de edición. Se editan aquí, en la pestaña
+  // Apoderado, para no perder esa capacidad.
+  const otherAdultIndices = adults
+    .map((_, i) => i)
+    .filter((i) => i !== father && i !== mother);
+
+  // El `id` de cada campo es estable por grupo (`padre.*`, `madre.*`, `otro-N.*`)
+  // y se usa para refs, saltos, conteos y estado de validación; la ruta RHF
+  // (`name`) apunta al índice real del adulto en `adults`. Se separan porque el
+  // `id` debe ser único/estable mientras que el `name` debe apuntar al dato editado.
   const adultFields = (
     index: number,
     group: CorrectionGroup,
@@ -383,21 +422,54 @@ export function buildCorrectionFields(
       dni: 'DNI de la madre',
       phone: 'Teléfono de la madre',
     }),
-    ...adultFields(
-      guardian,
-      'Apoderado',
-      'apoderado',
-      {
-        name: 'Nombre del apoderado',
-        dni: 'DNI del apoderado',
-        phone: 'Teléfono del apoderado',
-      },
-      {
-        phoneEmergency: true,
-        phoneMatchFieldNames: ['related_adults.phone'],
-        nameNote: guardianNote,
-      }
-    ),
+    // Apoderado y contacto de emergencia: roles asignables a un adulto registrado.
+    // El valor es el ÍNDICE del adulto (no su DNI); las opciones se construyen en
+    // vivo (`adultRefSelect`) desde el form, y el DNI se resuelve al guardar. Así,
+    // si corriges el DNI de un adulto y luego lo eliges, se manda el DNI corregido.
+    {
+      id: 'apoderado.guardian_dni',
+      name: 'guardian_ref',
+      label: 'Apoderado',
+      group: 'Apoderado',
+      control: 'select',
+      adultRefSelect: true,
+      matchFieldNames: ['related_adults.guardian_dni'],
+      note: 'Elige cuál de los adultos registrados es el apoderado.',
+    },
+    {
+      id: 'apoderado.emergency_contact_dni',
+      name: 'emergency_contact_ref',
+      label: 'Contacto de emergencia',
+      group: 'Apoderado',
+      control: 'select',
+      adultRefSelect: true,
+      emergency: true,
+      emptyOk: true,
+      // El backend emite la discrepancia de dominio sobre `emergency_contact_dni`
+      // (no sobre el teléfono): así el ERROR "no se pudo asignar contacto de
+      // emergencia" se enlaza a este selector y salta/cuenta correctamente.
+      matchFieldNames: ['related_adults.emergency_contact_dni'],
+      note: 'Elige el adulto al que llamar ante una emergencia.',
+    },
+    // Pestaña "Otro": datos editables de los adultos que no son padre ni madre
+    // (el apoderado escaneado por OCR con rol OTHER, tutores, etc.). Tienen su
+    // propia pestaña —como Padre/Madre—, y siguen apareciendo como opción en los
+    // selectores de apoderado / contacto de emergencia. Si no hay ninguno, se
+    // muestra "No registrado" (mismo fallback que Padre/Madre).
+    ...(otherAdultIndices.length > 0
+      ? otherAdultIndices.flatMap((index, n) => {
+          const roleLabel = relationshipLabel(adults[index].relationship);
+          return adultFields(index, 'Otro', `otro-${n}`, {
+            name: `Nombre (${roleLabel})`,
+            dni: `DNI (${roleLabel})`,
+            phone: `Teléfono (${roleLabel})`,
+          });
+        })
+      : adultFields(-1, 'Otro', 'otro', {
+          name: 'Nombre del adulto',
+          dni: 'DNI del adulto',
+          phone: 'Teléfono del adulto',
+        })),
   ];
 }
 

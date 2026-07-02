@@ -40,4 +40,12 @@ export const API_PATHS = {
    * educa_router.py:20). Lo consume la pantalla TriajeCorreccion.
    */
   educa: '/api/v1/triage/educa',
+  /**
+   * Contexto Core Beneficiary Management (MDM — Master Data Management).
+   * El `beneficiary_router` (`APIRouter(prefix="/beneficiaries")`) se incluye SIN
+   * prefijo extra en el `beneficiary_app`, que se monta en `{API_V1_STR}/mdm`
+   * (ver src/main.py:104, core_beneficiary_management/presentation/api/routes.py:24
+   * y beneficiary_router.py:16). Prefijo SIMPLE. Lo consume el feature `beneficiarios`.
+   */
+  beneficiaries: '/api/v1/mdm/beneficiaries',
 } as const;
