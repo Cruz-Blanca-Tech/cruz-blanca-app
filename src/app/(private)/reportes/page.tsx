@@ -1,9 +1,6 @@
+import { ReportesScreen } from '@/features/reportes/components/reportes-screen';
+
+/** Ruta /reportes: server component mínimo que monta la pantalla de reportes. */
 export default function ReportesPage() {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <h1 className="text-4xl font-semibold tracking-tight text-zinc-900">
-        Reportes
-      </h1>
-    </div>
-  );
+  return <ReportesScreen />;
 }

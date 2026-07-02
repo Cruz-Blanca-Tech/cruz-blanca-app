@@ -48,4 +48,21 @@ export const API_PATHS = {
    * y beneficiary_router.py:16). Prefijo SIMPLE. Lo consume el feature `beneficiarios`.
    */
   beneficiaries: '/api/v1/mdm/beneficiaries',
+  /**
+   * Contexto Reporting & Analytics. El `reporting_app` se monta en
+   * `{API_V1_STR}/reporting` (ver src/main.py), y sus routers (`operations`,
+   * `demographics`) se incluyen SIN prefijo extra, así que las rutas reales son
+   * la composición `/api/v1/reporting/<router>/<métrica>`. Prefijo SIMPLE. Lo
+   * consume el feature `dashboard` (las 5 métricas de analítica). Los `/exports/*`
+   * (feature `reportes`) NO pasan por aquí.
+   */
+  reporting: '/api/v1/reporting',
+  /**
+   * Gestión de usuarios (contexto de seguridad/autenticación). El `security_app`
+   * se monta en `/auth` y el `user_router` (`APIRouter(prefix="/users")`) se
+   * incluye SIN prefijo extra, así que la ruta real es la composición
+   * `/auth/users`. Prefijo SIMPLE. Lo consume el feature `usuarios` (listado en
+   * `GET /auth/users/` y cambio de rol en `PATCH /auth/users/{id}/role`).
+   */
+  users: '/auth/users',
 } as const;
