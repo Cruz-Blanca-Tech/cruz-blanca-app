@@ -22,6 +22,7 @@ export const CORRECTION_GROUPS = [
   'Religión y permisos',
   'Padre',
   'Madre',
+  'Otro',
   'Apoderado',
 ] as const;
 export type CorrectionGroup = (typeof CORRECTION_GROUPS)[number];
@@ -76,7 +77,15 @@ export interface CorrectionFormValues {
     medical_exams_permission: boolean | null;
   };
   adults: AdultFormValue[];
-  guardian_dni: string;
+  /**
+   * ÍNDICE (como string) del adulto asignado como apoderado dentro de `adults`, o
+   * '' si ninguno. Se referencia por índice —no por DNI— para que la asignación
+   * sobreviva a correcciones del DNI; el DNI (`guardian_dni`) se resuelve al
+   * guardar leyendo `adults[índice].dni` vivo (ver `formValuesToDossier`).
+   */
+  guardian_ref: string;
+  /** Índice (como string) del adulto asignado como contacto de emergencia, o ''. */
+  emergency_contact_ref: string;
 }
 
 const s = (v: string | null | undefined): string => v ?? '';
@@ -84,6 +93,32 @@ const s = (v: string | null | undefined): string => v ?? '';
 const emptyToNull = (v: string): string | null => {
   const t = v.trim();
   return t.length ? t : null;
+};
+
+/**
+ * DNI (guardado por el backend) → índice del adulto en la lista, como string
+ * ('' si ninguno). `findIndex` toma la primera aparición, consistente con la
+ * deduplicación por DNI de `buildAdultRefOptions`.
+ */
+const refFromDni = (
+  adults: EducaDossierData['related_adults']['adults'],
+  dni: string | null
+): string => {
+  if (!dni) return '';
+  const i = adults.findIndex((a) => a.dni === dni);
+  return i >= 0 ? String(i) : '';
+};
+
+/**
+ * Inversa al guardar: índice (string) → DNI VIVO del adulto (`values.adults[i].dni`),
+ * o null si el índice está vacío o fuera de rango. Resuelve contra los valores
+ * actuales del formulario, así refleja cualquier corrección del DNI.
+ */
+const dniFromRef = (values: CorrectionFormValues, ref: string): string | null => {
+  if (!ref) return null;
+  const i = Number(ref);
+  if (!Number.isInteger(i) || i < 0 || i >= values.adults.length) return null;
+  return emptyToNull(values.adults[i].dni);
 };
 
 /** `EducaDossierData` (respuesta) → valores iniciales del formulario. */
@@ -130,7 +165,11 @@ export function dossierToFormValues(d: EducaDossierData): CorrectionFormValues {
       full_name: s(a.full_name),
       phone: s(a.phone),
     })),
-    guardian_dni: s(d.related_adults.guardian_dni),
+    guardian_ref: refFromDni(d.related_adults.adults, d.related_adults.guardian_dni),
+    emergency_contact_ref: refFromDni(
+      d.related_adults.adults,
+      d.related_adults.emergency_contact_dni
+    ),
   };
 }
 
@@ -160,7 +199,11 @@ export function formValuesToDossier(
         full_name: emptyToNull(a.full_name),
         phone: emptyToNull(a.phone),
       })),
-      guardian_dni: emptyToNull(values.guardian_dni),
+      // Apoderado y contacto de emergencia: la UI guarda el ÍNDICE del adulto;
+      // aquí se resuelve al DNI VIVO (`values.adults[índice].dni`), así se manda
+      // el DNI corregido si el revisor lo editó. '' o índice inválido → null.
+      guardian_dni: dniFromRef(values, values.guardian_ref),
+      emergency_contact_dni: dniFromRef(values, values.emergency_contact_ref),
       validation_issues: original.related_adults.validation_issues,
     },
     education: {
@@ -195,22 +238,23 @@ export function formValuesToDossier(
   };
 }
 
-/** Etiqueta legible de un adulto según su parentesco (para la nota del apoderado). */
+/**
+ * Etiqueta legible del PARENTESCO base de un adulto. "Apoderado" y "contacto de
+ * emergencia" NO son parentescos: son roles asignables (ver los selectores de la
+ * pestaña Apoderado), así que cualquier adulto que no sea padre ni madre —incluido
+ * el apoderado escaneado por OCR (rol `OTHER`)— se rotula "Otro".
+ */
 export function relationshipLabel(relationship: string): string {
   if (relationship === 'FATHER') return 'Padre';
   if (relationship === 'MOTHER') return 'Madre';
-  return 'Apoderado';
+  return 'Otro';
 }
 
-/** Índices de los adultos clave dentro del array (`-1` si no existen). */
+/** Índices de padre/madre dentro del array de adultos (`-1` si no existen). */
 export function resolveAdultIndices(caseData: EducaCase) {
   const adults = caseData.dossier_data.related_adults.adults;
-  const guardianDni = caseData.dossier_data.related_adults.guardian_dni;
   return {
     father: adults.findIndex((a) => a.relationship === 'FATHER'),
     mother: adults.findIndex((a) => a.relationship === 'MOTHER'),
-    guardian: guardianDni
-      ? adults.findIndex((a) => a.dni === guardianDni)
-      : -1,
   };
 }

@@ -32,7 +32,7 @@ import type {
   CorrectionFieldDescriptor,
   FieldStatus,
 } from '../lib/correction-fields';
-import { ageFromIso } from '../lib/correction-fields';
+import { ageFromIso, buildAdultRefOptions } from '../lib/correction-fields';
 import type { CorrectionFormValues } from '../lib/correction-form';
 
 interface StatusMeta {
@@ -264,6 +264,10 @@ export function CaseFieldRow({
     control,
     name: 'beneficiary.birth_date',
   });
+  // Adultos vivos del form: los selectores de rol (apoderado/emergencia) derivan
+  // de aquí sus opciones, para que reflejen DNIs/nombres recién corregidos. Sin
+  // genérico explícito: el tipo (AdultFormValue[]) se infiere del `control`.
+  const adults = useWatch({ control, name: 'adults' });
 
   return (
     <div
@@ -338,26 +342,41 @@ export function CaseFieldRow({
         <Controller
           control={control}
           name={fieldName(field.name!)}
-          render={({ field: rhf }) => (
-            <Select
-              value={(rhf.value as string) || null}
-              onValueChange={(value) => rhf.onChange(value ?? '')}
-            >
-              <SelectTrigger
-                className={cn('h-8 w-full font-data text-[12.5px]', flagged && meta.border)}
-                onClick={(e) => e.stopPropagation()}
+          render={({ field: rhf }) => {
+            // Selectores de rol (apoderado/emergencia): opciones en vivo desde los
+            // adultos del form (value = índice). El resto usa opciones estáticas.
+            const options = field.adultRefSelect
+              ? buildAdultRefOptions(adults ?? [])
+              : field.selectOptions ?? [];
+            return (
+              <Select
+                value={(rhf.value as string) || null}
+                onValueChange={(value) => rhf.onChange(value ?? '')}
               >
-                <SelectValue placeholder="Seleccionar…" />
-              </SelectTrigger>
-              <SelectContent>
-                {field.selectOptions?.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+                <SelectTrigger
+                  className={cn('h-8 w-full font-data text-[12.5px]', flagged && meta.border)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Base UI muestra el valor crudo por defecto; mapeamos value →
+                      etiqueta del item seleccionado (nombre y rol, no el DNI). */}
+                  <SelectValue placeholder="Seleccionar…">
+                    {(value: string | null) => {
+                      if (!value) return 'Seleccionar…';
+                      const opt = options.find((o) => o.value === value);
+                      return opt?.triggerLabel ?? opt?.label ?? value;
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          }}
         />
       ) : (
         <Controller

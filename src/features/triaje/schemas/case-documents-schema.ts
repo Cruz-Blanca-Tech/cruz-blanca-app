@@ -10,12 +10,14 @@
  * source_id: Optional[str] }. El expediente se identifica por `batch_id` +
  * `dni_reference` (no por `case_id`): son documentos del contexto de intake.
  *
- * `id` llega como UUID serializado (string). `source_id` es una URI/URL (hasta
- * 500 chars) al origen del archivo; NO trae bytes ni una URL de imagen
- * embebible directa. Para el visor (fase UI): mapear `source_id` con
- * `toDriveThumbnailUrl` (`src/lib/drive-image.ts`) → `/api/drive-image`,
- * porque un `<img>` directo a Drive es throttleado (429/403) y la ruta del
- * backend por el proxy exige Bearer que un `<img>` no envía.
+ * `id` llega como UUID serializado (string). `source_id` es la URI del ORIGEN
+ * (Drive personal del voluntario) y NO sirve para el visor: es privado y no
+ * embebible. La imagen real vive en la bóveda de Custodia y solo la baja el
+ * "robot" (cuenta de servicio) del backend. Por eso el visor NO usa `source_id`:
+ * construye `/api/case-doc-image?batchId=&dni=&docId=` (ruta Next autenticada que
+ * reenvía el Bearer al endpoint `.../documents/{id}/image` del backend, el cual
+ * resuelve el `custody_id` y devuelve los bytes). Así el navegador nunca ve el
+ * enlace de Drive y se preserva la privacidad de la bóveda.
  */
 import { z } from 'zod';
 

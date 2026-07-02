@@ -14,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toDriveThumbnailUrl } from '@/lib/drive-image';
 import type { DocumentDossierItem } from '../schemas/case-documents-schema';
 
 interface CaseDocViewerProps {
@@ -25,6 +24,9 @@ interface CaseDocViewerProps {
   onSelectDoc: (id: string) => void;
   /** Muestra el aviso de "cambio automático" al saltar a un campo con documento. */
   autoSwitchHint: boolean;
+  /** Identificadores del expediente para resolver la imagen en custodia. */
+  batchId: string;
+  dniReference: string;
 }
 
 const MIN_ZOOM = 0.5;
@@ -41,20 +43,28 @@ export function CaseDocViewer({
   activeDocId,
   onSelectDoc,
   autoSwitchHint,
+  batchId,
+  dniReference,
 }: CaseDocViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
+  // Documentos cuya imagen falló al cargar (p. ej. sin copia en custodia → 404):
+  // se muestra el placeholder en vez de un ícono roto.
+  const [erroredIds, setErroredIds] = useState<Set<string>>(new Set());
 
   const activeDoc =
     documents.find((d) => d.id === activeDocId) ?? documents[0] ?? null;
-  const rawSrc = activeDoc ? toDriveThumbnailUrl(activeDoc.source_id) : null;
-  // `<Image>` hace `new URL(src)` para orígenes remotos: si `source_id` no es una
-  // URL de Drive reconocible (p. ej. un id suelto o una cadena mal formada),
-  // `toDriveThumbnailUrl` lo devuelve intacto y rompería el visor. Además, el
-  // `next.config` solo declara `localPatterns` (no `remotePatterns`), así que solo
-  // una ruta local (`/api/drive-image`) es servible; cualquier otra cosa → sin
-  // imagen disponible (en vez de romper el render).
-  const imageSrc = rawSrc && rawSrc.startsWith('/') ? rawSrc : null;
+
+  // Las imágenes de custodia NO son públicas: se piden a nuestra ruta autenticada
+  // (`/api/case-doc-image`), que las baja del backend con el Bearer y las reenvía.
+  // El backend resuelve el `custody_id` a partir de (batchId, dni, docId); el
+  // navegador nunca ve el enlace de Drive.
+  const imageSrc =
+    activeDoc && !erroredIds.has(activeDoc.id)
+      ? `/api/case-doc-image?batchId=${encodeURIComponent(batchId)}` +
+        `&dni=${encodeURIComponent(dniReference)}` +
+        `&docId=${encodeURIComponent(activeDoc.id)}`
+      : null;
 
   if (isLoading) {
     return (
@@ -192,11 +202,20 @@ export function CaseDocViewer({
               fill
               sizes="(max-width: 768px) 100vw, 45vw"
               className="object-contain"
+              // Sin optimizador de Next: `/_next/image` descarga la imagen del
+              // lado del servidor SIN reenviar la cookie de sesión, y esta ruta
+              // exige `access_token`. `unoptimized` hace que el navegador pida
+              // `/api/case-doc-image` directo (con cookie), evitando 400/401.
+              unoptimized
               onLoad={(event) => {
                 const img = event.currentTarget;
                 if (img.naturalWidth && img.naturalHeight) {
                   setRatio(img.naturalWidth / img.naturalHeight);
                 }
+              }}
+              onError={() => {
+                if (!activeDoc) return;
+                setErroredIds((prev) => new Set(prev).add(activeDoc.id));
               }}
             />
           </div>

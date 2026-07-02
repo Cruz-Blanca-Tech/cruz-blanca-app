@@ -40,10 +40,11 @@ const relatedAdultSchema = z.object({
   phone: z.string().nullable(),
 });
 
-/** Núcleo familiar: adultos relacionados + apoderado. */
+/** Núcleo familiar: adultos relacionados + apoderado + contacto de emergencia. */
 const familySchema = z.object({
   adults: z.array(relatedAdultSchema),
   guardian_dni: z.string().nullable(),
+  emergency_contact_dni: z.string().nullable(),
   validation_issues: z.array(z.string()),
 });
 

@@ -122,7 +122,8 @@ function emptyCorrectionValues(): CorrectionFormValues {
     religion: { baptized: null, first_communion: null },
     permissions: { haircut_permission: null, medical_exams_permission: null },
     adults: [],
-    guardian_dni: '',
+    guardian_ref: '',
+    emergency_contact_ref: '',
   };
 }
 
@@ -452,6 +453,8 @@ export function CaseCorrectionScreen({
               setAutoSwitchHint(false);
             }}
             autoSwitchHint={autoSwitchHint}
+            batchId={batchId}
+            dniReference={dniReference}
           />
         </div>
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Corrección de registro — Cruz Blanca</title>
+  <title>Beneficiarios — Cruz Blanca</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Alegreya+Sans+SC:wght@400;500;700&family=Alegreya+Sans:wght@400;500&family=Arimo:wght@400;500&display=swap" rel="stylesheet" />
@@ -15,18 +15,25 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; background: #0C529B; }
     #root { height: 100%; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+    select { appearance: none; -webkit-appearance: none; }
+    input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
   </style>
 </head>
 <body>
   <div id="root"></div>
+
   <script type="text/babel" src="ui_kits/Layout.jsx"></script>
-  <script type="text/babel" src="ui_kits/TriajeCorreccionScreen.jsx"></script>
+  <script type="text/babel" src="ui_kits/BeneficiariosScreen.jsx"></script>
+
   <script type="text/babel">
-    window.addEventListener('load', () => { if (window.lucide) window.lucide.createIcons(); });
-    ReactDOM.createRoot(document.getElementById('root')).render(<TriajeCorreccionScreen />);
+    window.addEventListener('load', () => {
+      if (window.lucide) window.lucide.createIcons();
+    });
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<BeneficiariosScreen />);
   </script>
 </body>
 </html>
