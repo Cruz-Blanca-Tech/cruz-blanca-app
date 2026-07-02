@@ -88,6 +88,17 @@ export interface CorrectionFieldDescriptor {
   adultRefSelect?: boolean;
   matchFieldNames?: string[];
   matchDocCodes?: string[];
+  /**
+   * Código(s) del documento FUENTE que el visor debe mostrar al enfocar este
+   * campo, en orden de preferencia (gana el primero que exista en el expediente).
+   * Es un mapeo ESTABLE campo→documento, independiente de que haya o no una
+   * discrepancia. Se distingue a propósito de `matchDocCodes` (que empareja el
+   * campo con una discrepancia): el `document_code` de una discrepancia apunta al
+   * documento donde se DETECTÓ el conflicto (p. ej. la ficha FINS), no al
+   * documento que hay que revisar para corregir el campo. Sin esto, el visor
+   * saltaría a ese documento de detección (a menudo el primero) en vez del DNI.
+   */
+  viewerDocCodes?: string[];
 }
 
 /**
@@ -171,6 +182,9 @@ export function buildCorrectionFields(
         group,
         control: 'text',
         placeholder: 'No registrado',
+        // El expediente solo trae un documento de DNI de adulto (DNIAP, el del
+        // apoderado). Padre, madre y demás adultos comparten ese documento fuente.
+        viewerDocCodes: ['DNIAP', 'DNI'],
       },
       {
         id: `${idPrefix}.phone`,
@@ -210,6 +224,7 @@ export function buildCorrectionFields(
       control: 'text',
       matchFieldNames: ['Número de Documento'],
       matchDocCodes: ['DNIBE'],
+      viewerDocCodes: ['DNIBE', 'DNI'],
     },
     {
       id: 'beneficiary.birth_date',
