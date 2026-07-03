@@ -160,7 +160,7 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6 overflow-y-auto custom-scrollbar">
       <header className="flex flex-col gap-1">
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
           Nueva Digitalización
