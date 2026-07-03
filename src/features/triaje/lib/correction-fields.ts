@@ -148,6 +148,7 @@ export function buildCorrectionFields(
     extra?: {
       phoneEmergency?: boolean;
       phoneMatchFieldNames?: string[];
+      dniMatchFieldNames?: string[];
       nameNote?: string;
     }
   ): CorrectionFieldDescriptor[] => {
@@ -185,6 +186,9 @@ export function buildCorrectionFields(
         // El expediente solo trae un documento de DNI de adulto (DNIAP, el del
         // apoderado). Padre, madre y demás adultos comparten ese documento fuente.
         viewerDocCodes: ['DNIAP', 'DNI'],
+        // `field_name` friendly del formato de DNI escaneado en FINS (`DNI Padre`,
+        // `DNI Madre`). No es una ruta de campo, por eso es explícito.
+        matchFieldNames: extra?.dniMatchFieldNames,
       },
       {
         id: `${idPrefix}.phone`,
@@ -208,6 +212,9 @@ export function buildCorrectionFields(
       label: 'Nombres',
       group: 'Beneficiario',
       control: 'text',
+      // `beneficiary.name` (DOMINIO) valida nombre Y apellido juntos: no existe un
+      // campo con esa ruta, así que la observación se ancla aquí (Nombres).
+      matchFieldNames: ['beneficiary.name'],
     },
     {
       id: 'beneficiary.last_name',
@@ -222,7 +229,12 @@ export function buildCorrectionFields(
       label: 'DNI del niño',
       group: 'Beneficiario',
       control: 'text',
-      matchFieldNames: ['Número de Documento'],
+      // El error DOMINIO `beneficiary.dni` lo cubre el fallback por `name`.
+      // Aquí solo los `field_name` friendly del OCR (formato del DNI del niño en
+      // FINS/DJ) y el id sintético del crosscheck. `Número de Documento` NO se
+      // lista: es el mismo literal para DNIBE y DNIAP → se empareja por
+      // `document_code` (DNIBE) para no capturar el DNI del apoderado (DNIAP).
+      matchFieldNames: ['DNI del Niño/a', 'DNI Niño', 'beneficiary_dni_crosscheck'],
       matchDocCodes: ['DNIBE'],
       viewerDocCodes: ['DNIBE', 'DNI'],
     },
@@ -427,16 +439,28 @@ export function buildCorrectionFields(
     },
 
     // Padre / Madre / Apoderado (desde related_adults.adults[])
-    ...adultFields(father, 'Padre', 'padre', {
-      name: 'Nombre del padre',
-      dni: 'DNI del padre',
-      phone: 'Teléfono del padre',
-    }),
-    ...adultFields(mother, 'Madre', 'madre', {
-      name: 'Nombre de la madre',
-      dni: 'DNI de la madre',
-      phone: 'Teléfono de la madre',
-    }),
+    ...adultFields(
+      father,
+      'Padre',
+      'padre',
+      {
+        name: 'Nombre del padre',
+        dni: 'DNI del padre',
+        phone: 'Teléfono del padre',
+      },
+      { dniMatchFieldNames: ['DNI Padre'] }
+    ),
+    ...adultFields(
+      mother,
+      'Madre',
+      'madre',
+      {
+        name: 'Nombre de la madre',
+        dni: 'DNI de la madre',
+        phone: 'Teléfono de la madre',
+      },
+      { dniMatchFieldNames: ['DNI Madre'] }
+    ),
     // Apoderado y contacto de emergencia: roles asignables a un adulto registrado.
     // El valor es el ÍNDICE del adulto (no su DNI); las opciones se construyen en
     // vivo (`adultRefSelect`) desde el form, y el DNI se resuelve al guardar. Así,
@@ -448,7 +472,15 @@ export function buildCorrectionFields(
       group: 'Apoderado',
       control: 'select',
       adultRefSelect: true,
-      matchFieldNames: ['related_adults.guardian_dni'],
+      // El backend NUNCA emite `related_adults.guardian_dni` (era un typo muerto).
+      // Emite la presencia/nombre del apoderado y los crosscheck de su DNI; ninguno
+      // es una ruta de campo, por eso van explícitos aquí.
+      matchFieldNames: [
+        'related_adults.guardian',
+        'related_adults.guardian_name',
+        'guardian_dni_crosscheck_exact',
+        'guardian_dni_crosscheck_fins',
+      ],
       note: 'Elige cuál de los adultos registrados es el apoderado.',
     },
     {
@@ -471,6 +503,15 @@ export function buildCorrectionFields(
     // propia pestaña —como Padre/Madre—, y siguen apareciendo como opción en los
     // selectores de apoderado / contacto de emergencia. Si no hay ninguno, se
     // muestra "No registrado" (mismo fallback que Padre/Madre).
+    //
+    // PENDIENTE (C.1) — HUÉRFANO CONSCIENTE: el formato del DNI del apoderado se
+    // emite con `field_name` friendly compartido ("DNI Apoderado" en FINS/DJ y
+    // "Número de Documento" en DNIAP), sin señalar A QUÉ adulto pertenece. Como el
+    // apoderado es un ROL dinámico (índice de adulto, no un campo fijo), hoy esa
+    // discrepancia queda sin descriptor a propósito (no la mapeamos a la fuerza
+    // para no capturarla en el campo equivocado). Arreglo correcto en el BACKEND:
+    // que la discrepancia emita el índice del adulto (p. ej. `related_adults.
+    // adults[i].dni`) para poder anclarla al `otro-N.dni` correspondiente.
     ...(otherAdultIndices.length > 0
       ? otherAdultIndices.flatMap((index, n) => {
           const roleLabel = relationshipLabel(adults[index].relationship);
@@ -497,18 +538,55 @@ export interface FieldValidation {
   discrepancy: TriageDiscrepancy | null;
 }
 
-/** Busca la discrepancia asociada a un campo (por field_name o document_code). */
+/**
+ * Normaliza un identificador para compararlo sin ruido de acentos, mayúsculas ni
+ * espacios sobrantes. Es una RED DE SEGURIDAD ante deriva del backend: hoy los
+ * literales coinciden exactos, pero así un `Género`/`genero` o un espacio extra
+ * no rompen el emparejamiento en silencio (el match sigue siendo por igualdad,
+ * solo que sobre la forma normalizada de AMBOS lados).
+ */
+function normalizeKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+/**
+ * Busca la discrepancia asociada a un campo. El emparejamiento es, en orden:
+ *  1. Fallback estructural: el `field_name` del backend coincide con la ruta RHF
+ *     (`name`) o el `id` del descriptor. Las reglas de DOMINIO emiten dot-paths
+ *     (`beneficiary.dni`, `education.grade`, …) que YA son esos identificadores,
+ *     así que no hace falta declararlos en `matchFieldNames`: se derivan (evita
+ *     duplicar la lista de campos).
+ *  2. `matchFieldNames`: solo para `field_name` que NO son una ruta de campo —
+ *     nombres "friendly" del OCR (`DNI Padre`, `DNI del Niño/a`) o ids sintéticos
+ *     de crosscheck / dominio compuesto (`beneficiary_dni_crosscheck`,
+ *     `beneficiary.name`, `related_adults.guardian`).
+ *  3. `matchDocCodes`: por `document_code` del documento (p. ej. `DNIBE`).
+ * Todo se compara sobre la forma normalizada (acentos/mayúsculas/espacios).
+ */
 export function matchDiscrepancy(
   field: CorrectionFieldDescriptor,
   discrepancies: TriageDiscrepancy[]
 ): TriageDiscrepancy | null {
+  const selfKeys = [field.name, field.id]
+    .filter((k): k is string => k != null)
+    .map(normalizeKey);
+  const fieldNameKeys = (field.matchFieldNames ?? []).map(normalizeKey);
+  const docCodeKeys = (field.matchDocCodes ?? []).map(normalizeKey);
   return (
-    discrepancies.find(
-      (d) =>
-        (field.matchFieldNames?.includes(d.field_name) ?? false) ||
-        (d.document_code != null &&
-          (field.matchDocCodes?.includes(d.document_code) ?? false))
-    ) ?? null
+    discrepancies.find((d) => {
+      const nameKey = normalizeKey(d.field_name);
+      if (selfKeys.includes(nameKey) || fieldNameKeys.includes(nameKey)) {
+        return true;
+      }
+      return (
+        d.document_code != null &&
+        docCodeKeys.includes(normalizeKey(d.document_code))
+      );
+    }) ?? null
   );
 }
 
