@@ -92,6 +92,9 @@
   --color-warning-light:  var(--warning-light);
   --color-warning-accent: var(--warning-accent);
   --color-warning-dark:   var(--warning-dark);
+  --color-fault:        var(--fault);
+  --color-fault-light:  var(--fault-light);
+  --color-fault-dark:   var(--fault-dark);
   --color-info:       var(--info);
   --color-info-light: var(--info-light);
   --color-info-dark:  var(--info-dark);
@@ -225,6 +228,11 @@
   --warning-light:  #FDF3E3;
   --warning-accent: #FCD34D;
   --warning-dark:   #B56E1F;
+  /* Fallo de sistema ("Con error"): ámbar quemado, distinto del naranja de
+     `warning` (en proceso) y del rojo de `error` (rechazo del usuario). */
+  --fault:       #C26A2C;
+  --fault-light: #FBEAD7;
+  --fault-dark:  #9A4A12;
   --info:       #5292B5;
   --info-light: #E8F2F8;
   --info-dark:  #3A7499;
