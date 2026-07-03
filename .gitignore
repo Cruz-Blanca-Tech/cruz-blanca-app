@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+docs/referencias/client.ts
+docs/referencias/route.ts
+/.playwright-mcp
+CLAUDE.md
+CLAUDE.md
+CLAUDE.md
+CLAUDE.md
