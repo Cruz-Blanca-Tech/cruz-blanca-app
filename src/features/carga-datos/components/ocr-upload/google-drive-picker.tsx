@@ -155,17 +155,45 @@ function getDriveToken(google: GoogleApi): Promise<string> {
   return requestDriveToken(google);
 }
 
+async function fetchFolderContents(
+  folderId: string,
+  token: string
+): Promise<PickedFile[]> {
+  try {
+    const query = `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`;
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        query
+      )}&fields=files(id,name)&pageSize=1000`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    if (!res.ok) throw new Error('Error al listar archivos de la carpeta');
+    const data = await res.json();
+    return (data.files || []).map((f: { id: string; name: string }) => ({
+      source_id: f.id,
+      file_name: f.name,
+    }));
+  } catch (err) {
+    console.error('Error fetching folder contents:', err);
+    return [];
+  }
+}
+
 /** Construye y muestra el Picker; resuelve los docs elegidos vía `onPicked`. */
 function openDrivePicker(
   google: GoogleApi,
   token: string,
-  onPicked: (files: PickedFile[]) => void
+  onPicked: (files: PickedFile[]) => void,
+  setFetchingDocs: (fetching: boolean) => void
 ): void {
-  // Muestra carpetas para poder navegar dentro de ellas; las carpetas en sí no
-  // son seleccionables (solo archivos).
+  // Muestra carpetas y permite seleccionarlas
   const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
     .setIncludeFolders(true)
-    .setSelectFolderEnabled(false);
+    .setSelectFolderEnabled(true);
 
   const picker = new google.picker.PickerBuilder()
     .addView(view)
@@ -173,14 +201,37 @@ function openDrivePicker(
     .setDeveloperKey(GOOGLE_API_KEY ?? '')
     .setAppId(GOOGLE_APP_ID)
     .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-    .setTitle('Selecciona los documentos a digitalizar')
-    .setCallback((response: PickerResponse) => {
+    .setTitle('Selecciona documentos o carpetas a digitalizar')
+    .setCallback(async (response: PickerResponse) => {
       if (response.action !== google.picker.Action.PICKED) return;
-      const picked = (response.docs ?? []).map((doc) => ({
-        source_id: doc.id,
-        file_name: doc.name,
-      }));
-      if (picked.length > 0) onPicked(picked);
+      const docs = response.docs ?? [];
+      if (docs.length === 0) return;
+
+      setFetchingDocs(true);
+      try {
+        let finalFiles: PickedFile[] = [];
+
+        for (const doc of docs) {
+          const mimeType = (doc as any).mimeType;
+          if (mimeType === 'application/vnd.google-apps.folder') {
+            // Es una carpeta: extraer sus archivos
+            const folderFiles = await fetchFolderContents(doc.id, token);
+            finalFiles = finalFiles.concat(folderFiles);
+          } else {
+            // Es un archivo normal
+            finalFiles.push({
+              source_id: doc.id,
+              file_name: doc.name,
+            });
+          }
+        }
+
+        if (finalFiles.length > 0) {
+          onPicked(finalFiles);
+        }
+      } finally {
+        setFetchingDocs(false);
+      }
     })
     .build();
 
@@ -208,6 +259,7 @@ export function GoogleDrivePicker({
   disabled = false,
 }: GoogleDrivePickerProps) {
   const [loading, setLoading] = useState(false);
+  const [fetchingDocs, setFetchingDocs] = useState(false);
   const [error, setError] = useState<string | null>(CONFIG_ERROR);
 
   const handleOpen = useCallback(async () => {
@@ -224,7 +276,7 @@ export function GoogleDrivePicker({
         throw new Error('Las APIs de Google no se cargaron correctamente.');
       }
       const token = await getDriveToken(google);
-      openDrivePicker(google, token, onPick);
+      openDrivePicker(google, token, onPick, setFetchingDocs);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'No se pudo abrir Google Drive.'
@@ -291,12 +343,16 @@ export function GoogleDrivePicker({
           onClick={handleOpen}
           disabled={disabled || loading || Boolean(CONFIG_ERROR)}
         >
-          {loading ? (
+          {loading || fetchingDocs ? (
             <Loader2 className="animate-spin" />
           ) : (
             <FolderOpen />
           )}
-          {hasFiles ? 'Agregar más de Drive' : 'Seleccionar de Google Drive'}
+          {fetchingDocs
+            ? 'Procesando carpeta...'
+            : hasFiles
+              ? 'Agregar más de Drive'
+              : 'Seleccionar de Google Drive'}
         </Button>
         {hasFiles && (
           <span className="font-data text-xs text-muted-foreground">

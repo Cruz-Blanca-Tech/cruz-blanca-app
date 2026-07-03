@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { google_token } = (await request.json()) as { google_token?: string };
-    if (!google_token) {
+    const { code } = (await request.json()) as { code?: string };
+    if (!code) {
       return NextResponse.json(
-        { error: 'Token de Google requerido.' },
+        { error: 'Código de autorización requerido.' },
         { status: 400 }
       );
     }
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     const backendResponse = await axios.post(
       backendUrl,
-      { google_token },
+      { auth_code: code },
       {
         headers: { 'Content-Type': 'application/json' },
         validateStatus: () => true,
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (backendResponse.status >= 400) {
+      console.error('❌ Error desde el backend (FastAPI):', JSON.stringify(backendResponse.data, null, 2));
       return NextResponse.json(backendResponse.data, { status: backendResponse.status });
     }
 

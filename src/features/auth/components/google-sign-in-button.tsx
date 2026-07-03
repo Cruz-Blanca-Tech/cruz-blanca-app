@@ -1,38 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clientEnv } from '@/lib/env';
 import { useAuthStore } from '../stores/auth-store';
 
-interface GoogleCredentialResponse {
-  credential: string;
+interface GoogleCodeResponse {
+  code: string;
 }
 
 declare global {
   interface Window {
     google?: {
       accounts: {
-        id: {
-          initialize: (config: {
+        oauth2: {
+          initCodeClient: (config: {
             client_id: string;
-            callback: (response: GoogleCredentialResponse) => void;
+            scope: string;
             ux_mode?: 'popup' | 'redirect';
-            auto_select?: boolean;
-          }) => void;
-          renderButton: (
-            parent: HTMLElement,
-            options: {
-              type?: 'standard' | 'icon';
-              theme?: 'outline' | 'filled_blue' | 'filled_black';
-              size?: 'large' | 'medium' | 'small';
-              text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
-              shape?: 'rectangular' | 'pill' | 'circle' | 'square';
-              logo_alignment?: 'left' | 'center';
-              width?: number;
-            }
-          ) => void;
-          prompt: () => void;
+            callback: (response: GoogleCodeResponse) => void;
+            error_callback?: (error: any) => void;
+          }) => { requestCode: () => void };
         };
       };
     };
@@ -43,15 +31,13 @@ const GOOGLE_CLIENT_ID = clientEnv.googleClientId;
 
 const GSI_SCRIPT_ID = 'google-identity-services-script';
 const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
-
-// Google limita el ancho del botón renderizado al rango [200, 400].
-const GSI_MIN_WIDTH = 200;
-const GSI_MAX_WIDTH = 400;
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const AUTH_SCOPES = 'email profile openid';
 
 function loadGoogleScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') return reject(new Error('window unavailable'));
-    if (window.google?.accounts?.id) return resolve();
+    if (window.google?.accounts?.oauth2) return resolve();
     const existing = document.getElementById(GSI_SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
       existing.addEventListener('load', () => resolve(), { once: true });
@@ -72,101 +58,69 @@ function loadGoogleScript(): Promise<void> {
 /**
  * Botón "Continuar con Google" con el aspecto del diseño Cruz Blanca.
  *
- * El backend espera el ID token (credential JWT) que solo emite Google
- * Identity Services. Para conservar ese flujo real y a la vez mostrar un
- * botón con estilo propio, se renderiza el botón oficial de GSI por encima
- * del botón visual, transparente: el clic llega al botón de Google (que
- * devuelve el credential) mientras el usuario ve el diseño de la marca.
+ * Utiliza el flujo Authorization Code (oauth2.initCodeClient) para poder pedir
+ * los permisos de perfil y de Drive en la misma ventana de consentimiento.
  */
 export function GoogleSignInButton() {
   const router = useRouter();
-  const overlayRef = useRef<HTMLDivElement>(null);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
   const isLoading = useAuthStore((s) => s.isLoading);
   const [localError, setLocalError] = useState<string | null>(
     GOOGLE_CLIENT_ID ? null : 'Falta configurar NEXT_PUBLIC_GOOGLE_CLIENT_ID.'
   );
 
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
-
-    let cancelled = false;
-    let observer: ResizeObserver | undefined;
-
-    const handleCredential = async (response: GoogleCredentialResponse) => {
-      try {
-        await loginWithGoogle(response.credential);
-        router.replace('/dashboard');
-      } catch (err) {
-        if (cancelled) return;
-        setLocalError(err instanceof Error ? err.message : 'Error al iniciar sesión.');
+  const handleLoginClick = async () => {
+    if (!GOOGLE_CLIENT_ID || isLoading) return;
+    
+    setLocalError(null);
+    try {
+      await loadGoogleScript();
+      
+      if (!window.google?.accounts?.oauth2) {
+        throw new Error('No se pudo cargar la librería de autenticación.');
       }
-    };
 
-    const renderButton = () => {
-      const el = overlayRef.current;
-      if (cancelled || !window.google || !el) return;
-      const width = Math.min(
-        GSI_MAX_WIDTH,
-        Math.max(GSI_MIN_WIDTH, Math.round(el.getBoundingClientRect().width))
-      );
-      el.replaceChildren();
-      window.google.accounts.id.renderButton(el, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        text: 'continue_with',
-        shape: 'rectangular',
-        logo_alignment: 'center',
-        width,
-      });
-    };
-
-    loadGoogleScript()
-      .then(() => {
-        if (cancelled || !window.google) return;
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleCredential,
-          ux_mode: 'popup',
-        });
-        renderButton();
-        if (overlayRef.current && typeof ResizeObserver !== 'undefined') {
-          observer = new ResizeObserver(() => renderButton());
-          observer.observe(overlayRef.current);
+      const client = window.google.accounts.oauth2.initCodeClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: `${AUTH_SCOPES} ${DRIVE_SCOPE}`,
+        ux_mode: 'popup',
+        callback: async (response) => {
+          if (response.code) {
+            try {
+              await loginWithGoogle(response.code);
+              router.replace('/dashboard');
+            } catch (err) {
+              setLocalError(err instanceof Error ? err.message : 'Error al iniciar sesión en el servidor.');
+            }
+          }
+        },
+        error_callback: (error) => {
+          if (error?.type === 'popup_closed') {
+             // El usuario cerró la ventana
+             return;
+          }
+          setLocalError('No se pudo completar la autenticación con Google.');
         }
-      })
-      .catch((err: Error) => {
-        if (cancelled) return;
-        setLocalError(err.message);
       });
 
-    return () => {
-      cancelled = true;
-      observer?.disconnect();
-    };
-  }, [loginWithGoogle, router]);
+      client.requestCode();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Error al iniciar sesión.');
+    }
+  };
 
   return (
     <div className="w-full">
-      <div className="relative w-full">
-        {/* Capa visible: botón con el estilo del diseño */}
-        <div
-          aria-hidden="true"
-          data-loading={isLoading || undefined}
-          className="flex w-full items-center justify-center gap-3 rounded-md border-[1.5px] border-border bg-card px-5 py-3 text-base font-medium text-foreground transition-all hover:border-brand hover:bg-slate-50 hover:shadow-[0_2px_8px_var(--overlay-brand10)] data-[loading]:opacity-60"
-        >
-          <GoogleIcon />
-          {isLoading ? 'Conectando…' : 'Continuar con Google'}
-        </div>
-
-        {/* Capa real de GSI: transparente, captura el clic */}
-        <div
-          ref={overlayRef}
-          aria-label="Iniciar sesión con Google"
-          className="absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.0001]"
-        />
-      </div>
+      <button
+        type="button"
+        onClick={handleLoginClick}
+        disabled={isLoading || !GOOGLE_CLIENT_ID}
+        aria-label="Iniciar sesión con Google"
+        className="flex w-full items-center justify-center gap-3 rounded-md border-[1.5px] border-border bg-card px-5 py-3 text-base font-medium text-foreground transition-all hover:border-brand hover:bg-slate-50 hover:shadow-[0_2px_8px_var(--overlay-brand10)] disabled:opacity-60 disabled:pointer-events-none"
+      >
+        <GoogleIcon />
+        {isLoading ? 'Conectando…' : 'Continuar con Google'}
+      </button>
 
       {localError && (
         <p className="mt-3 text-sm text-error" role="alert">
