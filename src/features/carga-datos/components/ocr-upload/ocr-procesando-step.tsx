@@ -46,7 +46,7 @@ export function OcrProcesandoStep({
   const hasFailed = result.total_failed_files > 0;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6 overflow-y-auto custom-scrollbar">
       <header className="flex flex-col gap-1">
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
           Procesando documentos
@@ -129,7 +129,7 @@ export function OcrProcesandoStep({
                 {result.total_failed_files}
               </Badge>
             </h3>
-            <ul className="divide-y divide-destructive/15 overflow-hidden rounded-lg border border-destructive/30 bg-destructive/[0.04]">
+            <ul className="divide-y divide-destructive/15 overflow-y-auto custom-scrollbar rounded-lg border border-destructive/30 bg-destructive/[0.04] max-h-[300px]">
               {result.failed_files.map((file) => (
                 <li
                   key={file.file_name}

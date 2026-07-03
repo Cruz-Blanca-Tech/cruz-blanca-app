@@ -7,40 +7,24 @@ import { Button } from '@/components/ui/button';
 import { clientEnv } from '@/lib/env';
 import { cn } from '@/lib/utils';
 import type {
-  GapiApi,
   GoogleApi,
   GoogleTokenResponse,
-  PickerResponse,
 } from '@/types/google-picker';
 import type { PickedFile } from '../../types';
+import { CustomDrivePickerModal } from './custom-drive-picker-modal';
 
 const GOOGLE_CLIENT_ID = clientEnv.googleClientId;
-const GOOGLE_API_KEY = clientEnv.googleApiKey;
 
 /** Drive completo del usuario en modo lectura: suficiente para navegar y elegir. */
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
-/**
- * El App ID del Picker es el número de proyecto de Google Cloud, que coincide
- * con el prefijo numérico del Client ID (p. ej. `732112449971-xxxx.apps...`).
- */
-const GOOGLE_APP_ID = GOOGLE_CLIENT_ID?.split('-')[0] ?? '';
-
-const GAPI_SCRIPT_ID = 'google-api-js';
-const GAPI_SCRIPT_SRC = 'https://apis.google.com/js/api.js';
-// Mismo id que usa el login: si el script ya está en la página, se reutiliza.
 const GSI_SCRIPT_ID = 'google-identity-services-script';
 const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
-/** `window.google` está tipado de forma acotada por el login; lo ampliamos aquí. */
 function getGoogleApi(): GoogleApi | undefined {
   return (window as unknown as { google?: GoogleApi }).google;
 }
 
-/**
- * Carga un script externo una sola vez. `isReady` evita esperar el evento `load`
- * cuando la librería ya está disponible (p. ej. el GSI cargado por el login).
- */
 function loadScript(
   id: string,
   src: string,
@@ -76,41 +60,44 @@ function loadScript(
   });
 }
 
-/** Carga `gapi` y su módulo `picker` (deja disponible `google.picker`). */
-async function ensurePicker(): Promise<void> {
-  await loadScript(GAPI_SCRIPT_ID, GAPI_SCRIPT_SRC, () =>
-    Boolean(window.gapi)
-  );
-  await new Promise<void>((resolve, reject) => {
-    const gapi: GapiApi | undefined = window.gapi;
-    if (!gapi) {
-      reject(new Error('La librería de Google (gapi) no está disponible.'));
-      return;
-    }
-    if (getGoogleApi()?.picker) {
-      resolve();
-      return;
-    }
-    gapi.load('picker', () => resolve());
-  });
-}
-
-/** Carga Google Identity Services (oauth2) para pedir el access token. */
 async function ensureIdentityServices(): Promise<void> {
   await loadScript(GSI_SCRIPT_ID, GSI_SCRIPT_SRC, () =>
     Boolean(getGoogleApi()?.accounts?.oauth2)
   );
 }
 
-/**
- * Token de Drive cacheado en memoria durante la sesión. El usuario solo concede
- * el permiso de Drive la primera vez; mientras el token siga vigente reabrimos el
- * Picker sin volver a pedir cuenta/consentimiento.
- */
-let cachedToken: { value: string; expiresAt: number } | null = null;
-
-/** Margen de seguridad para renovar antes de que el token expire de verdad. */
+const SESSION_STORAGE_KEY = 'cruz_blanca_drive_token';
+let memoryToken: { value: string; expiresAt: number } | null = null;
 const TOKEN_EXPIRY_MARGIN_MS = 60_000;
+
+function getCachedToken(): { value: string; expiresAt: number } | null {
+  if (memoryToken) return memoryToken;
+  try {
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.expiresAt > Date.now()) {
+        memoryToken = parsed;
+        return parsed;
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+function setCachedToken(value: string, expiresAt: number) {
+  const tokenObj = { value, expiresAt };
+  memoryToken = tokenObj;
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(tokenObj));
+  } catch (e) {
+    // Ignore storage errors (e.g. incognito mode restrictions)
+  }
+}
 
 /** Pide un access token de Drive (silencioso si ya se concedió el permiso). */
 function requestDriveToken(google: GoogleApi): Promise<string> {
@@ -130,10 +117,7 @@ function requestDriveToken(google: GoogleApi): Promise<string> {
           return;
         }
         const ttlMs = (response.expires_in ?? 3600) * 1000;
-        cachedToken = {
-          value: response.access_token,
-          expiresAt: Date.now() + ttlMs - TOKEN_EXPIRY_MARGIN_MS,
-        };
+        setCachedToken(response.access_token, Date.now() + ttlMs - TOKEN_EXPIRY_MARGIN_MS);
         resolve(response.access_token);
       },
       error_callback: (error) =>
@@ -141,106 +125,21 @@ function requestDriveToken(google: GoogleApi): Promise<string> {
           new Error(error.message ?? 'Se canceló la autorización de Drive.')
         ),
     });
-    // `prompt: ''` deja que Google omita la pantalla de cuenta/consentimiento
-    // cuando el permiso ya fue concedido en una sesión anterior.
     client.requestAccessToken({ prompt: '' });
   });
 }
 
 /** Devuelve el token cacheado si sigue vigente; si no, pide uno nuevo. */
 function getDriveToken(google: GoogleApi): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now()) {
-    return Promise.resolve(cachedToken.value);
+  const cached = getCachedToken();
+  if (cached && cached.expiresAt > Date.now()) {
+    return Promise.resolve(cached.value);
   }
   return requestDriveToken(google);
 }
 
-async function fetchFolderContents(
-  folderId: string,
-  token: string
-): Promise<PickedFile[]> {
-  try {
-    const query = `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`;
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        query
-      )}&fields=files(id,name)&pageSize=1000`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    if (!res.ok) throw new Error('Error al listar archivos de la carpeta');
-    const data = await res.json();
-    return (data.files || []).map((f: { id: string; name: string }) => ({
-      source_id: f.id,
-      file_name: f.name,
-    }));
-  } catch (err) {
-    console.error('Error fetching folder contents:', err);
-    return [];
-  }
-}
-
-/** Construye y muestra el Picker; resuelve los docs elegidos vía `onPicked`. */
-function openDrivePicker(
-  google: GoogleApi,
-  token: string,
-  onPicked: (files: PickedFile[]) => void,
-  setFetchingDocs: (fetching: boolean) => void
-): void {
-  // Muestra carpetas y permite seleccionarlas
-  const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-    .setIncludeFolders(true)
-    .setSelectFolderEnabled(true);
-
-  const picker = new google.picker.PickerBuilder()
-    .addView(view)
-    .setOAuthToken(token)
-    .setDeveloperKey(GOOGLE_API_KEY ?? '')
-    .setAppId(GOOGLE_APP_ID)
-    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-    .setTitle('Selecciona documentos o carpetas a digitalizar')
-    .setCallback(async (response: PickerResponse) => {
-      if (response.action !== google.picker.Action.PICKED) return;
-      const docs = response.docs ?? [];
-      if (docs.length === 0) return;
-
-      setFetchingDocs(true);
-      try {
-        let finalFiles: PickedFile[] = [];
-
-        for (const doc of docs) {
-          const mimeType = (doc as any).mimeType;
-          if (mimeType === 'application/vnd.google-apps.folder') {
-            // Es una carpeta: extraer sus archivos
-            const folderFiles = await fetchFolderContents(doc.id, token);
-            finalFiles = finalFiles.concat(folderFiles);
-          } else {
-            // Es un archivo normal
-            finalFiles.push({
-              source_id: doc.id,
-              file_name: doc.name,
-            });
-          }
-        }
-
-        if (finalFiles.length > 0) {
-          onPicked(finalFiles);
-        }
-      } finally {
-        setFetchingDocs(false);
-      }
-    })
-    .build();
-
-  picker.setVisible(true);
-}
-
 interface GoogleDrivePickerProps {
   files: PickedFile[];
-  /** Recibe los documentos recién elegidos; el padre fusiona y deduplica. */
   onPick: (files: PickedFile[]) => void;
   onRemove: (sourceId: string) => void;
   disabled?: boolean;
@@ -248,9 +147,7 @@ interface GoogleDrivePickerProps {
 
 const CONFIG_ERROR = !GOOGLE_CLIENT_ID
   ? 'Falta configurar NEXT_PUBLIC_GOOGLE_CLIENT_ID.'
-  : !GOOGLE_API_KEY
-    ? 'Falta configurar NEXT_PUBLIC_GOOGLE_API_KEY para usar el selector de Google Drive.'
-    : null;
+  : null;
 
 export function GoogleDrivePicker({
   files,
@@ -259,8 +156,9 @@ export function GoogleDrivePicker({
   disabled = false,
 }: GoogleDrivePickerProps) {
   const [loading, setLoading] = useState(false);
-  const [fetchingDocs, setFetchingDocs] = useState(false);
   const [error, setError] = useState<string | null>(CONFIG_ERROR);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const handleOpen = useCallback(async () => {
     if (CONFIG_ERROR) {
@@ -270,13 +168,14 @@ export function GoogleDrivePicker({
     setLoading(true);
     setError(null);
     try {
-      await Promise.all([ensurePicker(), ensureIdentityServices()]);
+      await ensureIdentityServices();
       const google = getGoogleApi();
-      if (!google?.accounts?.oauth2 || !google.picker) {
+      if (!google?.accounts?.oauth2) {
         throw new Error('Las APIs de Google no se cargaron correctamente.');
       }
       const token = await getDriveToken(google);
-      openDrivePicker(google, token, onPick, setFetchingDocs);
+      setAccessToken(token);
+      setIsModalOpen(true);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'No se pudo abrir Google Drive.'
@@ -284,14 +183,14 @@ export function GoogleDrivePicker({
     } finally {
       setLoading(false);
     }
-  }, [onPick]);
+  }, []);
 
   const hasFiles = files.length > 0;
 
   return (
     <div className="flex flex-col gap-3">
       {hasFiles ? (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
           {files.map((file) => (
             <li
               key={file.source_id}
@@ -343,16 +242,12 @@ export function GoogleDrivePicker({
           onClick={handleOpen}
           disabled={disabled || loading || Boolean(CONFIG_ERROR)}
         >
-          {loading || fetchingDocs ? (
+          {loading ? (
             <Loader2 className="animate-spin" />
           ) : (
             <FolderOpen />
           )}
-          {fetchingDocs
-            ? 'Procesando carpeta...'
-            : hasFiles
-              ? 'Agregar más de Drive'
-              : 'Seleccionar de Google Drive'}
+          {hasFiles ? 'Agregar más de Drive' : 'Seleccionar de Google Drive'}
         </Button>
         {hasFiles && (
           <span className="font-data text-xs text-muted-foreground">
@@ -368,6 +263,13 @@ export function GoogleDrivePicker({
           {error}
         </p>
       )}
+
+      <CustomDrivePickerModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        token={accessToken}
+        onPick={onPick}
+      />
     </div>
   );
 }
