@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { clientEnv } from '@/lib/env';
 import { useAuthStore } from '../stores/auth-store';
@@ -69,12 +69,22 @@ export function GoogleSignInButton() {
     GOOGLE_CLIENT_ID ? null : 'Falta configurar NEXT_PUBLIC_GOOGLE_CLIENT_ID.'
   );
 
+  // Pre-cargar el script al montar el componente para evitar que el
+  // bloqueador de popups del navegador bloquee la ventana por perder
+  // el contexto de interacción del usuario (user gesture).
+  useEffect(() => {
+    if (GOOGLE_CLIENT_ID) {
+      loadGoogleScript().catch((err) => {
+        console.error('Error pre-cargando GSI:', err);
+      });
+    }
+  }, []);
+
   const handleLoginClick = async () => {
     if (!GOOGLE_CLIENT_ID || isLoading) return;
     
     setLocalError(null);
     try {
-      await loadGoogleScript();
       
       if (!window.google?.accounts?.oauth2) {
         throw new Error('No se pudo cargar la librería de autenticación.');
