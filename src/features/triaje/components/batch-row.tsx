@@ -15,8 +15,7 @@ interface BatchRowProps {
 /** Una fila de la tabla de lotes. */
 export function BatchRow({ batch }: BatchRowProps) {
   const { absolute, relative } = formatBatchDate(batch.created_at);
-  const filesCount =
-    batch.documents_failed_count + batch.documents_approved_count;
+  const filesCount = batch.documents_total_count;
   const pendingReviewCount = batch.triage_summary.verdicts.REQUIRES_TRIAGE ?? 0;
 
   return (

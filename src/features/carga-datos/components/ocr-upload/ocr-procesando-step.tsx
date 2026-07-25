@@ -11,9 +11,16 @@ import {
   UploadCloud,
 } from 'lucide-react';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+
+import { triajeKeys } from '@/features/triaje/hooks/use-triaje-queries';
+import { triajeBatchesService } from '@/features/triaje/services/batches-service';
 
 import type { CreateBatchResponse } from '../../schemas/create-batch-schema';
 import type { BatchSummary } from '../../types';
@@ -43,7 +50,26 @@ export function OcrProcesandoStep({
   summary,
   onUploadMore,
 }: OcrProcesandoStepProps) {
+  const router = useRouter();
   const hasFailed = result.total_failed_files > 0;
+
+  // Hacemos polling del estado del lote en segundo plano
+  const { data: batch } = useQuery({
+    queryKey: triajeKeys.batchDetail(result.batch_id),
+    queryFn: () => triajeBatchesService.getBatch(result.batch_id),
+    refetchInterval: (query) => {
+      if (!query.state.data) return 5000;
+      const isProcessing = ['PENDING', 'PROCESSING'].includes(query.state.data.status);
+      return isProcessing ? 5000 : false;
+    },
+  });
+
+  // Redirigir automáticamente cuando deje de estar en proceso
+  useEffect(() => {
+    if (batch && !['PENDING', 'PROCESSING'].includes(batch.status)) {
+      router.push(`/triaje/${batch.id}`);
+    }
+  }, [batch, router]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 overflow-y-auto custom-scrollbar">
@@ -181,9 +207,13 @@ export function OcrProcesandoStep({
             Verás todos los lotes en proceso y finalizados en la bandeja de
             triaje.
           </p>
-          {/* TODO: ruta de triaje pendiente — habilitar cuando exista la página. */}
-          <Button variant="link" size="sm" className="self-end px-0" disabled>
-            Ir a la bandeja de triaje
+          <Button 
+            variant="link" 
+            size="sm" 
+            className="self-end px-0" 
+            onClick={() => router.push(`/triaje/${result.batch_id}`)}
+          >
+            Ir a revisar este lote
             <ArrowRight />
           </Button>
         </footer>
