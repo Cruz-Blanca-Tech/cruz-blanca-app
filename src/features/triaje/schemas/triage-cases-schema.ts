@@ -39,6 +39,8 @@ export const triageCaseListItemSchema = z.object({
   discrepancies: z.array(triageDiscrepancySchema),
   created_at: z.string(),
   updated_at: z.string().nullable(),
+  /** Mapa código → uuid de los documentos ya cargados para este expediente. */
+  document_ids: z.record(z.string(), z.string()).optional().default({}),
 });
 export type TriageCaseListItem = z.infer<typeof triageCaseListItemSchema>;
 

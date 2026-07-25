@@ -23,15 +23,28 @@ import { z } from 'zod';
 
 /** Documento individual del expediente (metadata mínima para el visor). */
 export const documentDossierItemSchema = z.object({
-  id: z.string(),
-  code: z.string().nullable(),
-  file_name: z.string(),
-  source_id: z.string().nullable(),
+  id: z.string().nullish(), // Es null/ausente para documentos pendientes
+  code: z.string().nullish(),
+  file_name: z.string().nullish().default('Documento pendiente'),
+  source_id: z.string().nullish(),
 });
 export type DocumentDossierItem = z.infer<typeof documentDossierItemSchema>;
 
-/** Respuesta del listado de documentos de un expediente. */
+export const pendingDocumentItemSchema = z.object({
+  code: z.string(),
+  name: z.string().nullish(),
+});
+export type PendingDocumentItem = z.infer<typeof pendingDocumentItemSchema>;
+
+/**
+ * Respuesta del endpoint `GET /api/v1/triage/batches/{batch_id}/cases/{dni}/documents`.
+ *  - `documents`         → Documentos ya extraídos.
+ *  - `pending_documents` → Documentos faltantes para completar el expediente.
+ *  - `version`           → hash o timestamp para detectar cambios
+ */
 export const caseDocumentsSchema = z.object({
-  documents: z.array(documentDossierItemSchema),
+  documents: z.array(documentDossierItemSchema).nullish().transform((v) => v || []),
+  pending_documents: z.array(pendingDocumentItemSchema).nullish().transform((v) => v || []),
+  version: z.union([z.string(), z.number()]).nullish().transform((v) => String(v || '')),
 });
 export type CaseDocuments = z.infer<typeof caseDocumentsSchema>;

@@ -14,7 +14,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { DocumentDossierItem } from '../schemas/case-documents-schema';
+import type { DocumentDossierItem, PendingDocumentItem } from '../schemas/case-documents-schema';
+import type { TriageDiscrepancy } from '../schemas/triage-discrepancy-schema';
+
 
 interface CaseDocViewerProps {
   documents: DocumentDossierItem[];
@@ -27,6 +29,13 @@ interface CaseDocViewerProps {
   /** Identificadores del expediente para resolver la imagen en custodia. */
   batchId: string;
   dniReference: string;
+  discrepancies: TriageDiscrepancy[];
+  /** Documentos requeridos que aun faltan — el backend los calcula en /documents. */
+  pendingDocuments: PendingDocumentItem[];
+  /** Callback para refrescar el expediente tras una re-validación exitosa. */
+  onDocumentUploaded: () => void;
+  isIncomplete: boolean;
+  onOpenUploadModal: () => void;
 }
 
 const MIN_ZOOM = 0.5;
@@ -45,6 +54,11 @@ export function CaseDocViewer({
   autoSwitchHint,
   batchId,
   dniReference,
+  discrepancies,
+  pendingDocuments,
+  onDocumentUploaded,
+  isIncomplete,
+  onOpenUploadModal,
 }: CaseDocViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
@@ -60,11 +74,15 @@ export function CaseDocViewer({
   // El backend resuelve el `custody_id` a partir de (batchId, dni, docId); el
   // navegador nunca ve el enlace de Drive.
   const imageSrc =
-    activeDoc && !erroredIds.has(activeDoc.id)
+    activeDoc?.id && !erroredIds.has(activeDoc.id)
       ? `/api/case-doc-image?batchId=${encodeURIComponent(batchId)}` +
         `&dni=${encodeURIComponent(dniReference)}` +
         `&docId=${encodeURIComponent(activeDoc.id)}`
       : null;
+
+  const hasMissingDocs = pendingDocuments.length > 0 || discrepancies.some(
+    (d) => d.document_code === 'GLOBAL' || d.rule_description?.toLowerCase().includes('falta adjuntar')
+  );
 
   if (isLoading) {
     return (
@@ -90,7 +108,7 @@ export function CaseDocViewer({
     );
   }
 
-  if (documents.length === 0) {
+  if (documents.length === 0 && !hasMissingDocs) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
         <FileWarning className="size-7 text-ink-muted" />
@@ -116,16 +134,29 @@ export function CaseDocViewer({
           variant="line"
           className="h-auto w-full justify-start overflow-x-auto border-b border-border p-0"
         >
-          {documents.map((doc) => (
+          {documents.map((doc, index) => (
             <TabsTrigger
-              key={doc.id}
-              value={doc.id}
+              key={doc.id ?? doc.code ?? index}
+              value={doc.id ?? ''}
               className="rounded-none px-3 py-2 font-sans text-[12.5px]"
             >
               {doc.file_name}
             </TabsTrigger>
           ))}
         </TabsList>
+        {hasMissingDocs && !isIncomplete && (
+          <div className="flex shrink-0 items-center justify-end border-b border-border px-3 py-1.5 h-[41px]">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 text-[11px] px-2 text-primary border-primary/30 hover:bg-brand-50"
+              onClick={onOpenUploadModal}
+            >
+              <Plus className="size-3.5 mr-1" />
+              Subir documento
+            </Button>
+          </div>
+        )}
       </Tabs>
 
       {/* Aviso de cambio automático */}
@@ -214,8 +245,8 @@ export function CaseDocViewer({
                 }
               }}
               onError={() => {
-                if (!activeDoc) return;
-                setErroredIds((prev) => new Set(prev).add(activeDoc.id));
+                if (!activeDoc?.id) return;
+                setErroredIds((prev) => new Set(prev).add(activeDoc.id!));
               }}
             />
           </div>
