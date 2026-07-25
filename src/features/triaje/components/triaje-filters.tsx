@@ -104,10 +104,11 @@ export function TriajeFilters() {
     programs.data?.map((p) => ({ value: p.id, label: p.name })) ?? [];
   const activityOptions: FilterOption[] =
     activities.data?.map((a) => ({ value: a.id, label: a.name })) ?? [];
-  const statusOptions: FilterOption[] = (statuses.data ?? []).map((s) => ({
-    value: s,
-    label: BATCH_STATUS_CONFIG[s].filterLabel,
-  }));
+  const statusOptions: FilterOption[] = [
+    { value: 'PENDING,PROCESSING', label: 'En proceso' },
+    { value: 'COMPLETED', label: 'Por revisar' },
+    { value: 'FINALIZED,REJECTED,FAILED', label: 'Finalizado' },
+  ];
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2.5">
@@ -139,7 +140,7 @@ export function TriajeFilters() {
         icon={Activity}
         value={status}
         onChange={(next) =>
-          setStatus(next === null ? null : batchStatusSchema.parse(next))
+          setStatus(next === null ? null : next)
         }
         allLabel="Todos los estados"
         options={statusOptions}

@@ -103,7 +103,7 @@ export function BatchDetailFooter({
         ) : (
           <CheckCircle2 />
         )}
-        Registrar aprobados ({approvedCount})
+        Validar y cargar lote ({approvedCount})
       </Button>
     </div>
   );

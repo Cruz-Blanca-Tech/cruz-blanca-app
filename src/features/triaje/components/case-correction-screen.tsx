@@ -487,7 +487,7 @@ export function CaseCorrectionScreen({
               <div className="flex h-full flex-col items-center justify-center gap-3 text-center px-6">
                 <FileWarning className="size-10 text-error/80" />
                 <h3 className="font-heading text-lg font-semibold text-ink-primary">
-                  Expediente Incompleto
+                  Expediente Incompleto (DNI: {dniReference})
                 </h3>
                 <p className="font-sans text-sm text-ink-secondary max-w-md">
                   Faltan documentos requeridos para procesar este expediente. Por favor, sube los documentos pendientes para continuar.
