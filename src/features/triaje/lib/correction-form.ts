@@ -14,16 +14,12 @@ import type {
   EducaDossierData,
 } from '../schemas/educa-case-schema';
 
-/** Grupos del formulario (tabs), en el orden del mockup. */
 export const CORRECTION_GROUPS = [
   'Beneficiario',
+  'Contactos y Apoderado',
   'Educación',
   'Salud',
   'Religión y permisos',
-  'Padre',
-  'Madre',
-  'Otro',
-  'Apoderado',
 ] as const;
 export type CorrectionGroup = (typeof CORRECTION_GROUPS)[number];
 

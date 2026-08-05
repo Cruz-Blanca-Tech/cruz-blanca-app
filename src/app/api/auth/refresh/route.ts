@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
+import { cookies } from 'next/headers';
 import { serverEnv } from '@/lib/env.server';
 
 export async function POST(request: NextRequest) {
@@ -12,40 +13,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { code } = (await request.json()) as { code?: string };
-    if (!code) {
+    const cookieStore = await cookies();
+    const refreshToken = cookieStore.get('refresh_token')?.value;
+
+    if (!refreshToken) {
       return NextResponse.json(
-        { error: 'Código de autorización requerido.' },
-        { status: 400 }
+        { error: 'No se proporcionó refresh token.' },
+        { status: 401 }
       );
     }
 
-    const backendUrl = `${BACKEND_BASE_URL.replace(/\/$/, '')}/auth/login`;
+    const backendUrl = `${BACKEND_BASE_URL.replace(/\/$/, '')}/auth/refresh`;
 
+    // Realizar POST al backend enviando el refresh token en las cookies
     const backendResponse = await axios.post(
       backendUrl,
-      { auth_code: code },
+      {},
       {
-        headers: { 'Content-Type': 'application/json' },
-        validateStatus: () => true,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cookie': `refresh_token=${refreshToken}`
+        },
+        validateStatus: () => true, // Capturar todos los códigos HTTP sin lanzar excepción
       }
     );
 
     if (backendResponse.status >= 400) {
-      console.error('❌ Error desde el backend (FastAPI):', JSON.stringify(backendResponse.data, null, 2));
+      // Si el backend rechaza el refresh token (vencido, revocado, etc)
       return NextResponse.json(backendResponse.data, { status: backendResponse.status });
     }
 
     const accessToken = backendResponse.data?.access_token as string | undefined;
     if (!accessToken) {
       return NextResponse.json(
-        { error: 'El backend no devolvió un access_token.' },
+        { error: 'El backend no devolvió un access_token durante el refresh.' },
         { status: 502 }
       );
     }
 
     const response = NextResponse.json({ ok: true });
 
+    // Configurar la nueva cookie de access_token
     response.cookies.set({
       name: 'access_token',
       value: accessToken,
@@ -53,9 +61,10 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // Ajusta este tiempo si es necesario
     });
 
+    // Reenviar cualquier cookie que el backend intente setear (idealmente el nuevo refresh_token)
     const setCookieHeader = backendResponse.headers['set-cookie'];
     if (setCookieHeader) {
       const cookiesArray = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
@@ -68,12 +77,12 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('Error en /api/auth/google/callback:', error);
+    console.error('Error en /api/auth/refresh:', error);
     if (axios.isAxiosError(error) && error.response) {
       return NextResponse.json(error.response.data, { status: error.response.status });
     }
     return NextResponse.json(
-      { error: 'Error inesperado durante el inicio de sesión.' },
+      { error: 'Error inesperado al refrescar el token.' },
       { status: 500 }
     );
   }

@@ -11,7 +11,7 @@ interface AuthState {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
-  loginWithGoogle: (googleIdToken: string) => Promise<void>;
+  loginWithGoogle: (code: string) => Promise<void>;
   hydrateSession: () => Promise<void>;
   logout: () => Promise<void>;
   clearSession: () => void;
@@ -24,10 +24,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
   error: null,
 
-  async loginWithGoogle(googleIdToken) {
+  async loginWithGoogle(code) {
     set({ isLoading: true, error: null });
     try {
-      await authService.loginWithGoogle(googleIdToken);
+      await authService.loginWithGoogle(code);
       const user = await authService.getCurrentUser();
       set({ user, role: user.role, isLoading: false, isInitialized: true });
     } catch (error) {

@@ -12,13 +12,13 @@ import type { BatchStatus } from '../schemas/batch-status-schema';
 interface TriajeFiltersState {
   programId: string | null;
   activityId: string | null;
-  status: BatchStatus | null;
+  status: string | null;
   /** Índice de página (0-based). Se traduce a `skip = page * pageSize`. */
   page: number;
 
   setProgramId: (programId: string | null) => void;
   setActivityId: (activityId: string | null) => void;
-  setStatus: (status: BatchStatus | null) => void;
+  setStatus: (status: string | null) => void;
   setPage: (page: number) => void;
   clear: () => void;
 }

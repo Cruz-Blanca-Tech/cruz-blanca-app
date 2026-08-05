@@ -53,7 +53,8 @@ export type FieldControl =
   | 'select'
   | 'bool'
   | 'multi'
-  | 'readonly';
+  | 'readonly'
+  | 'adults_list';
 
 export interface CorrectionFieldDescriptor {
   /** Id estable para refs, foco y salto desde el panel. */
@@ -236,7 +237,6 @@ export function buildCorrectionFields(
       // `document_code` (DNIBE) para no capturar el DNI del apoderado (DNIAP).
       matchFieldNames: ['DNI del Niño/a', 'DNI Niño', 'beneficiary_dni_crosscheck'],
       matchDocCodes: ['DNIBE'],
-      viewerDocCodes: ['DNIBE', 'DNI'],
     },
     {
       id: 'beneficiary.birth_date',
@@ -438,6 +438,15 @@ export function buildCorrectionFields(
       nullableBool: true,
     },
 
+    // Adultos Relacionados
+    {
+      id: 'beneficiary.adultos',
+      name: 'adults',
+      label: 'Adultos Relacionados',
+      group: 'Contactos y Apoderado',
+      control: 'adults_list',
+      note: 'Añade, edita y asigna roles a los adultos responsables del menor.',
+    },
     // Padre / Madre / Apoderado (desde related_adults.adults[])
     ...adultFields(
       father,
