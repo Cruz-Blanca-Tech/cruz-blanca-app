@@ -15,6 +15,7 @@ import {
   OctagonAlert,
   Save,
   XCircle,
+  FileWarning,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ import {
   type SectionIssue,
 } from './case-validation-panel';
 import { RejectCaseDialog } from './reject-case-dialog';
+import { DossierDocumentChecklist } from './dossier-document-checklist';
 
 interface CaseCorrectionScreenProps {
   batchId: string;
@@ -69,6 +71,7 @@ const CASE_STATUS_META: Record<string, { label: string; className: string }> = {
   IN_REVIEW: { label: 'En revisión', className: 'bg-info-light text-info-dark' },
   APPROVED: { label: 'Aprobado', className: 'bg-success-light text-success-dark' },
   REJECTED: { label: 'Rechazado', className: 'bg-error-light text-error-dark' },
+  INCOMPLETE: { label: 'Incompleto', className: 'bg-error-light text-error-dark' },
 };
 
 function titleCase(value: string | null): string {
@@ -142,6 +145,7 @@ export function CaseCorrectionScreen({
   const submitCorrection = useSubmitCorrection(caseId, batchId);
 
   const caseData = caseQuery.data;
+  const isIncomplete = caseData?.status === 'INCOMPLETE';
   const documents = useMemo(() => docsQuery.data?.documents ?? [], [docsQuery.data]);
   const discrepancies = useMemo(
     () => caseData?.discrepancies ?? [],
@@ -155,12 +159,14 @@ export function CaseCorrectionScreen({
   // Inicializa el formulario una sola vez por expediente (evita clobber en
   // refetches de foco). Tras guardar, el reset se hace explícito en onSuccess.
   const initializedCaseId = useRef<string | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
   useEffect(() => {
-    if (caseData && initializedCaseId.current !== caseId) {
+    if (caseData && !isIncomplete && initializedCaseId.current !== caseId) {
       form.reset(dossierToFormValues(caseData.dossier_data));
       initializedCaseId.current = caseId;
     }
-  }, [caseData, caseId, form]);
+  }, [caseData, caseId, form, isIncomplete]);
 
   const descriptors = useMemo(
     () => (caseData ? buildCorrectionFields(caseData) : []),
@@ -200,7 +206,7 @@ export function CaseCorrectionScreen({
       for (const text of arr) if (text) issues.push({ text, group, section });
     };
     push(dd.beneficiary.validation_issues, 'Beneficiario', 'Beneficiario');
-    push(dd.related_adults.validation_issues, 'Apoderado', 'Adultos relacionados');
+    push(dd.related_adults.validation_issues, 'Contactos y Apoderado', 'Adultos relacionados');
     push(dd.religion.validation_issues, 'Religión y permisos', 'Religión');
     push(dd.permissions.validation_issues, 'Religión y permisos', 'Permisos');
     return issues;
@@ -251,7 +257,7 @@ export function CaseCorrectionScreen({
       (found, code) => found ?? documents.find((d) => d.code === code),
       undefined
     );
-    if (doc && doc.id !== effectiveDocId) {
+    if (doc?.id && doc.id !== effectiveDocId) {
       setActiveDocId(doc.id);
       setAutoSwitchHint(true);
       if (hintTimer.current) clearTimeout(hintTimer.current);
@@ -464,24 +470,49 @@ export function CaseCorrectionScreen({
             autoSwitchHint={autoSwitchHint}
             batchId={batchId}
             dniReference={dniReference}
+            discrepancies={discrepancies}
+            pendingDocuments={docsQuery.data?.pending_documents ?? []}
+            onDocumentUploaded={() => {
+              void caseQuery.refetch();
+            }}
+            isIncomplete={isIncomplete}
+            onOpenUploadModal={() => setIsUploadModalOpen(true)}
           />
         </div>
 
         {/* Formulario + acciones */}
         <div className="flex min-h-0 flex-col gap-2.5 overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-white p-3 shadow-card">
-            <FormProvider {...form}>
-              <CaseFieldsForm
-                fields={descriptors}
-                validations={validations}
-                groupIssues={groupIssues}
-                activeGroup={activeGroup}
-                onSelectGroup={setActiveGroup}
-                activeFieldId={activeFieldId}
-                onFocusField={focusField}
-                fieldRefs={fieldRefs}
-              />
-            </FormProvider>
+            {isIncomplete ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center px-6">
+                <FileWarning className="size-10 text-error/80" />
+                <h3 className="font-heading text-lg font-semibold text-ink-primary">
+                  Expediente Incompleto (DNI: {dniReference})
+                </h3>
+                <p className="font-sans text-sm text-ink-secondary max-w-md">
+                  Faltan documentos requeridos para procesar este expediente. Por favor, sube los documentos pendientes para continuar.
+                </p>
+                <Button onClick={() => setIsUploadModalOpen(true)} className="mt-2" disabled={docsQuery.isLoading}>
+                  Subir documentos faltantes
+                </Button>
+                <p className="font-data text-[11px] text-ink-muted mt-2">
+                  La validación de datos cruzados está bloqueada hasta que el expediente esté completo.
+                </p>
+              </div>
+            ) : (
+              <FormProvider {...form}>
+                <CaseFieldsForm
+                  fields={descriptors}
+                  validations={validations}
+                  groupIssues={groupIssues}
+                  activeGroup={activeGroup}
+                  onSelectGroup={setActiveGroup}
+                  activeFieldId={activeFieldId}
+                  onFocusField={focusField}
+                  fieldRefs={fieldRefs}
+                />
+              </FormProvider>
+            )}
           </div>
 
           {/* Acciones */}
@@ -499,7 +530,7 @@ export function CaseCorrectionScreen({
                 variant="outline"
                 className="border-error text-error-dark hover:bg-error-light"
                 onClick={() => setRejectOpen(true)}
-                disabled={submitCorrection.isPending}
+                disabled={submitCorrection.isPending || isIncomplete}
               >
                 <XCircle />
                 Rechazar expediente
@@ -510,7 +541,7 @@ export function CaseCorrectionScreen({
                   <ArrowRight />
                 </Button>
               )}
-              <Button onClick={onSubmit} disabled={submitCorrection.isPending}>
+              <Button onClick={onSubmit} disabled={submitCorrection.isPending || isIncomplete}>
                 {submitCorrection.isPending ? (
                   <Loader2 className="animate-spin" />
                 ) : (
@@ -529,6 +560,18 @@ export function CaseCorrectionScreen({
         open={rejectOpen}
         onOpenChange={setRejectOpen}
         onRejected={goBackToBatch}
+      />
+
+      <DossierDocumentChecklist
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        batchId={batchId}
+        dniReference={dniReference}
+        pendingDocuments={docsQuery.data?.pending_documents ?? []}
+        onSuccess={() => {
+          setIsUploadModalOpen(false);
+          void caseQuery.refetch();
+        }}
       />
     </div>
   );

@@ -28,15 +28,24 @@ const KPI_DESCRIPTORS: KpiDescriptor[] = [
     icon: Layers,
     iconClassName: 'bg-brand-200 text-primary',
   },
-  ...batchStatusValues.map((status) => {
-    const config = BATCH_STATUS_CONFIG[status];
-    return {
-      key: status,
-      label: config.filterLabel,
-      icon: config.icon,
-      iconClassName: config.kpiIconClassName,
-    };
-  }),
+  {
+    key: 'PENDING,PROCESSING',
+    label: BATCH_STATUS_CONFIG['PROCESSING'].filterLabel,
+    icon: BATCH_STATUS_CONFIG['PROCESSING'].icon,
+    iconClassName: BATCH_STATUS_CONFIG['PROCESSING'].kpiIconClassName,
+  },
+  {
+    key: 'COMPLETED',
+    label: BATCH_STATUS_CONFIG['COMPLETED'].filterLabel,
+    icon: BATCH_STATUS_CONFIG['COMPLETED'].icon,
+    iconClassName: BATCH_STATUS_CONFIG['COMPLETED'].kpiIconClassName,
+  },
+  {
+    key: 'FINALIZED,REJECTED,FAILED',
+    label: BATCH_STATUS_CONFIG['FINALIZED'].filterLabel,
+    icon: BATCH_STATUS_CONFIG['FINALIZED'].icon,
+    iconClassName: BATCH_STATUS_CONFIG['FINALIZED'].kpiIconClassName,
+  }
 ];
 
 function KpiCard({
@@ -68,7 +77,7 @@ function KpiCard({
 }
 
 const GRID_CLASSNAME =
-  'grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7';
+  'grid grid-cols-2 gap-2.5 sm:grid-cols-4';
 
 /** Fila de 7 KPIs (totales globales informativos), con carga y error. */
 export function SummaryCards() {
@@ -103,10 +112,12 @@ export function SummaryCards() {
     );
   }
 
-  const valueFor = (key: string): number =>
-    key === 'TOTAL'
-      ? data.total_batches
-      : (data.statuses[key as keyof typeof data.statuses] ?? 0);
+  const valueFor = (key: string): number => {
+    if (key === 'TOTAL') return data.total_batches;
+    return key.split(',').reduce((sum, status) => {
+      return sum + (data.statuses[status as keyof typeof data.statuses] ?? 0);
+    }, 0);
+  };
 
   return (
     <div className={GRID_CLASSNAME}>

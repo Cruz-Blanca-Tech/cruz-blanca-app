@@ -31,6 +31,7 @@ export const batchListItemSchema = z.object({
   created_at: z.string().nullable(),
   documents_failed_count: count,
   documents_approved_count: count,
+  documents_total_count: count.optional().default(0),
   description: z.string().nullable(),
   activity_name: z.string().nullable(),
   program_name: z.string().nullable(),

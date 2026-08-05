@@ -10,8 +10,8 @@ const authAxios = axios.create({
 });
 
 export const authService = {
-  async loginWithGoogle(googleIdToken: string): Promise<void> {
-    await authAxios.post('/google/callback', { google_token: googleIdToken });
+  async loginWithGoogle(code: string): Promise<void> {
+    await authAxios.post('/google/callback', { code });
   },
 
   async logout(): Promise<void> {

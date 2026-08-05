@@ -106,6 +106,8 @@ export const educaCaseSchema = z.object({
   status: z.string(),
   dossier_data: educaDossierDataSchema,
   discrepancies: z.array(triageDiscrepancySchema),
+  /** Mapa código → uuid de los documentos ya cargados. */
+  document_ids: z.record(z.string(), z.string()).optional().default({}),
 });
 export type EducaCase = z.infer<typeof educaCaseSchema>;
 

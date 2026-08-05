@@ -3,6 +3,20 @@ import type { ApiErrorPayload, RequestOptions } from './types';
 
 export const AUTH_TOKEN_EXPIRED_EVENT = 'auth:token-expired';
 
+let isRefreshing = false;
+let failedQueue: { resolve: (token: string) => void; reject: (error: Error) => void }[] = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token as string);
+    }
+  });
+  failedQueue = [];
+};
+
 class ApiClient {
   private basePath = '/api/proxy';
   private axiosInstance;
@@ -18,23 +32,47 @@ class ApiClient {
 
     this.axiosInstance.interceptors.response.use(
       (response) => response,
-      (error: AxiosError<ApiErrorPayload>) => {
+      async (error: AxiosError<ApiErrorPayload>) => {
+        const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
         if (error.response) {
           const statusCode = error.response.status;
           const errorData = error.response.data;
 
-          // Solo 401 indica sesión inválida/expirada → cerrar sesión y redirigir.
-          // 403 es "autenticado pero sin permisos": se trata como error normal.
-          if (statusCode === 401) {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(
-                new CustomEvent(AUTH_TOKEN_EXPIRED_EVENT, { detail: { statusCode } })
-              );
-              setTimeout(() => {
-                window.location.href = '/auth?session_expired=true';
-              }, 100);
+          if (statusCode === 401 && originalRequest && !originalRequest.url?.includes('/api/auth/refresh') && !originalRequest._retry) {
+            if (isRefreshing) {
+              try {
+                await new Promise<string>((resolve, reject) => {
+                  failedQueue.push({ resolve, reject });
+                });
+                return this.axiosInstance(originalRequest);
+              } catch (err) {
+                return Promise.reject(err);
+              }
             }
-            throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            try {
+              await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+              isRefreshing = false;
+              processQueue(null, 'refreshed');
+              return this.axiosInstance(originalRequest);
+            } catch (refreshError) {
+              isRefreshing = false;
+              processQueue(refreshError as Error, null);
+              
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent(AUTH_TOKEN_EXPIRED_EVENT, { detail: { statusCode } })
+                );
+                setTimeout(() => {
+                  window.location.href = '/auth?session_expired=true';
+                }, 100);
+              }
+              throw new Error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+            }
           }
 
           let errorMessage =
