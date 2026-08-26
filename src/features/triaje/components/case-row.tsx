@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { XCircle, TriangleAlert, PencilLine } from 'lucide-react';
+import { XCircle, TriangleAlert, PencilLine, Eye } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import type { TriageCaseListItem } from '../schemas/triage-cases-schema';
+import { isCaseFinalized } from '../lib/case-actions';
 import { CaseVerdictBadge } from './case-verdict-badge';
 import { DiscrepanciesCell } from './discrepancies-cell';
 
@@ -43,6 +44,9 @@ function CountCell({ count, icon: Icon, activeClassName }: CountCellProps) {
 export function CaseRow({ caseItem, index }: CaseRowProps) {
   const hasErrors = caseItem.error_count > 0;
   const hasWarnings = caseItem.warning_count > 0;
+  // Un expediente ya resuelto se sigue pudiendo abrir (consultar el detalle es
+  // legítimo), pero se anuncia como lectura: sus campos no admiten corrección.
+  const isFinalized = isCaseFinalized(caseItem.status);
 
   return (
     <TableRow
@@ -91,7 +95,7 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
             en la URL para alimentar el visor de documentos tras un F5. */}
         <Button
           size="sm"
-          variant="outline"
+          variant={isFinalized ? 'ghost' : 'outline'}
           nativeButton={false}
           render={
             <Link
@@ -99,8 +103,8 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
             />
           }
         >
-          <PencilLine />
-          Corregir
+          {isFinalized ? <Eye /> : <PencilLine />}
+          {isFinalized ? 'Ver' : 'Corregir'}
         </Button>
       </TableCell>
     </TableRow>

@@ -16,6 +16,7 @@ import {
   Save,
   XCircle,
   FileWarning,
+  Lock,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ import {
   matchDiscrepancy,
   type FieldValidation,
 } from '../lib/correction-fields';
+import { getCaseActionsState } from '../lib/case-actions';
 import {
   CORRECTION_GROUPS,
   dossierToFormValues,
@@ -146,6 +148,12 @@ export function CaseCorrectionScreen({
 
   const caseData = caseQuery.data;
   const isIncomplete = caseData?.status === 'INCOMPLETE';
+  // Un expediente ya resuelto no admite correcciones, y sólo admite rechazo
+  // mientras su lote no se haya cargado al registro de beneficiarios.
+  const caseActions = getCaseActionsState({
+    caseStatus: caseData?.status ?? '',
+    batchStatus: batchQuery.data?.status,
+  });
   const documents = useMemo(() => docsQuery.data?.documents ?? [], [docsQuery.data]);
   const discrepancies = useMemo(
     () => caseData?.discrepancies ?? [],
@@ -291,7 +299,7 @@ export function CaseCorrectionScreen({
   };
 
   const onSubmit = form.handleSubmit((values) => {
-    if (!caseData) return;
+    if (!caseData || !caseActions.canEdit) return;
     const payload = formValuesToDossier(values, caseData.dossier_data);
     submitCorrection.mutate(payload, {
       onSuccess: (res) => {
@@ -500,18 +508,36 @@ export function CaseCorrectionScreen({
                 </p>
               </div>
             ) : (
-              <FormProvider {...form}>
-                <CaseFieldsForm
-                  fields={descriptors}
-                  validations={validations}
-                  groupIssues={groupIssues}
-                  activeGroup={activeGroup}
-                  onSelectGroup={setActiveGroup}
-                  activeFieldId={activeFieldId}
-                  onFocusField={focusField}
-                  fieldRefs={fieldRefs}
-                />
-              </FormProvider>
+              <>
+                {caseActions.lockReason && (
+                  <div className="mb-2.5 flex shrink-0 items-start gap-2 rounded-md bg-info-light px-3 py-2">
+                    <Lock className="mt-0.5 size-3.5 shrink-0 text-info-dark" />
+                    <p className="font-sans text-[12.5px] text-info-dark">
+                      {caseActions.lockReason}
+                    </p>
+                  </div>
+                )}
+                <FormProvider {...form}>
+                  {/* `fieldset[disabled]` alcanza a todos los controles del
+                      formulario, así el expediente cerrado se lee pero no se
+                      edita. `contents` deja el layout flex intacto. */}
+                  <fieldset
+                    disabled={!caseActions.canEdit}
+                    className="contents"
+                  >
+                    <CaseFieldsForm
+                      fields={descriptors}
+                      validations={validations}
+                      groupIssues={groupIssues}
+                      activeGroup={activeGroup}
+                      onSelectGroup={setActiveGroup}
+                      activeFieldId={activeFieldId}
+                      onFocusField={focusField}
+                      fieldRefs={fieldRefs}
+                    />
+                  </fieldset>
+                </FormProvider>
+              </>
             )}
           </div>
 
@@ -530,7 +556,11 @@ export function CaseCorrectionScreen({
                 variant="outline"
                 className="border-error text-error-dark hover:bg-error-light"
                 onClick={() => setRejectOpen(true)}
-                disabled={submitCorrection.isPending || isIncomplete}
+                disabled={
+                  submitCorrection.isPending ||
+                  isIncomplete ||
+                  !caseActions.canReject
+                }
               >
                 <XCircle />
                 Rechazar expediente
@@ -541,7 +571,14 @@ export function CaseCorrectionScreen({
                   <ArrowRight />
                 </Button>
               )}
-              <Button onClick={onSubmit} disabled={submitCorrection.isPending || isIncomplete}>
+              <Button
+                onClick={onSubmit}
+                disabled={
+                  submitCorrection.isPending ||
+                  isIncomplete ||
+                  !caseActions.canEdit
+                }
+              >
                 {submitCorrection.isPending ? (
                   <Loader2 className="animate-spin" />
                 ) : (
