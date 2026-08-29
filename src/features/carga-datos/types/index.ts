@@ -13,6 +13,11 @@
  */
 
 import type { ActivityRequirement } from '@/shared/schemas/activity-schema';
+import type { PickedFile } from '@/shared/drive/types';
+
+// `PickedFile` se movió a `@/shared/drive` (lo consumen `carga-datos` y `triaje`).
+// Se re-exporta desde aquí para no romper los importadores internos del feature.
+export type { PickedFile };
 
 /**
  * Body para crear una actividad (POST /activities/ → ActivityCreateRequest).
@@ -24,16 +29,6 @@ export interface CreateActivityRequest {
   is_active: boolean;
   program_id: string;
   requirements: ActivityRequirement[];
-}
-
-/**
- * Archivo seleccionado en el Google Picker, ya en el formato que espera el
- * backend. `source_id` es el id crudo del archivo en Drive (`doc.id` del Picker)
- * y `file_name` su nombre (`doc.name`).
- */
-export interface PickedFile {
-  source_id: string;
-  file_name: string;
 }
 
 /** Body para crear un batch de extracción (POST /api/v1/batches/). */

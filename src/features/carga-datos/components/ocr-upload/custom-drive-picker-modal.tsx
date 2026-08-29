@@ -1,26 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  Folder, 
-  FileText, 
-  ChevronRight, 
-  Loader2, 
+import {
+  ChevronRight,
+  Loader2,
   AlertCircle,
   FileSearch,
-  HardDrive,
-  Image as ImageIcon,
-  FileCode,
-  FileArchive,
   Search,
-  File,
   LayoutGrid,
   List as ListIcon
 } from 'lucide-react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogFooter
 } from '@/components/ui/dialog';
@@ -29,24 +22,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import type { PickedFile } from '../../types';
-
-interface DriveFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  modifiedTime?: string;
-  isSharedDrive?: boolean;
-}
+import type { PickedFile, DriveFile, DriveBreadcrumb } from '@/shared/drive/types';
+import { ROOT_NODES, listDriveContent, listFolderFiles } from '@/shared/drive/drive-api';
+import { getDriveFileIcon } from '@/shared/drive/drive-file-icon';
 
 interface CustomDrivePickerModalProps {
   isOpen: boolean;
@@ -55,23 +42,13 @@ interface CustomDrivePickerModalProps {
   onPick: (files: PickedFile[]) => void;
 }
 
-interface Breadcrumb {
-  id: string;
-  name: string;
-}
-
-const ROOT_NODES: DriveFile[] = [
-  { id: 'root', name: 'Mi Unidad', mimeType: 'application/vnd.google-apps.folder' },
-  { id: 'shared_drives_root', name: 'Unidades Compartidas', mimeType: 'application/vnd.google-apps.folder', isSharedDrive: true },
-];
-
 export function CustomDrivePickerModal({
   isOpen,
   onClose,
   token,
   onPick
 }: CustomDrivePickerModalProps) {
-  const [history, setHistory] = useState<Breadcrumb[]>([{ id: 'app_root', name: 'Google Drive' }]);
+  const [history, setHistory] = useState<DriveBreadcrumb[]>([{ id: 'app_root', name: 'Google Drive' }]);
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +63,7 @@ export function CustomDrivePickerModal({
 
   const fetchContent = useCallback(async (folderId: string, search: string = '') => {
     if (!token) return;
-    
+
     if (folderId === 'app_root') {
       setFiles(ROOT_NODES);
       setLoading(false);
@@ -96,46 +73,8 @@ export function CustomDrivePickerModal({
     setLoading(true);
     setError(null);
     try {
-      if (folderId === 'shared_drives_root') {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/drives?pageSize=100`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Error al cargar Unidades Compartidas');
-        const data = await res.json();
-        
-        let drives = (data.drives || []).map((d: any) => ({
-          id: d.id,
-          name: d.name,
-          mimeType: 'application/vnd.google-apps.folder',
-          isSharedDrive: true
-        }));
-        
-        if (search) {
-          drives = drives.filter((d: any) => d.name.toLowerCase().includes(search.toLowerCase()));
-        }
-        setFiles(drives);
-      } else {
-        let query = `'${folderId}' in parents and trashed = false`;
-        if (search) {
-          query += ` and name contains '${search.replace(/'/g, "\\'")}'`;
-        }
-        
-        const url = new URL('https://www.googleapis.com/drive/v3/files');
-        url.searchParams.append('q', query);
-        url.searchParams.append('fields', 'files(id,name,mimeType,modifiedTime)');
-        url.searchParams.append('orderBy', 'folder,name');
-        url.searchParams.append('pageSize', '1000');
-        url.searchParams.append('supportsAllDrives', 'true');
-        url.searchParams.append('includeItemsFromAllDrives', 'true');
-        url.searchParams.append('corpora', 'allDrives');
-
-        const res = await fetch(url.toString(), {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Error al cargar archivos de Google Drive');
-        const data = await res.json();
-        setFiles(data.files || []);
-      }
+      // El multi-picker lista con pageSize alto (1000) para poder "Seleccionar todo".
+      setFiles(await listDriveContent(token, folderId, search, 1000));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -202,34 +141,8 @@ export function CustomDrivePickerModal({
     }
   };
 
-  const fetchFolderContentsRecursive = async (folderId: string): Promise<PickedFile[]> => {
-    try {
-      const query = `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`;
-      const url = new URL('https://www.googleapis.com/drive/v3/files');
-      url.searchParams.append('q', query);
-      url.searchParams.append('fields', 'files(id,name)');
-      url.searchParams.append('pageSize', '1000');
-      url.searchParams.append('supportsAllDrives', 'true');
-      url.searchParams.append('includeItemsFromAllDrives', 'true');
-      url.searchParams.append('corpora', 'allDrives');
-
-      const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return (data.files || []).map((f: any) => ({
-        source_id: f.id,
-        file_name: f.name,
-      }));
-    } catch (err) {
-      console.error(err);
-      return [];
-    }
-  };
-
   const handleConfirm = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 || !token) return;
     setIsConfirming(true);
     setError(null);
     try {
@@ -238,7 +151,7 @@ export function CustomDrivePickerModal({
 
       for (const file of selectedFiles) {
         if (file.mimeType === 'application/vnd.google-apps.folder') {
-          const subFiles = await fetchFolderContentsRecursive(file.id);
+          const subFiles = await listFolderFiles(token, file.id);
           finalFiles = finalFiles.concat(subFiles);
         } else {
           finalFiles.push({
@@ -257,17 +170,6 @@ export function CustomDrivePickerModal({
     } finally {
       setIsConfirming(false);
     }
-  };
-
-  const getFileIcon = (mimeType: string, isSharedDrive?: boolean, size: number = 4) => {
-    const className = `size-${size} ${size > 4 ? 'opacity-80' : ''}`;
-    if (isSharedDrive) return <HardDrive className={cn(className, "text-emerald-600")} />;
-    if (mimeType === 'application/vnd.google-apps.folder') return <Folder className={cn(className, "text-blue-500 fill-blue-100")} />;
-    if (mimeType.includes('image')) return <ImageIcon className={cn(className, "text-purple-500")} />;
-    if (mimeType.includes('pdf')) return <FileText className={cn(className, "text-red-500")} />;
-    if (mimeType.includes('zip') || mimeType.includes('rar')) return <FileArchive className={cn(className, "text-amber-500")} />;
-    if (mimeType.includes('json') || mimeType.includes('html')) return <FileCode className={cn(className, "text-slate-500")} />;
-    return <File className={cn(className, "text-slate-400")} />;
   };
 
   const formatDate = (isoString?: string) => {
@@ -425,7 +327,7 @@ export function CustomDrivePickerModal({
                           </TableCell>
                           <TableCell className="p-2">
                             <div className="flex items-center justify-center size-8 rounded-md bg-white border border-slate-200 shadow-sm group-hover:border-slate-300 transition-colors">
-                              {getFileIcon(file.mimeType, file.isSharedDrive)}
+                              {getDriveFileIcon(file.mimeType, file.isSharedDrive)}
                             </div>
                           </TableCell>
                           <TableCell className={cn(
@@ -484,7 +386,7 @@ export function CustomDrivePickerModal({
                         )}
                         
                         <div className="flex-1 flex items-center justify-center p-4 w-full aspect-square bg-slate-50/50 rounded-lg border border-slate-100 mb-1">
-                          {getFileIcon(file.mimeType, file.isSharedDrive, 12)}
+                          {getDriveFileIcon(file.mimeType, file.isSharedDrive, 12)}
                         </div>
                         
                         <div className="w-full text-center px-1">

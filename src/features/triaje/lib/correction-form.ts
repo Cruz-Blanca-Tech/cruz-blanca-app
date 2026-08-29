@@ -14,6 +14,7 @@ import type {
   EducaDossierData,
 } from '../schemas/educa-case-schema';
 
+/** Grupos que se renderizan como PESTAÑAS en el formulario de corrección. */
 export const CORRECTION_GROUPS = [
   'Beneficiario',
   'Contactos y Apoderado',
@@ -21,7 +22,20 @@ export const CORRECTION_GROUPS = [
   'Salud',
   'Religión y permisos',
 ] as const;
-export type CorrectionGroup = (typeof CORRECTION_GROUPS)[number];
+
+/**
+ * Grupo al que pertenece un campo. Los 5 de `CORRECTION_GROUPS` son las pestañas
+ * visibles; 'Padre'/'Madre'/'Apoderado'/'Otro' son SUBGRUPOS contextuales sin
+ * pestaña propia: solo se muestran al saltar a uno de sus campos desde el panel
+ * de validación (`focusField` fija `activeGroup` al grupo del campo enfocado).
+ * Por eso el tipo es un superconjunto de `CORRECTION_GROUPS`, no su derivado.
+ */
+export type CorrectionGroup =
+  | (typeof CORRECTION_GROUPS)[number]
+  | 'Padre'
+  | 'Madre'
+  | 'Apoderado'
+  | 'Otro';
 
 /** Un adulto relacionado tal como lo maneja el formulario (strings no-nulos). */
 export interface AdultFormValue {
@@ -82,6 +96,48 @@ export interface CorrectionFormValues {
   guardian_ref: string;
   /** Índice (como string) del adulto asignado como contacto de emergencia, o ''. */
   emergency_contact_ref: string;
+}
+
+/**
+ * Valores iniciales vacíos del formulario. Se usan como `defaultValues` de
+ * `useForm` antes de que llegue el expediente (y como base neutra); una vez
+ * cargado, `dossierToFormValues` los reemplaza vía `form.reset`.
+ */
+export function emptyCorrectionValues(): CorrectionFormValues {
+  return {
+    beneficiary: {
+      dni: '',
+      first_name: '',
+      last_name: '',
+      birth_date: '',
+      gender: '',
+      address: '',
+    },
+    education: {
+      school: '',
+      grade: '',
+      knows_read: false,
+      knows_write: false,
+      repeated_grade: false,
+      learning_difficulties: false,
+    },
+    medical: {
+      allergies: [],
+      diseases: [],
+      insurance: [],
+      has_been_operated: false,
+      operation_reason: '',
+      has_been_hospitalized: false,
+      hospitalization_reason: '',
+      vaccines: [],
+      medications: [],
+    },
+    religion: { baptized: null, first_communion: null },
+    permissions: { haircut_permission: null, medical_exams_permission: null },
+    adults: [],
+    guardian_ref: '',
+    emergency_contact_ref: '',
+  };
 }
 
 const s = (v: string | null | undefined): string => v ?? '';

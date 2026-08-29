@@ -12,7 +12,7 @@ import {
 
 import { useDailyVolume } from '../hooks/use-dashboard-queries';
 import { ChartCard } from './chart-card';
-import { formatDay } from './dashboard-format';
+import { formatDay } from '../lib/dashboard-format';
 
 /** Serie única (total de casos) mapeada al primer token de marca (`--chart-1`). */
 const chartConfig = {

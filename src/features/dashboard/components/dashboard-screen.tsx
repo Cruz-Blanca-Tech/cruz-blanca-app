@@ -1,5 +1,3 @@
-'use client';
-
 import { SuccessRateCard } from './success-rate-card';
 import { AutomationLevelCard } from './automation-level-card';
 import { DailyVolumeChart } from './daily-volume-chart';

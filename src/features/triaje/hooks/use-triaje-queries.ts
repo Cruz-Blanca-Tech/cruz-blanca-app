@@ -181,7 +181,7 @@ export function useCaseDocuments(
  * propio lote. Se devuelve la promesa para que la mutación no se considere
  * resuelta hasta que el refetch quede en marcha.
  */
-function invalidateBatchState(
+export function invalidateBatchState(
   queryClient: ReturnType<typeof useQueryClient>,
   batchId: string
 ) {

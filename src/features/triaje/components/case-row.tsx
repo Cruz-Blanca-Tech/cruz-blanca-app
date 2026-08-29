@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import { XCircle, TriangleAlert, PencilLine, Eye } from 'lucide-react';
 

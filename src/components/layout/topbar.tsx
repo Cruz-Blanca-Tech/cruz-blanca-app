@@ -6,6 +6,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ROLES, type Role } from '@/features/auth/types';
+import { getInitials } from '@/lib/initials';
 
 const ROLE_LABELS: Record<Role, string> = {
   [ROLES.ADMIN]: 'Administrador',
@@ -13,16 +14,6 @@ const ROLE_LABELS: Record<Role, string> = {
   [ROLES.REVISOR]: 'Revisor',
   [ROLES.VISUALIZADOR]: 'Visualizador',
 };
-
-function getInitials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((word) => word[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase();
-}
 
 export function Topbar() {
   const pathname = usePathname();
