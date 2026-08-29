@@ -14,7 +14,7 @@ import {
 
 import { useAutomationLevel } from '../hooks/use-dashboard-queries';
 import { ChartCard } from './chart-card';
-import { resolveLabel } from './dashboard-format';
+import { resolveLabel } from '../lib/dashboard-format';
 
 /**
  * Nivel de automatización (GET /operations/automation-level). Dona (Pie con

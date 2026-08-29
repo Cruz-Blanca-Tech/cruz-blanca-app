@@ -1,42 +1,41 @@
+'use client';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { API_PATHS } from '@/lib/api-paths';
-import { triajeKeys } from './use-triaje-queries';
-export interface UploadMissingDocPayload {
-  document_code: string;
-  file: {
-    file_name: string;
-    source_id: string;
-  };
-}
+import { dossierService } from '../services/dossier-service';
+import { triajeKeys, invalidateBatchState } from './use-triaje-queries';
+import type { UploadMissingDocPayload } from '../schemas/dossier-schema';
 
-export interface UploadMissingDocResult {
-  message: string;
-  document_id: string;
-}
-
-export function useUploadMissingDoc(batchId: string, caseDni: string) {
+/**
+ * POST /batches/{batchId}/dossiers/{caseDni}/documents — sube un documento
+ * faltante del expediente.
+ *
+ * Tras el éxito invalida de forma dirigida (ver `useRevalidateDossier`): vistas
+ * del lote, documentos del expediente y —si se conoce el `caseId`— la vista de
+ * corrección del caso.
+ */
+export function useUploadMissingDoc(
+  batchId: string,
+  caseDni: string,
+  caseId?: string
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: UploadMissingDocPayload): Promise<UploadMissingDocResult> => {
-      try {
-        const response = await apiClient.post<UploadMissingDocResult>(
-          `${API_PATHS.batches}/${batchId}/dossiers/${caseDni}/documents`,
-          payload
-        );
-        return response;
-      } catch (err: any) {
-        throw new Error(err.message || 'Error al subir documento');
-      }
-    },
+    mutationFn: (payload: UploadMissingDocPayload) =>
+      dossierService.uploadMissingDoc(batchId, caseDni, payload),
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Error al procesar el documento');
     },
-    onSuccess: () => {
-      // Invalidar el caso y el lote para forzar el refetch
-      queryClient.invalidateQueries({ queryKey: triajeKeys.all });
-    },
+    onSuccess: () =>
+      Promise.all([
+        invalidateBatchState(queryClient, batchId),
+        queryClient.invalidateQueries({
+          queryKey: triajeKeys.caseDocuments(batchId, caseDni),
+        }),
+        caseId
+          ? queryClient.invalidateQueries({ queryKey: triajeKeys.case(caseId) })
+          : Promise.resolve(),
+      ]),
   });
 }

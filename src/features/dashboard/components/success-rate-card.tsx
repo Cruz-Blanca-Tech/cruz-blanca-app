@@ -14,7 +14,7 @@ import {
 
 import { useSuccessRate } from '../hooks/use-dashboard-queries';
 import { ChartCard } from './chart-card';
-import { resolveLabel } from './dashboard-format';
+import { resolveLabel } from '../lib/dashboard-format';
 
 /**
  * Tasa de éxito (GET /operations/success-rate). Dona (Pie con `innerRadius`) que

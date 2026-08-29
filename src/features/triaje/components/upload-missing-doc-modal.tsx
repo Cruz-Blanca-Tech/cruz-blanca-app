@@ -25,7 +25,7 @@ import { useBatch } from '../hooks/use-triaje-queries';
 import { useActivities } from '@/shared/hooks/use-intake-queries';
 import { useDocumentCatalog } from '@/features/carga-datos/hooks/use-carga-datos-queries';
 import { useUploadMissingDoc } from '../hooks/use-upload-missing-doc';
-import type { PickedFile } from '@/features/carga-datos/types';
+import type { PickedFile } from '@/shared/drive/types';
 import { SingleDriveFilePicker } from './single-drive-file-picker';
 
 interface UploadMissingDocModalProps {
@@ -91,6 +91,7 @@ export function UploadMissingDocModal({
     const forgedFileName = `${dniReference}_${selectedCode}.${ext}`;
 
     uploadMutation.mutate({
+      document_code: selectedCode,
       file: {
         file_name: forgedFileName,
         source_id: pickedFile.source_id,

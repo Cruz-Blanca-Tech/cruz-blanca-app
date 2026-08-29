@@ -26,14 +26,10 @@ import { cn } from '@/lib/utils';
 
 import { useUploadMissingDoc } from '../hooks/use-upload-missing-doc';
 import { useRevalidateDossier } from '../hooks/use-revalidate-dossier';
-import {
-  SingleDrivePickerModal,
-  ensureIdentityServices,
-  getDriveToken,
-} from './single-drive-file-picker';
+import { SingleDrivePickerModal } from './single-drive-file-picker';
+import { acquireDriveToken } from '@/shared/drive/drive-auth';
 import type { DocumentDossierItem } from '../schemas/case-documents-schema';
-import type { PickedFile } from '@/features/carga-datos/types';
-import type { GoogleApi } from '@/types/google-picker';
+import type { PickedFile } from '@/shared/drive/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Botón compacto de Drive — abre el modal sin dropzone
@@ -52,10 +48,7 @@ function CompactDrivePicker({
   const handleClick = async () => {
     setLoading(true);
     try {
-      await ensureIdentityServices();
-      const google = (window as unknown as { google?: GoogleApi }).google;
-      if (!google?.accounts?.oauth2) throw new Error('Google API no disponible');
-      const t = await getDriveToken(google);
+      const t = await acquireDriveToken();
       setToken(t);
       setIsPickerOpen(true);
     } catch {
@@ -107,6 +100,7 @@ interface DossierDocumentChecklistProps {
   isOpen: boolean;
   onClose: () => void;
   batchId: string;
+  caseId: string;
   dniReference: string;
   /**
    * Documentos faltantes calculados por el backend en
@@ -124,6 +118,7 @@ export function DossierDocumentChecklist({
   isOpen,
   onClose,
   batchId,
+  caseId,
   dniReference,
   pendingDocuments,
   onSuccess,
@@ -134,8 +129,8 @@ export function DossierDocumentChecklist({
   const [uploadingCode, setUploadingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const uploadMutation = useUploadMissingDoc(batchId, dniReference);
-  const revalidateMutation = useRevalidateDossier(batchId, dniReference);
+  const uploadMutation = useUploadMissingDoc(batchId, dniReference, caseId);
+  const revalidateMutation = useRevalidateDossier(batchId, dniReference, caseId);
 
   const actionablePending = pendingDocuments;
 

@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import type { Role } from '@/features/auth/types';
 
 import { ROLE_CONFIG } from '../lib/role-config';
-import { getInitials } from '../lib/user-format';
+import { getInitials } from '@/lib/initials';
 
 interface UserAvatarProps {
   fullName: string;

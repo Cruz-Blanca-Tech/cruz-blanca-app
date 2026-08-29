@@ -12,7 +12,7 @@ import {
 
 import { useRegistrationGrowth } from '../hooks/use-dashboard-queries';
 import { ChartCard } from './chart-card';
-import { formatMonth } from './dashboard-format';
+import { formatMonth } from '../lib/dashboard-format';
 
 /** Serie única (altas por mes) mapeada al token verde (`--chart-2`), tendencia positiva. */
 const chartConfig = {

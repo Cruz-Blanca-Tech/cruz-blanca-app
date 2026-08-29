@@ -4,15 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   ChevronRight,
-  File,
-  FileArchive,
-  FileCode,
   FileSearch,
-  FileText,
-  Folder,
   FolderOpen,
-  HardDrive,
-  Image as ImageIcon,
   Loader2,
   Search,
 } from 'lucide-react';
@@ -27,109 +20,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { clientEnv } from '@/lib/env';
 import { cn } from '@/lib/utils';
-import type { GoogleApi, GoogleTokenResponse } from '@/types/google-picker';
-import type { PickedFile } from '@/features/carga-datos/types';
-
-// ── Auth helpers (copiados del GoogleDrivePicker original) ──────────────────
-const GOOGLE_CLIENT_ID = clientEnv.googleClientId;
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
-const GSI_SCRIPT_ID = 'google-identity-services-script';
-const GSI_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
-
-function getGoogleApi(): GoogleApi | undefined {
-  return (window as unknown as { google?: GoogleApi }).google;
-}
-
-function loadScript(id: string, src: string, isReady: () => boolean): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined') { reject(new Error('window no disponible')); return; }
-    if (isReady()) { resolve(); return; }
-    const existing = document.getElementById(id) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error(`No se pudo cargar ${src}`)), { once: true });
-      return;
-    }
-    const script = document.createElement('script');
-    script.id = id; script.src = src; script.async = true; script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
-    document.head.appendChild(script);
-  });
-}
-
-export async function ensureIdentityServices(): Promise<void> {
-  await loadScript(GSI_SCRIPT_ID, GSI_SCRIPT_SRC, () => Boolean(getGoogleApi()?.accounts?.oauth2));
-}
-
-const SESSION_STORAGE_KEY = 'cruz_blanca_drive_token';
-let memoryToken: { value: string; expiresAt: number } | null = null;
-const TOKEN_EXPIRY_MARGIN_MS = 60_000;
-
-function getCachedToken(): { value: string; expiresAt: number } | null {
-  if (memoryToken) return memoryToken;
-  try {
-    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed.expiresAt > Date.now()) { memoryToken = parsed; return parsed; }
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    }
-  } catch { /* ignore */ }
-  return null;
-}
-
-function setCachedToken(value: string, expiresAt: number) {
-  const tokenObj = { value, expiresAt };
-  memoryToken = tokenObj;
-  try { sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(tokenObj)); } catch { /* ignore */ }
-}
-
-function requestDriveToken(google: GoogleApi): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID ?? '',
-      scope: DRIVE_SCOPE,
-      callback: (response: GoogleTokenResponse) => {
-        if (response.error || !response.access_token) {
-          reject(new Error(response.error_description ?? response.error ?? 'No se concedió acceso a Google Drive.'));
-          return;
-        }
-        const ttlMs = (response.expires_in ?? 3600) * 1000;
-        setCachedToken(response.access_token, Date.now() + ttlMs - TOKEN_EXPIRY_MARGIN_MS);
-        resolve(response.access_token);
-      },
-      error_callback: (error) => reject(new Error(error.message ?? 'Se canceló la autorización de Drive.')),
-    });
-    client.requestAccessToken({ prompt: '' });
-  });
-}
-
-export function getDriveToken(google: GoogleApi): Promise<string> {
-  const cached = getCachedToken();
-  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.value);
-  return requestDriveToken(google);
-}
-
-// ── Tipos internos ──────────────────────────────────────────────────────────
-interface DriveFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  modifiedTime?: string;
-  isSharedDrive?: boolean;
-}
-
-interface Breadcrumb { id: string; name: string; }
-
-const ROOT_NODES: DriveFile[] = [
-  { id: 'root', name: 'Mi Unidad', mimeType: 'application/vnd.google-apps.folder' },
-  { id: 'shared_drives_root', name: 'Unidades Compartidas', mimeType: 'application/vnd.google-apps.folder', isSharedDrive: true },
-];
-
-const CONFIG_ERROR = !GOOGLE_CLIENT_ID ? 'Falta configurar NEXT_PUBLIC_GOOGLE_CLIENT_ID.' : null;
+import type { DriveFile, DriveBreadcrumb, PickedFile } from '@/shared/drive/types';
+import { ROOT_NODES, listDriveContent } from '@/shared/drive/drive-api';
+import { getDriveFileIcon } from '@/shared/drive/drive-file-icon';
+import { CONFIG_ERROR, acquireDriveToken } from '@/shared/drive/drive-auth';
 
 // ── Componente de subpicker (Modal interno) ─────────────────────────────────
 export function SingleDrivePickerModal({
@@ -143,7 +38,7 @@ export function SingleDrivePickerModal({
   token: string | null;
   onPick: (file: PickedFile) => void;
 }) {
-  const [history, setHistory] = useState<Breadcrumb[]>([{ id: 'app_root', name: 'Google Drive' }]);
+  const [history, setHistory] = useState<DriveBreadcrumb[]>([{ id: 'app_root', name: 'Google Drive' }]);
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,33 +51,7 @@ export function SingleDrivePickerModal({
     if (folderId === 'app_root') { setFiles(ROOT_NODES); setLoading(false); return; }
     setLoading(true); setError(null);
     try {
-      if (folderId === 'shared_drives_root') {
-        const res = await fetch('https://www.googleapis.com/drive/v3/drives?pageSize=100', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Error al cargar Unidades Compartidas');
-        const data = await res.json();
-        let drives = (data.drives || []).map((d: { id: string; name: string }) => ({
-          id: d.id, name: d.name, mimeType: 'application/vnd.google-apps.folder', isSharedDrive: true,
-        }));
-        if (search) drives = drives.filter((d: DriveFile) => d.name.toLowerCase().includes(search.toLowerCase()));
-        setFiles(drives);
-      } else {
-        let query = `'${folderId}' in parents and trashed = false`;
-        if (search) query += ` and name contains '${search.replace(/'/g, "\\'")}'`;
-        const url = new URL('https://www.googleapis.com/drive/v3/files');
-        url.searchParams.append('q', query);
-        url.searchParams.append('fields', 'files(id,name,mimeType,modifiedTime)');
-        url.searchParams.append('orderBy', 'folder,name');
-        url.searchParams.append('pageSize', '200');
-        url.searchParams.append('supportsAllDrives', 'true');
-        url.searchParams.append('includeItemsFromAllDrives', 'true');
-        url.searchParams.append('corpora', 'allDrives');
-        const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error('Error al cargar archivos de Google Drive');
-        const data = await res.json();
-        setFiles(data.files || []);
-      }
+      setFiles(await listDriveContent(token, folderId, search));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -228,17 +97,6 @@ export function SingleDrivePickerModal({
   const pickFile = (file: DriveFile) => {
     onPick({ source_id: file.id, file_name: file.name });
     onClose();
-  };
-
-  const getIcon = (mimeType: string, isSharedDrive?: boolean, size = 4) => {
-    const cls = `size-${size}`;
-    if (isSharedDrive) return <HardDrive className={cn(cls, 'text-emerald-600')} />;
-    if (mimeType === 'application/vnd.google-apps.folder') return <Folder className={cn(cls, 'text-blue-500 fill-blue-100')} />;
-    if (mimeType.includes('image')) return <ImageIcon className={cn(cls, 'text-purple-500')} />;
-    if (mimeType.includes('pdf')) return <FileText className={cn(cls, 'text-red-500')} />;
-    if (mimeType.includes('zip') || mimeType.includes('rar')) return <FileArchive className={cn(cls, 'text-amber-500')} />;
-    if (mimeType.includes('json') || mimeType.includes('html')) return <FileCode className={cn(cls, 'text-slate-500')} />;
-    return <File className={cn(cls, 'text-slate-400')} />;
   };
 
   return (
@@ -326,7 +184,7 @@ export function SingleDrivePickerModal({
                         )}
                       >
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white border border-slate-200 shadow-sm group-hover:border-slate-300 transition-colors">
-                          {getIcon(file.mimeType, file.isSharedDrive)}
+                          {getDriveFileIcon(file.mimeType, file.isSharedDrive)}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-sm font-medium">{file.name}</span>
                         {isFolder && <ChevronRight className="size-4 text-muted-foreground shrink-0" />}
@@ -363,10 +221,7 @@ export function SingleDriveFilePicker({ onPick, disabled = false }: SingleDriveF
     if (CONFIG_ERROR) { setError(CONFIG_ERROR); return; }
     setLoading(true); setError(null);
     try {
-      await ensureIdentityServices();
-      const google = getGoogleApi();
-      if (!google?.accounts?.oauth2) throw new Error('Las APIs de Google no se cargaron correctamente.');
-      const token = await getDriveToken(google);
+      const token = await acquireDriveToken();
       setAccessToken(token);
       setIsModalOpen(true);
     } catch (err) {

@@ -1,8 +1,7 @@
 /**
  * Helpers de PRESENTACIÓN del dashboard (formateo puro para los ejes/leyendas de
  * los gráficos). No mutan la data de los hooks: reciben el valor crudo del
- * backend y devuelven una cadena legible. Viven en `components/` porque son parte
- * de la capa de UI (formateo local a la vista), no de la capa de datos.
+ * backend y devuelven una cadena legible.
  */
 
 /** Abreviaturas de mes en español (índice 0 = enero). */
