@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import axios from 'axios';
 import { serverEnv } from '@/lib/env.server';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST() {
   const BACKEND_BASE_URL = serverEnv.backendBaseUrl;
   const cookieStore = await cookies();

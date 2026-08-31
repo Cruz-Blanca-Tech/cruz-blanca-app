@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { serverEnv } from '@/lib/env.server';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const BACKEND_BASE_URL = serverEnv.backendBaseUrl;
