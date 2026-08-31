@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { serverEnv } from '@/lib/env.server';
 
-export const dynamic = 'force-dynamic';
-
 /**
  * Descarga AUTENTICADA de los reportes CSV de la Reporting & Analytics API.
  *
