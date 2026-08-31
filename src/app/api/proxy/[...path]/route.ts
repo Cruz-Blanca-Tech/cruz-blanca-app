@@ -3,8 +3,6 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { cookies } from 'next/headers';
 import { serverEnv } from '@/lib/env.server';
 
-export const dynamic = 'force-dynamic';
-
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export async function GET(
