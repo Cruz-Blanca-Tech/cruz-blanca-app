@@ -83,10 +83,12 @@ const fieldName = (name: string) => name as FieldPath<CorrectionFormValues>;
 function BoolToggle({
   value,
   nullable,
+  disabled,
   onChange,
 }: {
   value: boolean | null;
   nullable: boolean;
+  disabled?: boolean;
   onChange: (v: boolean | null) => void;
 }) {
   const options: { v: boolean; label: string; active: string }[] = [
@@ -101,9 +103,11 @@ function BoolToggle({
           <button
             key={String(o.v)}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(selected && nullable ? null : o.v)}
             className={cn(
               'flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border font-sans text-sm font-semibold transition-colors',
+              disabled && 'cursor-not-allowed opacity-60',
               selected
                 ? o.active
                 : 'border-border bg-white text-ink-secondary hover:bg-muted'
@@ -125,12 +129,14 @@ function MultiSelect({
   onChange,
   otrosLabel = 'Otros',
   freeform = false,
+  disabled = false,
 }: {
   options: string[];
   value: string[];
   onChange: (v: string[]) => void;
   otrosLabel?: string;
   freeform?: boolean;
+  disabled?: boolean;
 }) {
   const [draft, setDraft] = useState('');
   const [showInput, setShowInput] = useState(false);
@@ -162,9 +168,11 @@ function MultiSelect({
             <button
               key={opt}
               type="button"
+              disabled={disabled}
               onClick={() => toggle(opt)}
               className={cn(
                 'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-sans text-xs font-medium transition-colors',
+                disabled && 'cursor-not-allowed opacity-60',
                 selected
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-white text-ink-secondary hover:bg-muted'
@@ -186,29 +194,33 @@ function MultiSelect({
             )}
           >
             {c}
-            <button
-              type="button"
-              onClick={() => removeCustom(c)}
-              className="inline-flex"
-              aria-label={`Quitar ${c}`}
-            >
-              <X className="size-3" />
-            </button>
+            {!disabled && (
+              <button
+                type="button"
+                onClick={() => removeCustom(c)}
+                className="inline-flex"
+                aria-label={`Quitar ${c}`}
+              >
+                <X className="size-3" />
+              </button>
+            )}
           </span>
         ))}
-        <button
-          type="button"
-          onClick={() => setShowInput((s) => !s)}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 font-sans text-xs font-medium transition-colors',
-            showInput
-              ? 'border-primary text-primary'
-              : 'border-border text-ink-muted hover:text-primary'
-          )}
-        >
-          <Plus className="size-3" />
-          {otrosLabel}
-        </button>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={() => setShowInput((s) => !s)}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 font-sans text-xs font-medium transition-colors',
+              showInput
+                ? 'border-primary text-primary'
+                : 'border-border text-ink-muted hover:text-primary'
+            )}
+          >
+            <Plus className="size-3" />
+            {otrosLabel}
+          </button>
+        )}
       </div>
       {showInput && (
         <div className="flex gap-1.5">
@@ -245,6 +257,7 @@ interface CaseFieldRowProps {
   isActive: boolean;
   onFocus: () => void;
   registerRef: (el: HTMLDivElement | null) => void;
+  disabled?: boolean;
 }
 
 /** Fila de un campo del expediente: etiqueta + estado + control + observación. */
@@ -255,6 +268,7 @@ export function CaseFieldRow({
   isActive,
   onFocus,
   registerRef,
+  disabled = false,
 }: CaseFieldRowProps) {
   const { control } = useFormContext<CorrectionFormValues>();
   const meta = STATUS_META[status];
@@ -320,6 +334,7 @@ export function CaseFieldRow({
             <BoolToggle
               value={(rhf.value as boolean | null) ?? (field.nullableBool ? null : false)}
               nullable={Boolean(field.nullableBool)}
+              disabled={disabled}
               onChange={rhf.onChange}
             />
           )}
@@ -335,6 +350,7 @@ export function CaseFieldRow({
               onChange={rhf.onChange}
               otrosLabel={field.otrosLabel}
               freeform={field.freeform}
+              disabled={disabled}
             />
           )}
         />
@@ -352,8 +368,10 @@ export function CaseFieldRow({
               <Select
                 value={(rhf.value as string) || null}
                 onValueChange={(value) => rhf.onChange(value ?? '')}
+                disabled={disabled}
               >
                 <SelectTrigger
+                  disabled={disabled}
                   className={cn('h-8 w-full font-data text-[12.5px]', flagged && meta.border)}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -390,6 +408,7 @@ export function CaseFieldRow({
               onBlur={rhf.onBlur}
               onClick={(e) => e.stopPropagation()}
               onFocus={onFocus}
+              disabled={disabled}
               placeholder={field.placeholder ?? 'Ingresar manualmente…'}
               className={cn('h-8 font-data text-[12.5px]', flagged && meta.border)}
             />

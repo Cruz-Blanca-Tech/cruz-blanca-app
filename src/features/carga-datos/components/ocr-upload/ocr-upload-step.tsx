@@ -37,10 +37,12 @@ const MISSING_FIELD_LABELS: ReadonlyArray<
 
 import { ExpectedDocuments } from './expected-documents';
 import { GoogleDrivePicker } from './google-drive-picker';
+import { FileValidationPreview } from './file-validation-preview';
 import { FileNamingHelp } from './file-naming-help';
 import { OcrHelpNote } from './ocr-help-note';
 import { OcrStepper } from './ocr-stepper';
 import { ProgramActivityStep } from './program-activity-step';
+import { useBatchFileValidation } from '../../hooks/use-batch-file-validation';
 
 interface OcrUploadStepProps {
   /**
@@ -102,6 +104,7 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
         year: catalog?.year ?? 0,
         previewImageUrl: catalog?.preview_image_url ?? null,
         confidenceThreshold: req.confidence_threshold,
+        isRequired: req.is_required,
       };
     });
   }, [activity, documentCatalog.data]);
@@ -110,6 +113,15 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   const documentsLoading =
     hasActivity && (activities.isLoading || documentCatalog.isLoading);
 
+  const fileValidation = useBatchFileValidation(files, documents);
+
+  const handleDiscardInvalid = useCallback(() => {
+    const validSourceIds = new Set(
+      fileValidation.validFiles.map((v) => v.file.source_id)
+    );
+    setFiles((prev) => prev.filter((f) => validSourceIds.has(f.source_id)));
+  }, [fileValidation.validFiles]);
+
   // Validación centralizada del Paso 1: programa/actividad (store), archivos
   // (picker) y descripción (local) se validan con un único schema Zod.
   const validation = createBatchFormSchema.safeParse({
@@ -117,7 +129,7 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
     files,
     description,
   });
-  const canProceed = validation.success;
+  const canProceed = validation.success && fileValidation.canSubmit;
 
   // Campos faltantes derivados de los issues del schema, en orden de pantalla.
   const missing = validation.success
@@ -135,19 +147,42 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
       return;
     }
 
+    if (fileValidation.validCount === 0) {
+      toast.error(
+        'Ninguno de los archivos seleccionados es válido para esta actividad. Revisa la nomenclatura requerida.'
+      );
+      return;
+    }
+
+    if (fileValidation.hasInvalidFiles) {
+      toast.info(
+        `Se enviarán ${fileValidation.validCount} archivo(s) válidos (${fileValidation.invalidCount} inválido(s) ignorados).`
+      );
+    }
+
+    if (fileValidation.hasIncompleteDossiers) {
+      toast.warning(
+        'Hay expedientes con documentos faltantes. Se procesarán y podrás anexar los faltantes en Triaje.'
+      );
+    }
+
+    // Enviamos únicamente los archivos válidos al backend para proteger la extracción
+    const payload = {
+      ...validation.data,
+      files: fileValidation.validFiles.map((v) => v.file),
+    };
+
     // Capturamos el resumen de lo enviado: el frontend es la fuente de verdad
-    // del conteo de archivos (no se pide al backend).
+    // del conteo de archivos válidos (no se pide al backend).
     const summary: BatchSummary = {
       programLabel: programLabel ?? '—',
       activityLabel: activity?.name ?? '—',
-      filesCount: validation.data.files.length,
+      filesCount: payload.files.length,
       submittedAt: new Date(),
     };
 
-    // `validation.data` ya tiene la forma de CreateBatchRequest (descripción
-    // trim()-eada). En vez de toast+reset, avanzamos al Paso 2 con el response
-    // del batch y el resumen de la carga; el detalle de fallidos se muestra allí.
-    createBatch.mutate(validation.data, {
+    // Avanzamos al Paso 2 con el response del batch y el resumen de la carga
+    createBatch.mutate(payload, {
       onSuccess: (result) => {
         onBatchCreated(result, summary);
       },
@@ -185,6 +220,13 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
             files={files}
             onPick={handlePick}
             onRemove={handleRemove}
+            disabled={createBatch.isPending}
+          />
+
+          <FileValidationPreview
+            validation={fileValidation}
+            onRemoveFile={handleRemove}
+            onDiscardInvalid={handleDiscardInvalid}
             disabled={createBatch.isPending}
           />
 
@@ -231,7 +273,9 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
             <div className="flex items-center gap-3">
               {!canProceed && !createBatch.isPending && (
                 <span className="hidden font-data text-xs text-muted-foreground sm:inline">
-                  Falta seleccionar: {missing.join(', ')}
+                  {files.length > 0 && fileValidation.validCount === 0
+                    ? 'No hay archivos con formato o código válido para esta actividad'
+                    : `Falta seleccionar: ${missing.join(', ')}`}
                 </span>
               )}
               <Button

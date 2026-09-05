@@ -21,6 +21,7 @@ interface CaseFieldsFormProps {
   activeFieldId: string | null;
   onFocusField: (id: string) => void;
   fieldRefs: React.RefObject<Record<string, HTMLDivElement | null>>;
+  disabled?: boolean;
 }
 
 /** Formulario del expediente por grupos (tabs) + filas de campo. */
@@ -33,6 +34,7 @@ export function CaseFieldsForm({
   activeFieldId,
   onFocusField,
   fieldRefs,
+  disabled = false,
 }: CaseFieldsFormProps) {
   const activeFields = fields.filter((f) => f.group === activeGroup);
 
@@ -95,6 +97,7 @@ export function CaseFieldsForm({
               registerRef={(el) => {
                 fieldRefs.current[field.id] = el;
               }}
+              disabled={disabled}
             />
           );
         })}

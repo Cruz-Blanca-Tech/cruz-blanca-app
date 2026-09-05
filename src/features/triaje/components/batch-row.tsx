@@ -16,7 +16,8 @@ interface BatchRowProps {
 export function BatchRow({ batch }: BatchRowProps) {
   const { absolute, relative } = formatBatchDate(batch.created_at);
   const filesCount =
-    batch.documents_failed_count + batch.documents_approved_count;
+    batch.total_documents_count ??
+    (batch.documents_failed_count + batch.documents_approved_count);
   const pendingReviewCount = batch.triage_summary.verdicts.REQUIRES_TRIAGE ?? 0;
 
   return (
@@ -60,11 +61,12 @@ export function BatchRow({ batch }: BatchRowProps) {
         <ExpedientesBreakdown
           status={batch.status}
           triageSummary={batch.triage_summary}
+          failureReason={batch.failure_reason}
         />
       </TableCell>
 
       <TableCell className="px-4 py-3.5 align-middle">
-        <StatusBadge status={batch.status} />
+        <StatusBadge status={batch.status} failureReason={batch.failure_reason} />
       </TableCell>
 
       <TableCell className="px-4 py-3.5 text-right align-middle">

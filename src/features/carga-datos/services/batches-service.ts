@@ -5,7 +5,7 @@ import {
   createBatchResponseSchema,
   type CreateBatchResponse,
 } from '../schemas/create-batch-schema';
-import type { CreateBatchRequest } from '../types';
+import type { CreateBatchRequest, PickedFile } from '../types';
 
 /**
  * Servicio de batches de extracción (creación — exclusivo de `carga-datos`).
@@ -22,5 +22,30 @@ export const batchesService = {
   async createBatch(payload: CreateBatchRequest): Promise<CreateBatchResponse> {
     const data = await apiClient.post(API_PATHS.batches, payload);
     return parseApiResponse(createBatchResponseSchema, data, 'la creación del lote');
+  },
+
+  /** POST → anexa documentos a un expediente específico de un lote existente. */
+  async appendDocuments(
+    batchId: string,
+    dniReference: string,
+    files: PickedFile[]
+  ): Promise<{
+    batch_id: string;
+    dni_reference: string;
+    dossier_status: string;
+    added_documents_count: number;
+    rejected_documents_count: number;
+    message: string;
+  }> {
+    const url = `${API_PATHS.batches}/${batchId}/dossiers/${dniReference}/documents`;
+    const data = await apiClient.post(url, { files });
+    return data as {
+      batch_id: string;
+      dni_reference: string;
+      dossier_status: string;
+      added_documents_count: number;
+      rejected_documents_count: number;
+      message: string;
+    };
   },
 };
