@@ -85,6 +85,7 @@ interface CaseFieldRowProps {
   isActive: boolean;
   onFocus: () => void;
   registerRef: (el: HTMLDivElement | null) => void;
+  disabled?: boolean;
 }
 
 /** Fila de un campo del expediente: etiqueta + estado + control + observación. */
@@ -95,6 +96,7 @@ export function CaseFieldRow({
   isActive,
   onFocus,
   registerRef,
+  disabled = false,
 }: CaseFieldRowProps) {
   const { control } = useFormContext<CorrectionFormValues>();
   const meta = STATUS_META[status];
@@ -160,6 +162,7 @@ export function CaseFieldRow({
             <BoolToggle
               value={(rhf.value as boolean | null) ?? (field.nullableBool ? null : false)}
               nullable={Boolean(field.nullableBool)}
+              disabled={disabled}
               onChange={rhf.onChange}
             />
           )}
@@ -175,6 +178,7 @@ export function CaseFieldRow({
               onChange={rhf.onChange}
               otrosLabel={field.otrosLabel}
               freeform={field.freeform}
+              disabled={disabled}
             />
           )}
         />
@@ -192,8 +196,10 @@ export function CaseFieldRow({
               <Select
                 value={(rhf.value as string) || null}
                 onValueChange={(value) => rhf.onChange(value ?? '')}
+                disabled={disabled}
               >
                 <SelectTrigger
+                  disabled={disabled}
                   className={cn('h-8 w-full font-data text-[12.5px]', flagged && meta.border)}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -232,6 +238,7 @@ export function CaseFieldRow({
               onBlur={rhf.onBlur}
               onClick={(e) => e.stopPropagation()}
               onFocus={onFocus}
+              disabled={disabled}
               placeholder={field.placeholder ?? 'Ingresar manualmente…'}
               className={cn('h-8 font-data text-[12.5px]', flagged && meta.border)}
             />

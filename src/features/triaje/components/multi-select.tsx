@@ -12,12 +12,14 @@ export function MultiSelect({
   onChange,
   otrosLabel = 'Otros',
   freeform = false,
+  disabled = false,
 }: {
   options: string[];
   value: string[];
   onChange: (v: string[]) => void;
   otrosLabel?: string;
   freeform?: boolean;
+  disabled?: boolean;
 }) {
   const [draft, setDraft] = useState('');
   const [showInput, setShowInput] = useState(false);
@@ -49,9 +51,11 @@ export function MultiSelect({
             <button
               key={opt}
               type="button"
+              disabled={disabled}
               onClick={() => toggle(opt)}
               className={cn(
                 'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-sans text-xs font-medium transition-colors',
+                disabled && 'cursor-not-allowed opacity-60',
                 selected
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-white text-ink-secondary hover:bg-muted'
@@ -73,29 +77,33 @@ export function MultiSelect({
             )}
           >
             {c}
-            <button
-              type="button"
-              onClick={() => removeCustom(c)}
-              className="inline-flex"
-              aria-label={`Quitar ${c}`}
-            >
-              <X className="size-3" />
-            </button>
+            {!disabled && (
+              <button
+                type="button"
+                onClick={() => removeCustom(c)}
+                className="inline-flex"
+                aria-label={`Quitar ${c}`}
+              >
+                <X className="size-3" />
+              </button>
+            )}
           </span>
         ))}
-        <button
-          type="button"
-          onClick={() => setShowInput((s) => !s)}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 font-sans text-xs font-medium transition-colors',
-            showInput
-              ? 'border-primary text-primary'
-              : 'border-border text-ink-muted hover:text-primary'
-          )}
-        >
-          <Plus className="size-3" />
-          {otrosLabel}
-        </button>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={() => setShowInput((s) => !s)}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 font-sans text-xs font-medium transition-colors',
+              showInput
+                ? 'border-primary text-primary'
+                : 'border-border text-ink-muted hover:text-primary'
+            )}
+          >
+            <Plus className="size-3" />
+            {otrosLabel}
+          </button>
+        )}
       </div>
       {showInput && (
         <div className="flex gap-1.5">

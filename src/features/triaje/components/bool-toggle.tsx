@@ -7,10 +7,12 @@ import { cn } from '@/lib/utils';
 export function BoolToggle({
   value,
   nullable,
+  disabled,
   onChange,
 }: {
   value: boolean | null;
   nullable: boolean;
+  disabled?: boolean;
   onChange: (v: boolean | null) => void;
 }) {
   const options: { v: boolean; label: string; active: string }[] = [
@@ -25,9 +27,11 @@ export function BoolToggle({
           <button
             key={String(o.v)}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(selected && nullable ? null : o.v)}
             className={cn(
               'flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border font-sans text-sm font-semibold transition-colors',
+              disabled && 'cursor-not-allowed opacity-60',
               selected
                 ? o.active
                 : 'border-border bg-white text-ink-secondary hover:bg-muted'
