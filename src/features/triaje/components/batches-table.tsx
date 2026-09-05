@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { BatchListItem } from '../schemas/batches-list-schema';
 import { BatchRow } from './batch-row';
 
@@ -139,10 +140,12 @@ export function BatchesTable({
   }
 
   return (
-    <TableShell>
-      {batches.map((batch) => (
-        <BatchRow key={batch.id} batch={batch} />
-      ))}
-    </TableShell>
+    <TooltipProvider>
+      <TableShell>
+        {batches.map((batch) => (
+          <BatchRow key={batch.id} batch={batch} />
+        ))}
+      </TableShell>
+    </TooltipProvider>
   );
 }

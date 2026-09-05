@@ -69,4 +69,5 @@ export interface ExpectedDocument {
   year: number;
   previewImageUrl: string | null;
   confidenceThreshold: number;
+  isRequired?: boolean;
 }

@@ -1,6 +1,11 @@
 import { Clock, Loader2, XCircle, OctagonAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { BatchStatus } from '../schemas/batch-status-schema';
 import type { BatchTriageSummary } from '../schemas/batches-list-schema';
 import { TRIAGE_VERDICT_LIST } from '../lib/triage-verdict-config';
@@ -51,6 +56,7 @@ function StatusText({ icon: Icon, text, className, spin }: StatusTextProps) {
 interface ExpedientesBreakdownProps {
   status: BatchStatus;
   triageSummary: BatchTriageSummary;
+  failureReason?: string | null;
 }
 
 /**
@@ -65,6 +71,7 @@ interface ExpedientesBreakdownProps {
 export function ExpedientesBreakdown({
   status,
   triageSummary,
+  failureReason,
 }: ExpedientesBreakdownProps) {
   if (status === 'PENDING') {
     return (
@@ -95,12 +102,45 @@ export function ExpedientesBreakdown({
     );
   }
   if (status === 'FAILED') {
+    const errorNode = (
+      <span
+        title={failureReason ?? undefined}
+        className={cn(
+          'inline-flex items-center gap-1.5 font-data text-[11.5px] italic text-fault-dark',
+          failureReason && 'cursor-help underline decoration-dotted underline-offset-4 hover:opacity-90'
+        )}
+      >
+        <OctagonAlert className="size-3 shrink-0" />
+        Ocurrió un error en el procesamiento
+      </span>
+    );
+
+    if (!failureReason) {
+      return errorNode;
+    }
+
     return (
-      <StatusText
-        icon={OctagonAlert}
-        text="Ocurrió un error en el procesamiento"
-        className="text-fault-dark"
-      />
+      <Tooltip>
+        <TooltipTrigger render={<span className="inline-flex cursor-help" />}>
+          {errorNode}
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          className="max-w-xs px-3 py-2 text-left bg-slate-900 text-white border border-slate-700 shadow-lg"
+        >
+          <div className="flex items-start gap-2">
+            <OctagonAlert className="size-3.5 shrink-0 text-red-400 mt-0.5" />
+            <div className="space-y-0.5 min-w-0">
+              <p className="font-semibold text-xs text-red-300">
+                Detalle del fallo
+              </p>
+              <p className="text-[11px] leading-snug text-slate-200 break-words font-sans">
+                {failureReason}
+              </p>
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
