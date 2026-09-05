@@ -1,7 +1,14 @@
 'use client';
 
 import { FormProvider } from 'react-hook-form';
-import { Lock } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Lock,
+  OctagonAlert,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 import { useCaseCorrection } from '../hooks/use-case-correction';
 import { CaseDocViewer } from './case-doc-viewer';
@@ -33,6 +40,8 @@ export function CaseCorrectionScreen({
   if (vm.isError || !vm.caseData) return <CaseNotFound onBack={vm.goBackToBatch} />;
 
   const { caseActions, isIncomplete } = vm;
+  const isApproved = vm.caseData?.status === 'APPROVED';
+  const isRejected = vm.caseData?.status === 'REJECTED';
 
   return (
     <div className="flex flex-1 flex-col gap-3 p-6">
@@ -56,6 +65,64 @@ export function CaseCorrectionScreen({
         onJumpField={vm.jumpToField}
         onJumpGroup={vm.setActiveGroup}
       />
+
+      {/* Banner de estado finalizado */}
+      {isApproved && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/30 bg-success-light px-4 py-3 text-success-dark">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="size-5 shrink-0 text-success" />
+            <div>
+              <p className="font-heading text-sm font-bold text-success-dark">
+                Expediente Aprobado
+              </p>
+              <p className="font-data text-xs text-success-dark/80">
+                Este expediente ya fue validado y aprobado exitosamente. No requiere más correcciones.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {vm.nextCase ? (
+              <Button size="sm" onClick={() => vm.nextCase && vm.goToCase(vm.nextCase)}>
+                Siguiente registro
+                <ArrowRight className="size-3.5" />
+              </Button>
+            ) : (
+              <Button size="sm" onClick={vm.goBackToBatch}>
+                <ArrowLeft className="size-3.5" />
+                Volver al lote para registrar
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      {isRejected && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 bg-error-light px-4 py-3 text-error-dark">
+          <div className="flex items-center gap-2.5">
+            <OctagonAlert className="size-5 shrink-0 text-error" />
+            <div>
+              <p className="font-heading text-sm font-bold text-error-dark">
+                Expediente Rechazado
+              </p>
+              <p className="font-data text-xs text-error-dark/80">
+                Este expediente ha sido rechazado y no admite modificaciones.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {vm.nextCase ? (
+              <Button size="sm" onClick={() => vm.nextCase && vm.goToCase(vm.nextCase)}>
+                Siguiente registro
+                <ArrowRight className="size-3.5" />
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={vm.goBackToBatch}>
+                <ArrowLeft className="size-3.5" />
+                Volver al lote
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Dos columnas */}
       <div className="grid min-h-[460px] gap-3.5 lg:h-[calc(100vh-360px)] lg:grid-cols-[45%_55%]">

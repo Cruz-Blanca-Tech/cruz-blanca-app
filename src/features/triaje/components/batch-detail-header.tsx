@@ -87,7 +87,10 @@ export function BatchDetailHeader({
               </h1>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <ProgramBadge name={batch.program_name} />
-                <StatusBadge status={batch.status} />
+                <StatusBadge
+                  status={batch.status}
+                  failureReason={batch.failure_reason}
+                />
                 <span className="font-data text-xs text-ink-muted">
                   {batch.activity_name ?? 'Actividad sin nombre'}
                   {` · ${batch.triage_summary.total_cases} expediente(s)`}

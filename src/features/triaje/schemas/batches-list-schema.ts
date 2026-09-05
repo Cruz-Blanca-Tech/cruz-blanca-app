@@ -32,10 +32,12 @@ export const batchListItemSchema = z.object({
   documents_failed_count: count,
   documents_approved_count: count,
   documents_total_count: count.optional().default(0),
+  total_documents_count: count.optional(),
   description: z.string().nullable(),
   activity_name: z.string().nullable(),
   program_name: z.string().nullable(),
   triage_summary: batchTriageSummarySchema,
+  failure_reason: z.string().nullable().optional(),
 });
 export type BatchListItem = z.infer<typeof batchListItemSchema>;
 
