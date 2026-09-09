@@ -1,4 +1,4 @@
-﻿name: Trigger auto deployment for ca-cruzblanca-frontend
+name: Deploy to Azure Container Apps (ca-cruzblanca-frontend)
 
 on:
   push:
@@ -11,32 +11,38 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
 
     steps:
-      - name: Checkout to the branch
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
+      # Login al Azure Container Registry usando credenciales del registry
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
         with:
-          client-id: ${{ secrets.CACRUZBLANCABACKEND_AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.CACRUZBLANCABACKEND_AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.CACRUZBLANCABACKEND_AZURE_SUBSCRIPTION_ID }}
+          registry: cruzblanca2026.azurecr.io
+          username: ${{ secrets.CACRUZBLANCABACKEND_REGISTRY_USERNAME }}
+          password: ${{ secrets.CACRUZBLANCABACKEND_REGISTRY_PASSWORD }}
 
-      - name: Build and push container image to registry
-        uses: azure/container-apps-deploy-action@v2
+      # Setup Docker Buildx para builds optimizados
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build y push de la imagen al registry
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
         with:
-          appSourcePath: ${{ github.workspace }}
-          dockerfilePath: './Dockerfile'
-          registryUrl: 'cruzblanca2026.azurecr.io'
-          registryUsername: ${{ secrets.CACRUZBLANCABACKEND_REGISTRY_USERNAME }}
-          registryPassword: ${{ secrets.CACRUZBLANCABACKEND_REGISTRY_PASSWORD }}
-          containerAppName: ca-cruzblanca-frontend
-          resourceGroup: rg-ocr-cruzblanca
-          imageToBuild: cruzblanca2026.azurecr.io/ca-cruzblanca-frontend:${{ github.sha }}
-          buildArguments: |
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            cruzblanca2026.azurecr.io/ca-cruzblanca-frontend:${{ github.sha }}
+            cruzblanca2026.azurecr.io/ca-cruzblanca-frontend:latest
+          build-args: |
             NEXT_PUBLIC_BACKEND_BASE_URL=${{ secrets.NEXT_PUBLIC_BACKEND_BASE_URL }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
             NEXT_PUBLIC_GOOGLE_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_API_KEY }}
+          cache-from: type=registry,ref=cruzblanca2026.azurecr.io/ca-cruzblanca-frontend:latest
+          cache-to: type=inline
+
