@@ -74,7 +74,14 @@ export function useCaseCorrection({
   const submitCorrection = useSubmitCorrection(caseId, batchId);
 
   const caseData = caseQuery.data;
-  const isIncomplete = caseData?.status === 'INCOMPLETE';
+  const pendingDocuments = useMemo(
+    () => docsQuery.data?.pending_documents ?? [],
+    [docsQuery.data]
+  );
+  const isIncomplete =
+    caseData?.status === 'INCOMPLETE' ||
+    pendingDocuments.length > 0 ||
+    (caseData?.discrepancies ?? []).some((d) => d.field_name?.startsWith('documents.'));
   // Un expediente ya resuelto no admite correcciones, y sólo admite rechazo
   // mientras su lote no se haya cargado al registro de beneficiarios.
   const caseActions = getCaseActionsState({
@@ -230,6 +237,14 @@ export function useCaseCorrection({
 
   const onSubmit = form.handleSubmit((values) => {
     if (!caseData || !caseActions.canEdit) return;
+
+    if (pendingDocuments.length > 0) {
+      const names = pendingDocuments.map((d) => d.name || d.code).join(', ');
+      toast.error(
+        `No se puede guardar ni aprobar: Faltan documentos requeridos (${names}). Debe adjuntarlos para continuar.`
+      );
+      return;
+    }
 
     // 1. Validación estricta del DNI del beneficiario
     const beneficiaryDni = (values.beneficiary.dni || '').trim();
@@ -391,7 +406,7 @@ export function useCaseCorrection({
     // Documentos (para el visor) y refetch
     documentsLoading: docsQuery.isLoading,
     documentsError: docsQuery.isError,
-    pendingDocuments: docsQuery.data?.pending_documents ?? [],
+    pendingDocuments,
     refetchCase: caseQuery.refetch,
     // Modales
     isUploadModalOpen,

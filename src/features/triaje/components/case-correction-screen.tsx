@@ -210,6 +210,7 @@ export function CaseCorrectionScreen({
             {isIncomplete ? (
               <IncompleteCasePanel
                 dniReference={dniReference}
+                pendingDocuments={vm.pendingDocuments}
                 onUpload={() => vm.setIsUploadModalOpen(true)}
                 disabled={vm.documentsLoading}
               />
