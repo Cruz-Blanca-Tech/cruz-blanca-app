@@ -1,7 +1,7 @@
 'use client';
 
 import { Controller, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, OctagonAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -25,11 +25,70 @@ export function AdultsListControl() {
   const guardianRef = useWatch({ control, name: 'guardian_ref' });
   const emergencyRef = useWatch({ control, name: 'emergency_contact_ref' });
   const watchedAdults = useWatch({ control, name: 'adults' }) || [];
+  const beneficiaryDni = useWatch({ control, name: 'beneficiary.dni' }) || '';
 
   // Calcular roles ya ocupados (ignorando la fila actual para que el usuario pueda ver su propio rol seleccionado)
   const getRoleDisabled = (role: string, currentIndex: number) => {
     return watchedAdults.some((a, i) => i !== currentIndex && a.relationship === role);
   };
+
+  const getDniError = (dni: string | undefined, currentIndex: number): string | null => {
+    const trimmed = (dni || '').trim();
+    const isGuardian = guardianRef === String(currentIndex);
+
+    if (isGuardian && !trimmed) {
+      return 'El apoderado debe tener DNI obligatorio.';
+    }
+
+    if (!trimmed) {
+      return 'El DNI es obligatorio para registrar al familiar.';
+    }
+
+    if (trimmed.length !== 8 || !/^\d{8}$/.test(trimmed)) {
+      return 'El DNI debe tener exactamente 8 dígitos numéricos.';
+    }
+
+    if (beneficiaryDni.trim() && trimmed === beneficiaryDni.trim()) {
+      return 'Coincide con el DNI del beneficiario.';
+    }
+
+    const isDuplicate = watchedAdults.some(
+      (other, idx) => idx !== currentIndex && (other.dni || '').trim() === trimmed
+    );
+    if (isDuplicate) {
+      return 'DNI duplicado con otro familiar.';
+    }
+
+    return null;
+  };
+
+  // Resumen de conflictos globales de DNI
+  const duplicateDniMessages: string[] = [];
+  const seenDnis = new Map<string, string>();
+  const trimmedBenDni = beneficiaryDni.trim();
+
+  watchedAdults.forEach((adult, idx) => {
+    const dni = (adult.dni || '').trim();
+    if (!dni) return;
+    const label =
+      adult.full_name ||
+      (adult.relationship === 'FATHER'
+        ? 'Padre'
+        : adult.relationship === 'MOTHER'
+        ? 'Madre'
+        : `Contacto ${idx + 1}`);
+
+    if (trimmedBenDni && dni === trimmedBenDni) {
+      duplicateDniMessages.push(`El DNI ${dni} de '${label}' coincide con el DNI del beneficiario.`);
+    }
+
+    if (seenDnis.has(dni)) {
+      const prev = seenDnis.get(dni);
+      duplicateDniMessages.push(`El DNI ${dni} está duplicado entre '${prev}' y '${label}'.`);
+    } else {
+      seenDnis.set(dni, label);
+    }
+  });
 
   const handleAppend = () => {
     if (fields.length >= 3) return;
@@ -40,6 +99,19 @@ export function AdultsListControl() {
 
   return (
     <div className="mt-3 flex flex-col gap-4">
+      {duplicateDniMessages.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-lg border border-error/40 bg-error-light p-3 text-error-dark">
+          <div className="flex items-center gap-2 font-semibold text-xs">
+            <OctagonAlert className="size-4 shrink-0 text-error" />
+            <span>Conflicto de DNI: cada persona debe tener un DNI único</span>
+          </div>
+          <ul className="ml-6 list-disc text-[11px] leading-tight space-y-0.5">
+            {duplicateDniMessages.map((msg, idx) => (
+              <li key={idx}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {fields.map((field, index) => {
         const isGuardian = guardianRef === String(index);
         const isEmergency = emergencyRef === String(index);
@@ -56,10 +128,11 @@ export function AdultsListControl() {
               <button
                 type="button"
                 onClick={() => remove(index)}
-                className="rounded-md p-1.5 text-ink-muted opacity-0 transition-all hover:bg-error-light hover:text-error group-hover:opacity-100"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted transition-all hover:bg-error-light hover:text-error"
                 title="Eliminar contacto"
               >
                 <X className="size-3.5" />
+                <span className="font-sans text-[11px] font-medium">Eliminar</span>
               </button>
             </div>
 
@@ -96,12 +169,36 @@ export function AdultsListControl() {
               <Controller
                 control={control}
                 name={`adults.${index}.dni`}
-                render={({ field: rhf }) => (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="font-sans text-[10.5px] font-semibold text-ink-secondary">DNI</label>
-                    <Input {...rhf} placeholder="Ej. 12345678" className="h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20" />
-                  </div>
-                )}
+                render={({ field: rhf }) => {
+                  const dniError = getDniError(rhf.value, index);
+                  return (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-sans text-[10.5px] font-semibold text-ink-secondary">
+                        DNI {isGuardian && <span className="text-error font-bold">* (Obligatorio apoderado)</span>}
+                      </label>
+                      <Input
+                        inputMode="numeric"
+                        maxLength={8}
+                        value={rhf.value || ''}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/\D/g, '').slice(0, 8);
+                          rhf.onChange(cleaned);
+                        }}
+                        onBlur={rhf.onBlur}
+                        placeholder="Ej. 12345678"
+                        className={cn(
+                          'h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20',
+                          dniError && 'border-error bg-error/5 text-error-dark focus-visible:ring-error/20'
+                        )}
+                      />
+                      {dniError && (
+                        <span className="font-sans text-[10px] font-semibold text-error">
+                          {dniError}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }}
               />
               <Controller
                 control={control}

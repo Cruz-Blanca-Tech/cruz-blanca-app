@@ -446,6 +446,7 @@ export function buildCorrectionFields(
       group: 'Contactos y Apoderado',
       control: 'adults_list',
       note: 'Añade, edita y asigna roles a los adultos responsables del menor.',
+      matchFieldNames: ['related_adults.adults'],
     },
     // Padre / Madre / Apoderado (desde related_adults.adults[])
     ...adultFields(

@@ -3,9 +3,11 @@
 import {
   AlertTriangle,
   ArrowRight,
+  CheckCircle2,
   FileX,
   Files,
   Info,
+  Layers,
   Loader2,
   Plus,
   UploadCloud,
@@ -24,7 +26,6 @@ import { triajeBatchesService } from '@/features/triaje/services/batches-service
 
 import type { CreateBatchResponse } from '../../schemas/create-batch-schema';
 import type { BatchSummary } from '../../types';
-import { OcrStepper } from './ocr-stepper';
 
 interface OcrProcesandoStepProps {
   /** Respuesta inmediata de POST /api/v1/batches/. */
@@ -64,7 +65,7 @@ export function OcrProcesandoStep({
     },
   });
 
-  // Redirigir automáticamente cuando deje de estar en proceso
+  // Redirigir automáticamente cuando deje de estar en proceso si sigue en esta pantalla
   useEffect(() => {
     if (batch && !['PENDING', 'PROCESSING'].includes(batch.status)) {
       router.push(`/triaje/${batch.id}`);
@@ -75,33 +76,63 @@ export function OcrProcesandoStep({
     <div className="flex flex-1 flex-col gap-6 p-6 overflow-y-auto custom-scrollbar">
       <header className="flex flex-col gap-1">
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-          Procesando documentos
+          Lote Enviado a Procesamiento
         </h1>
         <p className="text-sm text-muted-foreground">
-          La IA está extrayendo datos de los archivos que subiste.
+          Tus documentos se han recibido e ingresaron a la cola de extracción con IA.
         </p>
       </header>
 
-      <OcrStepper current={2} />
+      <Card className="mx-auto w-full max-w-3xl gap-0 py-0 overflow-hidden">
+        {/* Hero: éxito + llamado a la acción hacia Triaje */}
+        <div className="flex flex-col items-center gap-5 border-b border-border bg-gradient-to-b from-primary/5 to-card px-8 py-9 text-center">
+          <div className="relative flex items-center justify-center">
+            <span className="flex size-16 items-center justify-center rounded-full bg-success-light text-success-dark">
+              <CheckCircle2 className="size-9" />
+            </span>
+            <span
+              title="Procesando en segundo plano"
+              className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full bg-card shadow-sm border border-border"
+            >
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+            </span>
+          </div>
 
-      <Card className="mx-auto w-full max-w-3xl gap-0 py-0">
-        {/* Hero: spinner + estado del procesamiento */}
-        <div className="flex flex-col items-center gap-4 border-b border-border bg-gradient-to-b from-muted/40 to-card px-8 py-9 text-center">
-          <Loader2 className="size-14 animate-spin text-primary" />
           <div className="flex flex-col items-center gap-2">
-            <h2 className="font-heading text-lg font-semibold text-foreground">
-              Estamos procesando tus documentos
+            <h2 className="font-heading text-xl font-semibold text-foreground">
+              ¡Lote enviado con éxito!
             </h2>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-              En unos minutos estarán listos para revisión. Puedes cerrar esta ventana o continuar con otra tarea — te avisaremos cuando terminen.
+              La IA está extrayendo los datos en segundo plano. Puedes regresar a la bandeja de triaje para monitorear el progreso o revisar otros expedientes.
             </p>
+          </div>
+
+          {/* Botones de acción principales */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Button
+              size="lg"
+              onClick={() => router.push('/triaje')}
+              className="gap-2 font-medium"
+            >
+              <Layers className="size-4.5" />
+              Ir a la Bandeja de Triaje
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => router.push(`/triaje/${result.batch_id}`)}
+              className="gap-2"
+            >
+              Ver detalle de este lote
+              <ArrowRight className="size-4" />
+            </Button>
           </div>
         </div>
 
         {/* Resumen de la carga */}
         <section className="flex flex-col gap-3 px-8 py-5">
           <h3 className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Resumen de la carga
+            Resumen del lote enviado
           </h3>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-lg border border-border bg-muted/30 px-4 py-3.5 sm:grid-cols-4">
             <div className="flex flex-col gap-1.5">
@@ -150,7 +181,7 @@ export function OcrProcesandoStep({
           <section className="flex flex-col gap-3 px-8 pb-5">
             <h3 className="flex items-center gap-2 font-heading text-xs font-semibold uppercase tracking-wider text-destructive">
               <AlertTriangle className="size-3.5" />
-              Archivos que fallaron
+              Archivos no procesados
               <Badge variant="destructive" className="font-data">
                 {result.total_failed_files}
               </Badge>
@@ -180,42 +211,28 @@ export function OcrProcesandoStep({
 
         {/* CTA: subir más archivos */}
         <section className="px-8 pb-5">
-          <div className="flex items-center gap-4 rounded-lg border border-primary bg-secondary px-5 py-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-card text-primary">
-              <UploadCloud className="size-5" />
-            </span>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/40 px-5 py-4">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground">
-                ¿Tienes más archivos para subir?
+                ¿Deseas digitalizar otro lote?
               </p>
               <p className="font-data text-xs leading-snug text-muted-foreground">
-                Puedes seguir cargando archivos de otro tipo de actividad
-                mientras estos se procesan.
+                Puedes iniciar una nueva carga mientras este lote termina de procesarse.
               </p>
             </div>
-            <Button onClick={onUploadMore} className="shrink-0">
-              <Plus />
-              Subir archivos de otra actividad
+            <Button variant="secondary" onClick={onUploadMore} className="shrink-0 gap-1.5">
+              <Plus className="size-4" />
+              Cargar otro lote
             </Button>
           </div>
         </section>
 
-        {/* Footer: nota + enlace a bandeja de triaje (ruta pendiente) */}
+        {/* Footer: nota informativa */}
         <footer className="flex flex-col gap-3 border-t border-border bg-muted/30 px-8 py-3.5 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-1.5 font-data text-xs text-muted-foreground">
-            <Info className="size-3.5" />
-            Verás todos los lotes en proceso y finalizados en la bandeja de
-            triaje.
+            <Info className="size-3.5 shrink-0" />
+            Puedes cerrar esta pestaña o navegar con tranquilidad; te notificaremos el estado en la bandeja de triaje.
           </p>
-          <Button 
-            variant="link" 
-            size="sm" 
-            className="self-end px-0" 
-            onClick={() => router.push(`/triaje/${result.batch_id}`)}
-          >
-            Ir a revisar este lote
-            <ArrowRight />
-          </Button>
         </footer>
       </Card>
     </div>

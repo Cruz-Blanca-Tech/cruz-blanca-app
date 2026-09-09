@@ -32,6 +32,8 @@ export const triageCaseListItemSchema = z.object({
   dni_reference: z.string(),
   status: z.string(),
   verdict: z.string(),
+  sync_status: z.string().optional().default('PENDING'),
+  sync_error: z.string().nullable().optional(),
   min_confidence_score: z.number(),
   confidence_threshold: z.number(),
   error_count: count,

@@ -230,6 +230,104 @@ export function useCaseCorrection({
 
   const onSubmit = form.handleSubmit((values) => {
     if (!caseData || !caseActions.canEdit) return;
+
+    // 1. Validación estricta del DNI del beneficiario
+    const beneficiaryDni = (values.beneficiary.dni || '').trim();
+    if (!beneficiaryDni) {
+      toast.error('No se puede guardar: El DNI del beneficiario es obligatorio.');
+      return;
+    }
+    if (!/^\d{8}$/.test(beneficiaryDni)) {
+      toast.error('No se puede guardar: El DNI del beneficiario debe tener exactamente 8 dígitos numéricos.');
+      return;
+    }
+
+    // 2. Validación de Apoderado (guardian) obligatorio y con DNI de 8 dígitos
+    if (!values.guardian_ref || values.guardian_ref.trim() === '') {
+      toast.error('No se puede guardar: Debe asignar un Apoderado al expediente.');
+      return;
+    }
+
+    const guardianIdx = Number(values.guardian_ref);
+    const guardianAdult = values.adults[guardianIdx];
+    if (!guardianAdult) {
+      toast.error('No se puede guardar: El apoderado seleccionado no es válido.');
+      return;
+    }
+
+    const guardianName = (guardianAdult.full_name || '').trim();
+    if (!guardianName) {
+      toast.error('No se puede guardar: El apoderado seleccionado debe tener nombre completo.');
+      return;
+    }
+
+    const guardianDni = (guardianAdult.dni || '').trim();
+    if (!guardianDni) {
+      toast.error('No se puede guardar: El apoderado asignado debe tener DNI obligatorio.');
+      return;
+    }
+
+    if (!/^\d{8}$/.test(guardianDni)) {
+      toast.error(
+        `No se puede guardar: El DNI "${guardianDni}" del apoderado debe tener exactamente 8 dígitos numéricos.`
+      );
+      return;
+    }
+
+    // 3. Validación de formato y unicidad para todos los adultos
+    const seenDnis = new Map<string, string>();
+
+    for (let i = 0; i < values.adults.length; i++) {
+      const adult = values.adults[i];
+      const adDni = (adult.dni || '').trim();
+      const adName = (adult.full_name || '').trim();
+      const label =
+        adName ||
+        (adult.relationship === 'FATHER'
+          ? 'Padre'
+          : adult.relationship === 'MOTHER'
+          ? 'Madre'
+          : `Contacto ${i + 1}`);
+
+      if (!adDni) {
+        toast.error(
+          `No se puede guardar: El familiar '${label}' debe tener un DNI obligatorio de 8 dígitos. Si no corresponde registrarlo, elimínelo de la lista.`
+        );
+        return;
+      }
+
+      if (!/^\d{8}$/.test(adDni)) {
+        toast.error(
+          `No se puede guardar: El DNI "${adDni}" de '${label}' debe tener exactamente 8 dígitos numéricos.`
+        );
+        return;
+      }
+
+      if (!adName) {
+        toast.error(
+          `No se puede guardar: El familiar con DNI ${adDni} debe tener Nombre completo.`
+        );
+        return;
+      }
+
+      if (beneficiaryDni && adDni === beneficiaryDni) {
+        toast.error(
+          `No se puede guardar: El DNI ${adDni} de '${label}' coincide con el DNI del beneficiario.`
+        );
+        return;
+      }
+
+      if (seenDnis.has(adDni)) {
+        const prev = seenDnis.get(adDni);
+        toast.error(
+          `No se puede guardar: El DNI ${adDni} está repetido entre '${prev}' y '${label}'. Cada persona debe tener un DNI único.`
+        );
+        return;
+      }
+
+      seenDnis.set(adDni, label);
+    }
+
     const payload = formValuesToDossier(values, caseData.dossier_data);
     submitCorrection.mutate(payload, {
       onSuccess: (res) => {
