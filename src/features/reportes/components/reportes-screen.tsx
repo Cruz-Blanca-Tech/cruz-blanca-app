@@ -1,3 +1,5 @@
+'use client';
+
 import { ReportCard } from './report-card';
 import { REPORTS_CATALOG } from '../lib/reports-catalog';
 
