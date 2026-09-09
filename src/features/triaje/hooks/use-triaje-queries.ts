@@ -264,3 +264,31 @@ export function useRejectCase(caseId: string, batchId: string) {
       ]),
   });
 }
+
+/**
+ * POST /batch/{batchId}/retry-sync — reintenta la sincronización con Beneficiarios
+ * de todos los expedientes fallidos de un lote.
+ */
+export function useRetryBatchSync(batchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => batchDetailService.retryBatchSync(batchId),
+    onSuccess: () => invalidateBatchState(queryClient, batchId),
+  });
+}
+
+/**
+ * POST /educa/{caseId}/retry-sync — reintenta la sincronización con Beneficiarios
+ * de un expediente individual.
+ */
+export function useRetryCaseSync(caseId: string, batchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => caseCorrectionService.retryCaseSync(caseId),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: triajeKeys.case(caseId) }),
+        invalidateBatchState(queryClient, batchId),
+      ]),
+  });
+}

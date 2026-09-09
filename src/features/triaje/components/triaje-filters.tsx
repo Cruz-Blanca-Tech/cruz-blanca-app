@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 import { usePrograms, useActivities } from '@/shared/hooks/use-intake-queries';
+import { useIsMounted } from '@/shared/hooks/use-is-mounted';
 import { useBatchStatuses } from '../hooks/use-triaje-queries';
 import { batchStatusSchema } from '../schemas/batch-status-schema';
 import { BATCH_STATUS_CONFIG } from '../lib/batch-status-config';
@@ -82,6 +83,8 @@ function FilterSelect({
 
 /** Filtros del lado del servidor: Programa, Actividad (dependiente) y Estado. */
 export function TriajeFilters() {
+  const isMounted = useIsMounted();
+
   const { programId, activityId, status, setProgramId, setActivityId, setStatus, clear } =
     useTriajeFiltersStore(
       useShallow((s) => ({
@@ -118,8 +121,8 @@ export function TriajeFilters() {
         onChange={setProgramId}
         allLabel="Todos los programas"
         options={programOptions}
-        placeholder={programs.isLoading ? 'Cargando programas…' : 'Todos los programas'}
-        disabled={programs.isLoading || programs.isError}
+        placeholder={isMounted && programs.isLoading ? 'Cargando programas…' : 'Todos los programas'}
+        disabled={isMounted ? (programs.isLoading || programs.isError) : false}
       />
       <FilterSelect
         icon={Folder}
@@ -130,11 +133,11 @@ export function TriajeFilters() {
         placeholder={
           !programId
             ? 'Todas las actividades'
-            : activities.isLoading
+            : isMounted && activities.isLoading
               ? 'Cargando actividades…'
               : 'Todas las actividades'
         }
-        disabled={!programId || activities.isLoading}
+        disabled={isMounted ? (!programId || activities.isLoading) : false}
       />
       <FilterSelect
         icon={Activity}
@@ -145,7 +148,7 @@ export function TriajeFilters() {
         allLabel="Todos los estados"
         options={statusOptions}
         placeholder="Todos los estados"
-        disabled={statuses.isLoading || statuses.isError}
+        disabled={isMounted ? (statuses.isLoading || statuses.isError) : false}
       />
       {showClear && (
         <Button

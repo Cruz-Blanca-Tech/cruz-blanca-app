@@ -42,6 +42,7 @@ function CountCell({ count, icon: Icon, activeClassName }: CountCellProps) {
 export function CaseRow({ caseItem, index }: CaseRowProps) {
   const hasErrors = caseItem.error_count > 0;
   const hasWarnings = caseItem.warning_count > 0;
+  const isSyncFailed = caseItem.sync_status === 'FAILED';
   // Un expediente ya resuelto se sigue pudiendo abrir (consultar el detalle es
   // legítimo), pero se anuncia como lectura: sus campos no admiten corrección.
   const isFinalized = isCaseFinalized(caseItem.status);
@@ -49,11 +50,13 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
   return (
     <TableRow
       className={cn(
-        hasErrors
-          ? 'bg-error-light/40 hover:bg-error-light/60'
-          : hasWarnings
-            ? 'bg-warning-light/40 hover:bg-warning-light/60'
-            : undefined
+        isSyncFailed
+          ? 'bg-error-light/50 hover:bg-error-light/70 border-l-4 border-l-error'
+          : hasErrors
+            ? 'bg-error-light/40 hover:bg-error-light/60'
+            : hasWarnings
+              ? 'bg-warning-light/40 hover:bg-warning-light/60'
+              : undefined
       )}
     >
       <TableCell className="px-4 py-3 text-right align-middle font-data text-[11px] text-ink-muted">
@@ -85,7 +88,18 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
       </TableCell>
 
       <TableCell className="px-4 py-3 align-middle">
-        <CaseVerdictBadge verdict={caseItem.verdict} />
+        <div className="flex flex-col gap-1 items-start">
+          <CaseVerdictBadge verdict={caseItem.verdict} />
+          {isSyncFailed && (
+            <span
+              title={caseItem.sync_error || 'Error al sincronizar con Beneficiarios'}
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-error-light text-error-dark border border-error/30 cursor-help"
+            >
+              <TriangleAlert className="size-3 text-error" />
+              Error de sincronización
+            </span>
+          )}
+        </div>
       </TableCell>
 
       <TableCell className="px-4 py-3 text-right align-middle">
@@ -93,7 +107,12 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
             en la URL para alimentar el visor de documentos tras un F5. */}
         <Button
           size="sm"
-          variant={isFinalized ? 'ghost' : 'outline'}
+          variant={isSyncFailed ? 'outline' : isFinalized ? 'ghost' : 'outline'}
+          className={
+            isSyncFailed
+              ? 'border-error/40 bg-error-light text-error-dark hover:bg-error-light/80'
+              : undefined
+          }
           nativeButton={false}
           render={
             <Link
@@ -101,8 +120,8 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
             />
           }
         >
-          {isFinalized ? <Eye /> : <PencilLine />}
-          {isFinalized ? 'Ver' : 'Corregir'}
+          {isSyncFailed ? <TriangleAlert /> : isFinalized ? <Eye /> : <PencilLine />}
+          {isSyncFailed ? 'Ver error' : isFinalized ? 'Ver' : 'Corregir'}
         </Button>
       </TableCell>
     </TableRow>

@@ -100,6 +100,7 @@ export function BatchDetailScreen({ batchId }: BatchDetailScreenProps) {
 
       <BatchDetailFooter
         batchId={batchId}
+        batch={batch}
         summary={summaryQuery.data}
         isLoading={summaryQuery.isLoading}
         isError={summaryQuery.isError}

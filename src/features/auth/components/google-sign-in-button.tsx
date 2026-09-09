@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isAxiosError } from 'axios';
 import { clientEnv } from '@/lib/env';
 import { useAuthStore } from '../stores/auth-store';
 
@@ -99,7 +100,12 @@ export function GoogleSignInButton() {
         router.replace('/dashboard');
       } catch (err) {
         if (cancelled) return;
-        setLocalError(err instanceof Error ? err.message : 'Error al iniciar sesión.');
+        if (isAxiosError(err)) {
+          const detail = err.response?.data?.detail || err.response?.data?.error;
+          setLocalError(detail || 'Error de autenticación con Google.');
+        } else {
+          setLocalError(err instanceof Error ? err.message : 'Error al iniciar sesión.');
+        }
       }
     };
 
