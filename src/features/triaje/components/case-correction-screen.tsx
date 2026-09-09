@@ -66,7 +66,7 @@ export function CaseCorrectionScreen({
         onJumpGroup={vm.setActiveGroup}
       />
 
-      {/* Banner de estado finalizado */}
+      {/* Banner de estado informativo para expediente aprobado */}
       {isApproved && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/30 bg-success-light px-4 py-3 text-success-dark">
           <div className="flex items-center gap-2.5">
@@ -76,7 +76,9 @@ export function CaseCorrectionScreen({
                 Expediente Aprobado
               </p>
               <p className="font-data text-xs text-success-dark/80">
-                Este expediente ya fue validado y aprobado exitosamente. No requiere más correcciones.
+                {caseActions.canEdit
+                  ? 'Este expediente se encuentra aprobado. Puede realizar correcciones adicionales antes de completar el lote.'
+                  : 'Este expediente ya fue validado y su lote fue procesado. No requiere más correcciones.'}
               </p>
             </div>
           </div>
