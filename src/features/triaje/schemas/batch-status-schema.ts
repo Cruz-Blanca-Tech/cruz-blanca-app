@@ -15,6 +15,8 @@ export const batchStatusValues = [
   'FAILED',
   'REJECTED',
   'FINALIZED',
+  'SYNCING',
+  'SYNC_FAILED',
 ] as const;
 
 export const batchStatusSchema = z.enum(batchStatusValues);

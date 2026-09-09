@@ -59,6 +59,15 @@ export function getCaseActionsState({
     };
   }
 
+  if (batchStatus === 'SYNCING') {
+    return {
+      canEdit: false,
+      canReject: false,
+      lockReason:
+        'El lote se encuentra sincronizando con el registro de beneficiarios. Por favor espere.',
+    };
+  }
+
   // Si el lote ya se cargó / finalizó en MDM, ya no admite cambios ni rechazos.
   if (isBatchLoaded(batchStatus)) {
     return {

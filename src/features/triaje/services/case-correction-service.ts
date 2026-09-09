@@ -78,4 +78,12 @@ export const caseCorrectionService = {
     });
     return parseApiResponse(educaRejectSchema, data, 'el rechazo del expediente');
   },
+
+  /**
+   * POST /educa/{caseId}/retry-sync — reintenta la sincronización con Beneficiarios (MDM).
+   */
+  async retryCaseSync(caseId: string): Promise<{ status: string; message: string }> {
+    const data = await apiClient.post(`${API_PATHS.educa}/${caseId}/retry-sync`);
+    return data as { status: string; message: string };
+  },
 };

@@ -83,4 +83,17 @@ export const batchDetailService = {
     });
     return parseApiResponse(batchRejectSchema, data, 'el rechazo del lote');
   },
+
+  /**
+   * POST /batch/{batchId}/retry-sync — reintenta la sincronización con Beneficiarios
+   * de los expedientes del lote que fallaron anteriormente.
+   */
+  async retryBatchSync(batchId: string): Promise<BatchVerifyCompletion> {
+    const data = await apiClient.post(`${API_PATHS.batch}/${batchId}/retry-sync`);
+    return parseApiResponse(
+      batchVerifyCompletionSchema,
+      data,
+      'el reintento de sincronización del lote'
+    );
+  },
 };

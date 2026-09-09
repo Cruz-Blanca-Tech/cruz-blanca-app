@@ -19,18 +19,28 @@ export const batchVerificationStatusSchema = z.enum([
   'COMPLETED',
   'PENDING',
   'NOT_FOUND',
+  'SYNCING',
+  'SYNC_FAILED',
 ]);
 export type BatchVerificationStatus = z.infer<typeof batchVerificationStatusSchema>;
 
+export const syncFailedCaseSchema = z.object({
+  case_id: z.string(),
+  dni: z.string(),
+  error: z.string(),
+});
+export type SyncFailedCase = z.infer<typeof syncFailedCaseSchema>;
+
 /**
- * Respuesta de POST /batch/{id}/verify-completion. `verdict_summary` es un
- * conteo por veredicto (claves = `TriageVerdict.name`): record ABIERTO
- * string→número, igual que el desglose del listado de lotes.
+ * Respuesta de POST /batch/{id}/verify-completion y POST /batch/{id}/retry-sync.
  */
 export const batchVerifyCompletionSchema = z.object({
   status: batchVerificationStatusSchema,
   message: z.string(),
-  verdict_summary: z.record(z.string(), count),
+  verdict_summary: z.record(z.string(), count).optional().default({}),
+  failed_count: count.optional(),
+  failed_cases: z.array(syncFailedCaseSchema).optional().default([]),
+  reprocessed_count: count.optional(),
 });
 export type BatchVerifyCompletion = z.infer<typeof batchVerifyCompletionSchema>;
 

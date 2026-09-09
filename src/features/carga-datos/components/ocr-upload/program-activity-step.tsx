@@ -14,6 +14,7 @@ import {
 import { Label } from '@/components/ui/label';
 
 import { usePrograms, useActivities } from '@/shared/hooks/use-intake-queries';
+import { useIsMounted } from '@/shared/hooks/use-is-mounted';
 import { useCargaDatosStore } from '../../stores/carga-datos-store';
 import { useIsAdmin } from '@/features/auth/hooks/use-permissions';
 import { CreateActivityDialog } from './create-activity-dialog';
@@ -30,6 +31,7 @@ const CREATE_ACTIVITY_VALUE = '__create_activity__';
 const SHOW_CREATE_ACTIVITY = false;
 
 export function ProgramActivityStep() {
+  const isMounted = useIsMounted();
   const isAdmin = useIsAdmin();
 
   const selectedProgramId = useCargaDatosStore((s) => s.selectedProgramId);
@@ -86,12 +88,12 @@ export function ProgramActivityStep() {
           value={selectedProgramId}
           onValueChange={handleProgramChange}
           items={programItems}
-          disabled={programs.isLoading || programs.isError}
+          disabled={isMounted ? (programs.isLoading || programs.isError) : false}
         >
           <SelectTrigger id="program-select" className="h-10 w-full">
             <SelectValue
               placeholder={
-                programs.isLoading
+                isMounted && programs.isLoading
                   ? 'Cargando programas…'
                   : 'Selecciona un programa'
               }
@@ -121,14 +123,14 @@ export function ProgramActivityStep() {
           value={selectedActivityId}
           onValueChange={handleActivityChange}
           items={activityItems}
-          disabled={!hasProgram || activities.isLoading}
+          disabled={isMounted ? (!hasProgram || activities.isLoading) : false}
         >
           <SelectTrigger id="activity-select" className="h-10 w-full">
             <SelectValue
               placeholder={
                 !hasProgram
                   ? 'Primero elige un programa'
-                  : activities.isLoading
+                  : isMounted && activities.isLoading
                     ? 'Cargando actividades…'
                     : 'Selecciona una actividad'
               }

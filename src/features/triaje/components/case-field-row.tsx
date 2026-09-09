@@ -230,19 +230,33 @@ export function CaseFieldRow({
         <Controller
           control={control}
           name={fieldName(field.name!)}
-          render={({ field: rhf }) => (
-            <Input
-              type={field.control === 'date' ? 'date' : 'text'}
-              value={(rhf.value as string) ?? ''}
-              onChange={rhf.onChange}
-              onBlur={rhf.onBlur}
-              onClick={(e) => e.stopPropagation()}
-              onFocus={onFocus}
-              disabled={disabled}
-              placeholder={field.placeholder ?? 'Ingresar manualmente…'}
-              className={cn('h-8 font-data text-[12.5px]', flagged && meta.border)}
-            />
-          )}
+          render={({ field: rhf }) => {
+            const isDniField =
+              field.id.toLowerCase().includes('dni') ||
+              Boolean(field.name?.toLowerCase().includes('dni'));
+            return (
+              <Input
+                type={field.control === 'date' ? 'date' : 'text'}
+                inputMode={isDniField ? 'numeric' : undefined}
+                maxLength={isDniField ? 8 : undefined}
+                value={(rhf.value as string) ?? ''}
+                onChange={(e) => {
+                  if (isDniField) {
+                    const cleaned = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    rhf.onChange(cleaned);
+                  } else {
+                    rhf.onChange(e);
+                  }
+                }}
+                onBlur={rhf.onBlur}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={onFocus}
+                disabled={disabled}
+                placeholder={field.placeholder ?? 'Ingresar manualmente…'}
+                className={cn('h-8 font-data text-[12.5px]', flagged && meta.border)}
+              />
+            );
+          }}
         />
       )}
 
