@@ -11,7 +11,7 @@ import { API_PATHS } from '@/lib/api-paths';
 export const programsService = {
   /** GET /programs/ — lista de programas institucionales vigentes. */
   async getPrograms(): Promise<Program[]> {
-    const data = await apiClient.get(`${API_PATHS.intake}/programs`);
+    const data = await apiClient.get(`${API_PATHS.intake}/programs/`);
     return parseApiResponse(z.array(programSchema), data, 'programas');
   },
 };
