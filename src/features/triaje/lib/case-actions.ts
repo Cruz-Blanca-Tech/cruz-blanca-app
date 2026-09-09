@@ -59,22 +59,25 @@ export function getCaseActionsState({
     };
   }
 
-  // Aprobado. Corregirlo no se puede en ningún caso; rechazarlo depende de si el
-  // lote ya se cargó. Si todavía no sabemos el estado del lote, se bloquea por
-  // precaución: es preferible un botón de menos que uno que rebota con 409.
-  if (batchStatus === undefined || isBatchLoaded(batchStatus)) {
+  // Si el lote ya se cargó / finalizó en MDM, ya no admite cambios ni rechazos.
+  if (isBatchLoaded(batchStatus)) {
     return {
       canEdit: false,
       canReject: false,
       lockReason:
-        'Este expediente fue aprobado y su lote ya se cargó al registro de beneficiarios. Para corregir un dato, editá la ficha del beneficiario.',
+        'Este expediente pertenece a un lote que ya fue cargado al registro de beneficiarios. Para corregir un dato, edite la ficha del beneficiario.',
     };
   }
 
-  return {
-    canEdit: false,
-    canReject: true,
-    lockReason:
-      'Este expediente ya fue aprobado, así que no admite correcciones. Todavía podés rechazarlo porque el lote no se cargó.',
-  };
+  // Si el expediente está aprobado pero el lote todavía está abierto (no finalizado en MDM),
+  // SÍ se permite editar y guardar correcciones, y también rechazarlo si fuera necesario.
+  if (caseStatus === 'APPROVED') {
+    return {
+      canEdit: true,
+      canReject: true,
+      lockReason: null,
+    };
+  }
+
+  return { canEdit: true, canReject: true, lockReason: null };
 }
