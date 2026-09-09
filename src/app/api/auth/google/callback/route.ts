@@ -12,10 +12,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { code } = (await request.json()) as { code?: string };
-    if (!code) {
+    const body = (await request.json()) as {
+      code?: string;
+      google_token?: string;
+      auth_code?: string;
+    };
+    const token = body.google_token || body.code || body.auth_code;
+    if (!token) {
       return NextResponse.json(
-        { error: 'Código de autorización requerido.' },
+        { error: 'Token de Google requerido.' },
         { status: 400 }
       );
     }
@@ -24,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const backendResponse = await axios.post(
       backendUrl,
-      { auth_code: code },
+      { google_token: token, auth_code: token },
       {
         headers: { 'Content-Type': 'application/json' },
         validateStatus: () => true,
