@@ -80,6 +80,28 @@ export function BatchRowAction({
         </Button>
       );
 
+    case 'SYNCING':
+      return (
+        <Button size="sm" variant="ghost" disabled className="bg-brand-200 text-brand-dark">
+          <Loader2 className="animate-spin" />
+          Sincronizando…
+        </Button>
+      );
+
+    case 'SYNC_FAILED':
+      return (
+        <Link
+          href={`/triaje/${batchId}`}
+          className={cn(
+            buttonVariants({ size: 'sm' }),
+            'border border-error/40 bg-error-light text-error-dark hover:bg-error-light/80'
+          )}
+        >
+          <RefreshCw />
+          Revisar error
+        </Link>
+      );
+
     case 'PROCESSING':
       return (
         <Button size="sm" variant="ghost" disabled className="bg-muted text-ink-muted">

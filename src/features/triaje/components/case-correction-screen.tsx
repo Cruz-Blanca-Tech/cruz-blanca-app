@@ -6,11 +6,15 @@ import {
   ArrowRight,
   CheckCircle2,
   Lock,
+  Loader2,
   OctagonAlert,
+  RefreshCw,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
 import { useCaseCorrection } from '../hooks/use-case-correction';
+import { useRetryCaseSync } from '../hooks/use-triaje-queries';
 import { CaseDocViewer } from './case-doc-viewer';
 import { CaseFieldsForm } from './case-fields-form';
 import { CaseValidationPanel } from './case-validation-panel';
@@ -35,6 +39,7 @@ export function CaseCorrectionScreen({
   dniReference,
 }: CaseCorrectionScreenProps) {
   const vm = useCaseCorrection({ batchId, caseId, dniReference });
+  const retryCaseSync = useRetryCaseSync(caseId, batchId);
 
   if (vm.isLoading) return <CaseCorrectionSkeleton />;
   if (vm.isError || !vm.caseData) return <CaseNotFound onBack={vm.goBackToBatch} />;
@@ -42,6 +47,18 @@ export function CaseCorrectionScreen({
   const { caseActions, isIncomplete } = vm;
   const isApproved = vm.caseData?.status === 'APPROVED';
   const isRejected = vm.caseData?.status === 'REJECTED';
+  const isSyncFailed = vm.caseData?.sync_status === 'FAILED';
+
+  const handleRetrySync = () => {
+    retryCaseSync.mutate(undefined, {
+      onSuccess: (res) => {
+        toast.success(res.message || 'Expediente sincronizado con éxito.');
+      },
+      onError: (err) => {
+        toast.error(err.message || 'Fallo al sincronizar con Beneficiarios.');
+      },
+    });
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-3 p-6">
@@ -66,8 +83,46 @@ export function CaseCorrectionScreen({
         onJumpGroup={vm.setActiveGroup}
       />
 
+      {/* Banner de error de sincronización */}
+      {isSyncFailed && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-fault/50 bg-fault-light px-4 py-3 text-fault-dark shadow-sm">
+          <div className="flex items-start gap-2.5">
+            <OctagonAlert className="size-5 shrink-0 text-fault-dark mt-0.5" />
+            <div>
+              <p className="font-heading text-sm font-bold text-fault-dark">
+                ⚠️ Aprobado (Error de sincronización con Beneficiarios)
+              </p>
+              <p className="font-data text-xs text-fault-dark/90 mt-0.5">
+                El expediente fue validado por el revisor, pero no se pudo registrar en la base de beneficiarios.
+              </p>
+              {vm.caseData.sync_error && (
+                <p className="mt-1.5 rounded bg-white/70 px-2.5 py-1 font-data text-xs border border-fault/30 text-ink-primary">
+                  <strong>Motivo:</strong> {vm.caseData.sync_error}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRetrySync}
+              disabled={retryCaseSync.isPending}
+              className="bg-white hover:bg-fault-light border-fault/50 text-fault-dark font-medium shadow-sm gap-1.5"
+            >
+              {retryCaseSync.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              Reintentar sincronización
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Banner de estado informativo para expediente aprobado */}
-      {isApproved && (
+      {isApproved && !isSyncFailed && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/30 bg-success-light px-4 py-3 text-success-dark">
           <div className="flex items-center gap-2.5">
             <CheckCircle2 className="size-5 shrink-0 text-success" />

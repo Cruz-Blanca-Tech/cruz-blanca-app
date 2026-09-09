@@ -83,4 +83,20 @@ export const BATCH_STATUS_CONFIG: Record<BatchStatus, BatchStatusConfig> = {
     kpiIconClassName: 'bg-fault-light text-fault-dark',
     spin: false,
   },
+  SYNCING: {
+    label: 'SINCRONIZANDO',
+    filterLabel: 'Sincronizando',
+    icon: Loader2,
+    badgeClassName: 'bg-brand-200 text-brand-dark',
+    kpiIconClassName: 'bg-brand-200 text-brand-dark',
+    spin: true,
+  },
+  SYNC_FAILED: {
+    label: 'ERROR DE CARGA',
+    filterLabel: 'Error de carga',
+    icon: OctagonAlert,
+    badgeClassName: 'bg-error-light text-error-dark',
+    kpiIconClassName: 'bg-error-light text-error-dark',
+    spin: false,
+  },
 };

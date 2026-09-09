@@ -87,7 +87,14 @@ export function CaseCorrectionHeader({
             <h1 className="font-heading text-2xl font-bold text-ink-primary">
               {beneficiaryName}
             </h1>
-            {statusMeta ? (
+            {caseData.sync_status === 'FAILED' ? (
+              <Badge
+                className="gap-1.5 rounded-sm px-2 py-0.5 font-data text-[10.5px] font-semibold bg-fault-light text-fault-dark border border-fault/40"
+              >
+                <span className="size-1.5 rounded-full bg-current" />
+                Aprobado (Error de sync)
+              </Badge>
+            ) : statusMeta ? (
               <Badge
                 className={cn(
                   'gap-1.5 rounded-sm px-2 py-0.5 font-data text-[10.5px] font-semibold',

@@ -104,6 +104,8 @@ export type EducaDossierData = z.infer<typeof educaDossierDataSchema>;
  */
 export const educaCaseSchema = z.object({
   status: z.string(),
+  sync_status: z.string().optional().default('PENDING'),
+  sync_error: z.string().nullable().optional(),
   dossier_data: educaDossierDataSchema,
   discrepancies: z.array(triageDiscrepancySchema),
   /** Mapa código → uuid de los documentos ya cargados. */
