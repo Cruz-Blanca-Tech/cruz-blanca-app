@@ -181,26 +181,7 @@ export function useCaseCorrection({
     const field = descriptors.find((f) => f.id === id);
     if (!field) return;
     setActiveGroup(field.group);
-    // Auto-cambio de documento al enfocar el campo. Se prefiere el mapeo ESTABLE
-    // del descriptor (`viewerDocCodes`: DNI del niño → DNIBE, DNI de un adulto →
-    // DNIAP) y solo si el campo no lo declara se cae al `document_code` de su
-    // discrepancia. Esto evita que el visor salte al documento donde se DETECTÓ el
-    // conflicto (a menudo la ficha, la primera pestaña) en vez del documento a
-    // revisar. Solo se cambia si el documento objetivo existe en el expediente; si
-    // no, el visor se queda donde está (no vuelve al primero).
-    const disc = matchDiscrepancy(field, discrepancies);
-    const candidateCodes =
-      field.viewerDocCodes ?? (disc?.document_code ? [disc.document_code] : []);
-    const doc = candidateCodes.reduce<(typeof documents)[number] | undefined>(
-      (found, code) => found ?? documents.find((d) => d.code === code),
-      undefined
-    );
-    if (doc?.id && doc.id !== effectiveDocId) {
-      setActiveDocId(doc.id);
-      setAutoSwitchHint(true);
-      if (hintTimer.current) clearTimeout(hintTimer.current);
-      hintTimer.current = setTimeout(() => setAutoSwitchHint(false), 3500);
-    }
+    // Auto-cambio de documento deshabilitado por solicitud del usuario
   };
 
   const jumpToField = (id: string) => {
