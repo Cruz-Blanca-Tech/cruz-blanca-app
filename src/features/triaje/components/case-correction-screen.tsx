@@ -23,6 +23,7 @@ import { CaseNotFound } from './case-not-found';
 import { CaseCorrectionHeader } from './case-correction-header';
 import { IncompleteCasePanel } from './incomplete-case-panel';
 import { CaseCorrectionActions } from './case-correction-actions';
+import { UploadMissingDocModal } from './upload-missing-doc-modal';
 import { RejectCaseDialog } from './reject-case-dialog';
 import { DossierDocumentChecklist } from './dossier-document-checklist';
 
@@ -201,6 +202,7 @@ export function CaseCorrectionScreen({
             }}
             isIncomplete={isIncomplete}
             onOpenUploadModal={() => vm.setIsUploadModalOpen(true)}
+            onOpenReplaceModal={(code, name, skipOcr) => vm.setReplaceDocTarget({ code, name, skipOcr })}
           />
         </div>
 
@@ -279,6 +281,20 @@ export function CaseCorrectionScreen({
           void vm.refetchCase();
         }}
       />
+
+      {vm.replaceDocTarget && (
+        <UploadMissingDocModal
+          isOpen={!!vm.replaceDocTarget}
+          onClose={() => {
+            vm.setReplaceDocTarget(null);
+            void vm.refetchCase();
+          }}
+          batchId={batchId}
+          dniReference={dniReference}
+          fixedDocumentCode={vm.replaceDocTarget.code}
+          fixedDocumentName={vm.replaceDocTarget.name}
+        />
+      )}
     </div>
   );
 }

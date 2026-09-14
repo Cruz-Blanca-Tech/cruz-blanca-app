@@ -3,7 +3,6 @@ import { XCircle, TriangleAlert, PencilLine, Eye } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { TableCell, TableRow } from '@/components/ui/table';
 import type { TriageCaseListItem } from '../schemas/triage-cases-schema';
 import { isCaseFinalized } from '../lib/case-actions';
 import { CaseVerdictBadge } from './case-verdict-badge';
@@ -48,71 +47,78 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
   const isFinalized = isCaseFinalized(caseItem.status);
 
   return (
-    <TableRow
+    <li
       className={cn(
+        'grid grid-cols-1 sm:grid-cols-12 gap-4 items-center p-3 sm:p-4 rounded-xl border shadow-sm transition-all hover:shadow-md relative',
         isSyncFailed
-          ? 'bg-error-light/50 hover:bg-error-light/70 border-l-4 border-l-error'
+          ? 'bg-error-light/50 hover:bg-error-light/70 border-l-4 border-l-error border-y-error/30 border-r-error/30'
           : hasErrors
-            ? 'bg-error-light/40 hover:bg-error-light/60'
+            ? 'bg-error-light/20 hover:bg-error-light/40 border-error/20'
             : hasWarnings
-              ? 'bg-warning-light/40 hover:bg-warning-light/60'
-              : undefined
+              ? 'bg-warning-light/20 hover:bg-warning-light/40 border-warning/30'
+              : 'bg-card hover:border-blue-500/30'
       )}
     >
-      <TableCell className="px-4 py-3 text-right align-middle font-data text-[11px] text-ink-muted">
-        {index}
-      </TableCell>
+      {/* 1. Índice y DNI (3/12) */}
+      <div className="sm:col-span-3 flex items-center gap-3 min-w-0">
+        <span className="w-7 text-right font-data text-xs text-slate-400 select-none">
+          {index}
+        </span>
+        <span className="font-data text-[14.5px] font-bold text-ink-primary truncate">
+          {caseItem.dni_reference}
+        </span>
+      </div>
 
-      <TableCell className="px-4 py-3 align-middle font-data text-[12.5px] font-medium text-ink-primary">
-        {caseItem.dni_reference}
-      </TableCell>
+      {/* 2. Veredicto y Estado de Sincronización (3/12) */}
+      <div className="sm:col-span-3 flex flex-col items-start gap-1.5 min-w-0">
+        <CaseVerdictBadge verdict={caseItem.verdict} />
+        {isSyncFailed && (
+          <span
+            title={caseItem.sync_error || 'Error al sincronizar con Beneficiarios'}
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold bg-error-light text-error-dark border border-error/30 cursor-help"
+          >
+            <TriangleAlert className="size-3 text-error" />
+            Error de sincronización
+          </span>
+        )}
+      </div>
 
-      <TableCell className="px-4 py-3 align-middle">
-        <CountCell
-          count={caseItem.error_count}
-          icon={XCircle}
-          activeClassName="bg-error-light text-error-dark"
-        />
-      </TableCell>
+      {/* 3. Incidencias Detectadas (4/12) */}
+      <div className="sm:col-span-4 flex flex-wrap items-center gap-2 min-w-0">
+        {hasErrors || hasWarnings || caseItem.discrepancies.length > 0 ? (
+          <>
+            {hasErrors && (
+              <CountCell
+                count={caseItem.error_count}
+                icon={XCircle}
+                activeClassName="bg-error-light text-error-dark border border-error/20"
+              />
+            )}
+            {hasWarnings && (
+              <CountCell
+                count={caseItem.warning_count}
+                icon={TriangleAlert}
+                activeClassName="bg-warning-light text-warning-dark border border-warning/30"
+              />
+            )}
+            <DiscrepanciesCell discrepancies={caseItem.discrepancies} />
+          </>
+        ) : (
+          <span className="font-data text-xs italic text-slate-400">Sin incidencias</span>
+        )}
+      </div>
 
-      <TableCell className="px-4 py-3 align-middle">
-        <CountCell
-          count={caseItem.warning_count}
-          icon={TriangleAlert}
-          activeClassName="bg-warning-light text-warning-dark"
-        />
-      </TableCell>
-
-      <TableCell className="px-4 py-3 align-middle">
-        <DiscrepanciesCell discrepancies={caseItem.discrepancies} />
-      </TableCell>
-
-      <TableCell className="px-4 py-3 align-middle">
-        <div className="flex flex-col gap-1 items-start">
-          <CaseVerdictBadge verdict={caseItem.verdict} />
-          {isSyncFailed && (
-            <span
-              title={caseItem.sync_error || 'Error al sincronizar con Beneficiarios'}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-error-light text-error-dark border border-error/30 cursor-help"
-            >
-              <TriangleAlert className="size-3 text-error" />
-              Error de sincronización
-            </span>
-          )}
-        </div>
-      </TableCell>
-
-      <TableCell className="px-4 py-3 text-right align-middle">
-        {/* El `dni_reference` estable (no `beneficiary.dni`, que se corrige) viaja
-            en la URL para alimentar el visor de documentos tras un F5. */}
+      {/* 4. Acciones (2/12) */}
+      <div className="sm:col-span-2 flex justify-start sm:justify-end min-w-0">
         <Button
           size="sm"
           variant={isSyncFailed ? 'outline' : isFinalized ? 'ghost' : 'outline'}
-          className={
+          className={cn(
+            'w-full sm:w-auto transition-colors',
             isSyncFailed
-              ? 'border-error/40 bg-error-light text-error-dark hover:bg-error-light/80'
-              : undefined
-          }
+              ? 'border-error/40 bg-error-light text-error-dark hover:bg-error-light/80 hover:text-error-dark'
+              : !isFinalized && 'hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300'
+          )}
           nativeButton={false}
           render={
             <Link
@@ -120,10 +126,10 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
             />
           }
         >
-          {isSyncFailed ? <TriangleAlert /> : isFinalized ? <Eye /> : <PencilLine />}
+          {isSyncFailed ? <TriangleAlert className="size-4" /> : isFinalized ? <Eye className="size-4" /> : <PencilLine className="size-4" />}
           {isSyncFailed ? 'Ver error' : isFinalized ? 'Ver' : 'Corregir'}
         </Button>
-      </TableCell>
-    </TableRow>
+      </div>
+    </li>
   );
 }

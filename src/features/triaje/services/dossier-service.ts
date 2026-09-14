@@ -26,9 +26,19 @@ export const dossierService = {
     caseDni: string,
     payload: UploadMissingDocPayload
   ): Promise<UploadMissingDocResult> {
+    const backendPayload = {
+      files: [
+        {
+          file_id: payload.file.source_id,
+          file_name: payload.file.file_name,
+        }
+      ],
+      skip_ocr: payload.skip_ocr ?? false,
+    };
+
     const data = await apiClient.post(
       `${API_PATHS.batches}/${batchId}/dossiers/${caseDni}/documents`,
-      payload
+      backendPayload
     );
     return parseApiResponse(uploadMissingDocResultSchema, data, 'la subida del documento');
   },

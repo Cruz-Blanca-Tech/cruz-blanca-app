@@ -61,6 +61,19 @@ export async function listDriveContent(
 
   let query = `'${folderId}' in parents and trashed = false`;
   if (search) query += ` and name contains '${search.replace(/'/g, "\\'")}'`;
+
+  // Restringir a carpetas y formatos soportados por Azure Document Intelligence
+  const supportedMimes = [
+    "'application/vnd.google-apps.folder'",
+    "'application/pdf'",
+    "'image/jpeg'",
+    "'image/png'",
+    "'image/tiff'",
+    "'image/bmp'",
+  ].join(' or mimeType = ');
+  
+  query += ` and (mimeType = ${supportedMimes})`;
+
   const url = new URL(DRIVE_FILES_URL);
   url.searchParams.append('q', query);
   url.searchParams.append('fields', 'files(id,name,mimeType,modifiedTime)');
@@ -86,7 +99,15 @@ export async function listFolderFiles(
   folderId: string
 ): Promise<PickedFile[]> {
   try {
-    const query = `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`;
+    const supportedMimes = [
+      "'application/pdf'",
+      "'image/jpeg'",
+      "'image/png'",
+      "'image/tiff'",
+      "'image/bmp'",
+    ].join(' or mimeType = ');
+
+    const query = `'${folderId}' in parents and trashed = false and (mimeType = ${supportedMimes})`;
     const url = new URL(DRIVE_FILES_URL);
     url.searchParams.append('q', query);
     url.searchParams.append('fields', 'files(id,name)');

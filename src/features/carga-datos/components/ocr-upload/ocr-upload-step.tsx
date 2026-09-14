@@ -140,7 +140,10 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
     files,
     description,
   });
-  const canProceed = validation.success && fileValidation.canSubmit;
+  const canProceed =
+    fileValidation.validCount > 0 &&
+    !fileValidation.hasIncompleteDossiers &&
+    description.trim().length > 0;
 
   const handleSubmit = () => {
     if (!validation.success) {
@@ -428,14 +431,16 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
 
                 <div className="flex items-center gap-3">
                   {!canProceed && !createBatch.isPending && (
-                    <span className="hidden font-data text-xs text-muted-foreground sm:inline">
+                    <span className="hidden font-data text-xs font-medium text-destructive sm:inline">
                       {files.length === 0
                         ? 'Falta seleccionar archivos de Drive'
                         : fileValidation.validCount === 0
-                          ? 'No hay archivos con formato o código válido para esta actividad'
-                          : !description.trim()
-                            ? 'Falta ingresar la descripción del lote'
-                            : 'Falta completar campos requeridos'}
+                          ? 'No hay archivos con formato o código válido'
+                          : fileValidation.hasIncompleteDossiers
+                            ? 'Error: Tienes expedientes incompletos (revisa el cuadro arriba)'
+                            : !description.trim()
+                              ? 'Falta ingresar la descripción del lote'
+                              : 'Falta completar campos requeridos'}
                     </span>
                   )}
                   <Button

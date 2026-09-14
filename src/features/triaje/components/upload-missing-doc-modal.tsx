@@ -33,6 +33,10 @@ interface UploadMissingDocModalProps {
   onClose: () => void;
   batchId: string;
   dniReference: string;
+  /** Si se proveen, el modal actúa en modo "Reemplazar" para este documento específico. */
+  fixedDocumentCode?: string;
+  fixedDocumentName?: string;
+  skipOcr?: boolean;
 }
 
 export function UploadMissingDocModal({
@@ -40,23 +44,25 @@ export function UploadMissingDocModal({
   onClose,
   batchId,
   dniReference,
+  fixedDocumentCode,
+  fixedDocumentName,
+  skipOcr,
 }: UploadMissingDocModalProps) {
-  const [selectedCode, setSelectedCode] = useState<string>('');
+  const [selectedCode, setSelectedCode] = useState<string>(fixedDocumentCode ?? '');
   const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
 
   const batchQuery = useBatch(batchId);
   const activityId = batchQuery.data?.activity_id ?? null;
 
-  // Cargamos TODAS las actividades (sin filtrar por programa) y luego
-  // buscamos la que corresponde al lote. El batch solo expone activity_id,
-  // no program_id, así que no podemos pre-filtrar.
   const activitiesQuery = useActivities(null, isOpen);
   const catalogQuery = useDocumentCatalog(isOpen && Boolean(activityId));
 
   const uploadMutation = useUploadMissingDoc(batchId, dniReference);
 
-  // Derivar las opciones del select dinámicamente según la actividad
   const documentOptions = useMemo(() => {
+    if (fixedDocumentCode) {
+      return [{ code: fixedDocumentCode, name: fixedDocumentName ?? 'Documento' }];
+    }
     if (!activitiesQuery.data || !catalogQuery.data || !activityId) return [];
 
     const activity = activitiesQuery.data.find((a) => a.id === activityId);
@@ -71,9 +77,9 @@ export function UploadMissingDocModal({
         name: doc?.name ?? 'Documento',
       };
     }).filter(doc => doc.code !== '');
-  }, [activitiesQuery.data, catalogQuery.data, activityId]);
+  }, [activitiesQuery.data, catalogQuery.data, activityId, fixedDocumentCode, fixedDocumentName]);
 
-  const isLoadingData = batchQuery.isLoading || activitiesQuery.isLoading || catalogQuery.isLoading;
+  const isLoadingData = !fixedDocumentCode && (batchQuery.isLoading || activitiesQuery.isLoading || catalogQuery.isLoading);
 
   const handlePick = (file: PickedFile) => {
     setPickedFile(file);
@@ -84,14 +90,15 @@ export function UploadMissingDocModal({
   };
 
   const handleSubmit = () => {
-    if (!pickedFile || !selectedCode) return;
+    const codeToSubmit = fixedDocumentCode ?? selectedCode;
+    if (!pickedFile || !codeToSubmit) return;
 
-    // Forjamos el nombre del archivo: {dni}_{codigo}.{extension}
     const ext = pickedFile.file_name.split('.').pop() || 'pdf';
-    const forgedFileName = `${dniReference}_${selectedCode}.${ext}`;
+    const forgedFileName = `${dniReference}_${codeToSubmit}.${ext}`;
 
     uploadMutation.mutate({
-      document_code: selectedCode,
+      document_code: codeToSubmit,
+      skip_ocr: skipOcr,
       file: {
         file_name: forgedFileName,
         source_id: pickedFile.source_id,
@@ -99,23 +106,24 @@ export function UploadMissingDocModal({
     }, {
       onSuccess: () => {
         onClose();
-        // Reset state
         setPickedFile(null);
-        setSelectedCode('');
+        if (!fixedDocumentCode) setSelectedCode('');
       }
     });
   };
 
-  // Si abrimos el modal e intentamos cerrar pero está cargando la mutación, bloqueamos.
   const isMutating = uploadMutation.isPending;
+  const isReplaceMode = !!fixedDocumentCode;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isMutating && !open && onClose()}>
       <DialogContent className="max-w-md bg-white">
         <DialogHeader>
-          <DialogTitle>Subir documento faltante</DialogTitle>
+          <DialogTitle>{isReplaceMode ? 'Reemplazar documento' : 'Subir documento faltante'}</DialogTitle>
           <DialogDescription>
-            Selecciona el documento que deseas adjuntar al expediente de {dniReference}.
+            {isReplaceMode 
+              ? `Sube el archivo correcto para reemplazar "${fixedDocumentName ?? fixedDocumentCode}" en el expediente de ${dniReference}.`
+              : `Selecciona el documento que deseas adjuntar al expediente de ${dniReference}.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -125,6 +133,10 @@ export function UploadMissingDocModal({
             {isLoadingData ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground h-10 border rounded-md px-3 bg-slate-50">
                 <Loader2 className="size-4 animate-spin" /> Cargando tipos...
+              </div>
+            ) : isReplaceMode ? (
+              <div className="flex items-center h-10 border rounded-md px-3 bg-slate-100 text-sm font-medium text-slate-700">
+                {fixedDocumentName ?? fixedDocumentCode}
               </div>
             ) : (
               <Select value={selectedCode} onValueChange={(v) => setSelectedCode(v ?? '')} disabled={isMutating}>
@@ -171,9 +183,9 @@ export function UploadMissingDocModal({
           <Button variant="ghost" onClick={onClose} disabled={isMutating}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={!selectedCode || !pickedFile || isMutating}>
+          <Button onClick={handleSubmit} disabled={!(fixedDocumentCode ?? selectedCode) || !pickedFile || isMutating}>
             {isMutating && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {isMutating ? 'Subiendo...' : 'Subir y Procesar'}
+            {isMutating ? 'Subiendo...' : (skipOcr ? 'Subir Imagen' : 'Subir y Extraer')}
           </Button>
         </DialogFooter>
       </DialogContent>
