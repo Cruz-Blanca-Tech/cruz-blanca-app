@@ -1,6 +1,5 @@
 import { Files } from 'lucide-react';
 
-import { TableCell, TableRow } from '@/components/ui/table';
 import type { BatchListItem } from '../schemas/batches-list-schema';
 import { formatBatchDate } from '../lib/format-batch-date';
 import { ProgramBadge } from './program-badge';
@@ -12,7 +11,7 @@ interface BatchRowProps {
   batch: BatchListItem;
 }
 
-/** Una fila de la tabla de lotes. */
+/** Una fila (tarjeta) de la lista de lotes. */
 export function BatchRow({ batch }: BatchRowProps) {
   const { absolute, relative } = formatBatchDate(batch.created_at);
   const filesCount =
@@ -22,61 +21,61 @@ export function BatchRow({ batch }: BatchRowProps) {
   const pendingReviewCount = batch.triage_summary.verdicts.REQUIRES_TRIAGE ?? 0;
 
   return (
-    <TableRow>
-      <TableCell className="px-4 py-3.5 align-middle">
-        <div className="font-data text-[12.5px] font-medium text-ink-primary">
-          {absolute}
+    <li className="group flex flex-col sm:flex-row gap-5 p-5 rounded-xl bg-card border border-slate-200 shadow-sm transition-all hover:shadow-md hover:border-blue-500/30 relative">
+      
+      {/* Contenido principal (Izquierda) */}
+      <div className="flex-1 min-w-0 flex flex-col gap-2.5">
+        
+        {/* Fila de metadatos: Programa y Fecha */}
+        <div className="flex items-center gap-2 font-data text-[11.5px] font-medium text-ink-muted">
+          <ProgramBadge name={batch.program_name} />
+          <span className="text-slate-300">&bull;</span>
+          <span title={absolute}>{relative || absolute}</span>
         </div>
-        {relative && (
-          <div className="mt-0.5 font-data text-[11px] text-ink-muted">
-            {relative}
-          </div>
-        )}
-      </TableCell>
 
-      <TableCell className="px-4 py-3.5 align-middle">
-        <ProgramBadge name={batch.program_name} />
-      </TableCell>
-
-      <TableCell className="max-w-[240px] px-4 py-3.5 align-middle whitespace-normal">
-        <div className="font-sans text-sm font-medium text-ink-primary">
-          {batch.activity_name ?? 'Actividad sin nombre'}
+        {/* Título y Descripción */}
+        <div className="min-w-0">
+          <h3 className="font-sans text-[14.5px] font-bold text-ink-primary group-hover:text-blue-600 transition-colors truncate">
+            {batch.activity_name ?? 'Actividad sin nombre'}
+          </h3>
+          {batch.description ? (
+            <p className="mt-1 font-sans text-xs leading-relaxed text-ink-muted line-clamp-2">
+              {batch.description}
+            </p>
+          ) : (
+            <p className="mt-1 font-sans text-xs italic text-slate-400">
+              Sin descripción detallada
+            </p>
+          )}
         </div>
-        {batch.description && (
-          <div className="mt-0.5 font-data text-[11px] leading-snug text-ink-muted">
-            {batch.description}
-          </div>
-        )}
-      </TableCell>
 
-      <TableCell className="px-4 py-3.5 align-middle">
-        <span className="inline-flex items-center gap-1.5">
-          <Files className="size-3.5 text-ink-muted" />
-          <span className="font-data text-sm font-medium text-ink-primary">
-            {filesCount}
+        {/* Estadísticas: Archivos y Desglose */}
+        <div className="flex flex-wrap items-center gap-3 mt-1">
+          <span className="inline-flex items-center gap-1.5 bg-slate-100/80 px-2.5 py-1 rounded-md border border-slate-200/60">
+            <Files className="size-3.5 text-slate-500" />
+            <span className="font-data text-xs font-semibold text-slate-600">
+              {filesCount} archivos subidos
+            </span>
           </span>
-        </span>
-      </TableCell>
+          <ExpedientesBreakdown
+            status={batch.status}
+            triageSummary={batch.triage_summary}
+            failureReason={batch.failure_reason}
+          />
+        </div>
+      </div>
 
-      <TableCell className="px-4 py-3.5 align-middle">
-        <ExpedientesBreakdown
-          status={batch.status}
-          triageSummary={batch.triage_summary}
-          failureReason={batch.failure_reason}
-        />
-      </TableCell>
-
-      <TableCell className="px-4 py-3.5 align-middle">
+      {/* Acciones y Estado (Derecha) */}
+      <div className="flex flex-row sm:flex-col justify-between sm:justify-center items-center sm:items-end gap-3 shrink-0 sm:pl-5 sm:border-l sm:border-slate-100">
         <StatusBadge status={batch.status} failureReason={batch.failure_reason} />
-      </TableCell>
-
-      <TableCell className="px-4 py-3.5 text-right align-middle">
+        
         <BatchRowAction
           batchId={batch.id}
           status={batch.status}
           pendingReviewCount={pendingReviewCount}
         />
-      </TableCell>
-    </TableRow>
+      </div>
+
+    </li>
   );
 }

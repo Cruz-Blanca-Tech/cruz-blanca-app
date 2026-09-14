@@ -9,10 +9,19 @@ import {
   Minus,
   OctagonAlert,
   Plus,
+  RefreshCw,
+  MoreVertical,
+  ImagePlus,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { DocumentDossierItem, PendingDocumentItem } from '../schemas/case-documents-schema';
 import type { TriageDiscrepancy } from '../schemas/triage-discrepancy-schema';
@@ -36,6 +45,7 @@ interface CaseDocViewerProps {
   onDocumentUploaded: () => void;
   isIncomplete: boolean;
   onOpenUploadModal: () => void;
+  onOpenReplaceModal?: (code: string, name: string, skip_ocr?: boolean) => void;
 }
 
 const MIN_ZOOM = 0.5;
@@ -59,6 +69,7 @@ export function CaseDocViewer({
   onDocumentUploaded,
   isIncomplete,
   onOpenUploadModal,
+  onOpenReplaceModal,
 }: CaseDocViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
@@ -170,11 +181,54 @@ export function CaseDocViewer({
         </div>
       )}
 
-      {/* Barra de zoom */}
+      {/* Barra de zoom y herramientas */}
       <div className="flex shrink-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink-primary">
-          <ImageIcon className="size-3.5 shrink-0 text-primary" />
-          <span className="truncate">{activeDoc?.file_name}</span>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex min-w-0 items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink-primary">
+            <ImageIcon className="size-3.5 shrink-0 text-primary" />
+            <span className="truncate">{activeDoc?.file_name}</span>
+          </div>
+          {onOpenReplaceModal && (
+            <DropdownMenu>
+              <DropdownMenuTrigger 
+                className={`${buttonVariants({ variant: 'outline', size: 'sm' })} h-7 px-2 text-[11px] text-ink-muted hover:text-primary hover:border-primary/40 transition-colors cursor-pointer`}
+              >
+                <MoreVertical className="size-3" />
+                <span className="ml-1">Opciones</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem 
+                  className="cursor-pointer py-2"
+                  onClick={() => onOpenReplaceModal(
+                    activeDoc?.code ?? 'DESCONOCIDO', 
+                    activeDoc?.name ?? activeDoc?.file_name ?? 'Documento',
+                    true
+                  )}
+                >
+                  <ImagePlus className="mr-2 size-4 text-muted-foreground" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">Subir imagen (Sin OCR)</span>
+                    <span className="text-[10px] text-muted-foreground">Conserva tus correcciones manuales.</span>
+                  </div>
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem 
+                  className="cursor-pointer py-2 text-primary focus:bg-primary/5 focus:text-primary"
+                  onClick={() => onOpenReplaceModal(
+                    activeDoc?.code ?? 'DESCONOCIDO', 
+                    activeDoc?.name ?? activeDoc?.file_name ?? 'Documento',
+                    false
+                  )}
+                >
+                  <RefreshCw className="mr-2 size-4" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">Extraer datos con IA</span>
+                    <span className="text-[10px] opacity-70">Sobreescribe el formulario con el OCR.</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button

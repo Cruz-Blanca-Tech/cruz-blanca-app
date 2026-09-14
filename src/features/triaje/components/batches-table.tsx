@@ -1,15 +1,6 @@
 import { Inbox, OctagonAlert } from 'lucide-react';
 
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { BatchListItem } from '../schemas/batches-list-schema';
 import { BatchRow } from './batch-row';
@@ -22,51 +13,28 @@ interface BatchesTableProps {
   hasFilters: boolean;
 }
 
-const COLUMNS = [
-  'Fecha de carga',
-  'Programa',
-  'Actividad / descripción',
-  'Archivos',
-  'Desglose de expedientes',
-  'Estado',
-] as const;
-
-const HEAD_CLASSNAME =
-  'h-auto bg-slate-50 px-4 py-3 font-data text-[10.5px] font-semibold tracking-wider text-ink-secondary uppercase';
-
-function TableShell({ children }: { children: React.ReactNode }) {
+function ListShell({ children }: { children: React.ReactNode }) {
   return (
-    <Card className="gap-0 p-0 ring-border">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            {COLUMNS.map((column) => (
-              <TableHead key={column} className={HEAD_CLASSNAME}>
-                {column}
-              </TableHead>
-            ))}
-            <TableHead className={`${HEAD_CLASSNAME} text-right`}>
-              Acciones
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>{children}</TableBody>
-      </Table>
-    </Card>
+    <ul className="flex flex-col gap-3">
+      {children}
+    </ul>
   );
 }
 
 function LoadingRows() {
   return (
     <>
-      {Array.from({ length: 6 }).map((_, index) => (
-        <TableRow key={index} className="hover:bg-transparent">
-          {Array.from({ length: 7 }).map((__, cell) => (
-            <TableCell key={cell} className="px-4 py-3.5">
-              <Skeleton className="h-5 w-full" />
-            </TableCell>
-          ))}
-        </TableRow>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <li key={index} className="rounded-lg border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-12 w-1/4" />
+            <Skeleton className="h-12 w-1/4" />
+            <Skeleton className="h-12 w-1/4" />
+            <div className="ml-auto">
+              <Skeleton className="h-8 w-24" />
+            </div>
+          </div>
+        </li>
       ))}
     </>
   );
@@ -82,21 +50,17 @@ function MessageRow({
   description: string;
 }) {
   return (
-    <TableRow className="hover:bg-transparent">
-      <TableCell colSpan={7} className="px-5 py-12">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <Icon className="size-7 text-ink-muted" />
-          <p className="font-sans text-sm font-medium text-ink-secondary">
-            {title}
-          </p>
-          <p className="font-data text-xs text-ink-muted">{description}</p>
-        </div>
-      </TableCell>
-    </TableRow>
+    <li className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-12 text-center bg-slate-50/50">
+      <Icon className="size-7 text-ink-muted" />
+      <p className="font-sans text-sm font-medium text-ink-secondary">
+        {title}
+      </p>
+      <p className="font-data text-xs text-ink-muted">{description}</p>
+    </li>
   );
 }
 
-/** Tabla de lotes con estados de carga, error y vacío. */
+/** Lista de lotes con estados de carga, error y vacío. */
 export function BatchesTable({
   batches,
   isLoading,
@@ -105,27 +69,27 @@ export function BatchesTable({
 }: BatchesTableProps) {
   if (isLoading) {
     return (
-      <TableShell>
+      <ListShell>
         <LoadingRows />
-      </TableShell>
+      </ListShell>
     );
   }
 
   if (isError) {
     return (
-      <TableShell>
+      <ListShell>
         <MessageRow
           icon={OctagonAlert}
           title="No se pudieron cargar los lotes"
           description="Vuelve a intentarlo en unos segundos."
         />
-      </TableShell>
+      </ListShell>
     );
   }
 
   if (batches.length === 0) {
     return (
-      <TableShell>
+      <ListShell>
         <MessageRow
           icon={Inbox}
           title="No hay lotes para mostrar"
@@ -135,17 +99,17 @@ export function BatchesTable({
               : 'Cuando cargues un lote aparecerá aquí.'
           }
         />
-      </TableShell>
+      </ListShell>
     );
   }
 
   return (
     <TooltipProvider>
-      <TableShell>
+      <ListShell>
         {batches.map((batch) => (
           <BatchRow key={batch.id} batch={batch} />
         ))}
-      </TableShell>
+      </ListShell>
     </TooltipProvider>
   );
 }

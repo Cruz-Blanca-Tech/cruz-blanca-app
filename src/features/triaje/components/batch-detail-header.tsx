@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { BatchListItem } from '../schemas/batches-list-schema';
 import { formatBatchDate } from '../lib/format-batch-date';
-import { ProgramBadge } from './program-badge';
 import { StatusBadge } from './status-badge';
 
 interface BatchDetailHeaderProps {
@@ -58,7 +57,7 @@ export function BatchDetailHeader({
         )}
         <ChevronRight className="size-3 text-ink-disabled" />
         <span className="font-medium text-ink-primary">
-          {date?.absolute ?? 'Lote'}
+          {batch?.activity_name ?? 'Detalle'}
         </span>
       </nav>
 
@@ -83,17 +82,15 @@ export function BatchDetailHeader({
           ) : (
             <>
               <h1 className="font-heading text-2xl font-bold tracking-tight text-ink-primary">
-                Lote del {date?.absolute}
+                {batch.activity_name ?? 'Actividad sin nombre'}
               </h1>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <ProgramBadge name={batch.program_name} />
+              <div className="mt-2 flex flex-wrap items-center gap-2.5">
                 <StatusBadge
                   status={batch.status}
                   failureReason={batch.failure_reason}
                 />
-                <span className="font-data text-xs text-ink-muted">
-                  {batch.activity_name ?? 'Actividad sin nombre'}
-                  {` · ${batch.triage_summary.total_cases} expediente(s)`}
+                <span className="font-data text-[13px] text-ink-muted">
+                  {batch.triage_summary.total_cases} expediente(s) &middot; {date?.absolute}
                 </span>
               </div>
             </>

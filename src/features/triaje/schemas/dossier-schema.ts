@@ -15,6 +15,7 @@ import { z } from 'zod';
  */
 export const uploadMissingDocPayloadSchema = z.object({
   document_code: z.string(),
+  skip_ocr: z.boolean().optional(),
   file: z.object({
     file_name: z.string(),
     source_id: z.string(),

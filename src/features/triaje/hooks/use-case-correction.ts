@@ -99,6 +99,7 @@ export function useCaseCorrection({
   // refetches de foco). Tras guardar, el reset se hace explícito en onSuccess.
   const initializedCaseId = useRef<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [replaceDocTarget, setReplaceDocTarget] = useState<{ code: string; name: string; skipOcr?: boolean } | null>(null);
 
   useEffect(() => {
     if (caseData && !isIncomplete && initializedCaseId.current !== caseId) {
@@ -392,6 +393,8 @@ export function useCaseCorrection({
     // Modales
     isUploadModalOpen,
     setIsUploadModalOpen,
+    replaceDocTarget,
+    setReplaceDocTarget,
     rejectOpen,
     setRejectOpen,
   };

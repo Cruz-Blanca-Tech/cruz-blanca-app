@@ -7,6 +7,7 @@ import {
   FileWarning,
   Trash2,
   Users,
+  X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -134,45 +135,74 @@ export function FileValidationPreview({
                     <FileText className="size-3.5 text-muted-foreground" />
                     DNI: {group.dni}
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] px-1.5 py-0 ${
-                      group.isComplete
-                        ? 'border-success text-success-dark bg-success-light'
-                        : 'border-warning text-warning-dark bg-warning-light'
-                    }`}
-                  >
-                    {group.isComplete ? (
-                      <span className="flex items-center gap-1">
-                        <CheckCircle2 className="size-3" />
-                        Completo ({group.totalPresent}/{group.totalRequired})
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <AlertTriangle className="size-3" />
-                        Incompleto ({group.totalPresent}/{group.totalRequired})
-                      </span>
-                    )}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] px-1.5 py-0 ${
+                        group.isComplete
+                          ? 'border-success text-success-dark bg-success-light'
+                          : 'border-warning text-warning-dark bg-warning-light'
+                      }`}
+                    >
+                      {group.isComplete ? (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="size-3" />
+                          Completo ({group.totalPresent}/{group.totalRequired})
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="size-3" />
+                          Incompleto ({group.totalPresent}/{group.totalRequired})
+                        </span>
+                      )}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      title="Quitar este expediente completo del lote"
+                      disabled={disabled}
+                      onClick={() => {
+                        group.files.forEach(f => onRemoveFile(f.file.source_id));
+                      }}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Chips de documentos */}
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                  {group.presentCodes.map((code) => (
-                    <span
-                      key={code}
-                      className="rounded bg-success/20 px-1.5 py-0.5 font-mono font-medium text-success-dark text-[10px]"
-                    >
-                      ✓ {code}
-                    </span>
-                  ))}
+                  {group.presentCodes.map((code) => {
+                    const fileItem = group.files.find(f => f.code === code);
+                    return (
+                      <span
+                        key={code}
+                        className="group flex items-center gap-1 rounded bg-success/20 pl-1.5 pr-1 py-0.5 font-mono font-medium text-success-dark text-[10px]"
+                      >
+                        ✓ {code}
+                        {fileItem && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveFile(fileItem.file.source_id)}
+                            className="ml-0.5 rounded-full p-0.5 hover:bg-success/30 hover:text-destructive focus:outline-none focus:ring-1 focus:ring-destructive"
+                            title="Quitar este documento para subir otro"
+                            disabled={disabled}
+                          >
+                            <Trash2 className="size-2.5" />
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
                   {group.missingCodes.map((code) => (
                     <span
                       key={code}
-                      className="rounded border border-dashed border-warning/60 bg-warning/10 px-1.5 py-0.5 font-mono text-warning-dark text-[10px]"
+                      className="rounded border border-dashed border-destructive/60 bg-destructive/10 px-1.5 py-0.5 font-mono text-destructive-dark text-[10px]"
                       title={`Falta documento requerido: ${code}`}
                     >
-                      ✕ {code}
+                      ✗ {code}
                     </span>
                   ))}
                 </div>
@@ -180,12 +210,12 @@ export function FileValidationPreview({
             ))}
           </div>
 
-          {/* Advertencia si hay incompletos */}
+          {/* Error estricto si hay incompletos */}
           {hasIncompleteDossiers && (
-            <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-50 p-2.5 text-xs text-amber-800 border border-amber-200">
-              <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600" />
+            <div className="mt-3 flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-xs text-destructive border border-destructive/20">
+              <AlertTriangle className="size-4 shrink-0 mt-0.5 text-destructive" />
               <span>
-                <strong>Atención:</strong> Uno o más expedientes no tienen todos los documentos requeridos. Puedes procesar el lote así, pero los expedientes incompletos requerirán triaje manual y se les deberán anexar los documentos faltantes luego.
+                <strong>Bloqueo de seguridad:</strong> Tienes expedientes incompletos. Por favor, sube los documentos que faltan en rojo (✗) o elimina el DNI completo desde Google Drive Picker para poder continuar. El proceso no avanzará hasta que todos los expedientes estén completos.
               </span>
             </div>
           )}
