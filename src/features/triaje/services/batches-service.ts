@@ -91,4 +91,11 @@ export const triajeBatchesService = {
     const data = await apiClient.get(`${API_PATHS.batches}/${batchId}`);
     return parseApiResponse(batchListItemSchema, data, 'el lote');
   },
+
+  /**
+   * POST /batches/{batchId}/retry — reintenta un lote fallido.
+   */
+  async retryBatch(batchId: string): Promise<{ message: string, batch_id: string }> {
+    return await apiClient.post(`${API_PATHS.batches}/${batchId}/retry`);
+  },
 };

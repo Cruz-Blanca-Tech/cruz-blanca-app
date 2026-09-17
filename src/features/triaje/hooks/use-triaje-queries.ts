@@ -266,6 +266,21 @@ export function useRejectCase(caseId: string, batchId: string) {
 }
 
 /**
+ * POST /batches/{batchId}/retry — reintenta el pipeline de OCR de un lote fallido.
+ */
+export function useRetryBatch(batchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => triajeBatchesService.retryBatch(batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: triajeKeys.list._def });
+      queryClient.invalidateQueries({ queryKey: triajeKeys.summary._def });
+      invalidateBatchState(queryClient, batchId);
+    },
+  });
+}
+
+/**
  * POST /batch/{batchId}/retry-sync — reintenta la sincronización con Beneficiarios
  * de todos los expedientes fallidos de un lote.
  */
