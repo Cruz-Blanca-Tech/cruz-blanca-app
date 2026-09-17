@@ -16,11 +16,7 @@ interface BatchRowActionProps {
   pendingReviewCount: number;
 }
 
-// TODO: el endpoint de reintento de OCR aún no existe. Reemplazar por la mutación
-// correspondiente cuando esté disponible.
-function notifyRetryComingSoon() {
-  toast.info('El reintento de procesamiento estará disponible próximamente.');
-}
+import { useRetryBatch } from '../hooks/use-triaje-queries';
 
 /** Acción de la fila según el estado del lote (réplica visual del mockup). */
 export function BatchRowAction({
@@ -28,6 +24,7 @@ export function BatchRowAction({
   status,
   pendingReviewCount,
 }: BatchRowActionProps) {
+  const retryMutation = useRetryBatch(batchId);
   switch (status) {
     case 'COMPLETED':
       return (
@@ -67,16 +64,18 @@ export function BatchRowAction({
         </span>
       );
 
+    case 'PENDING':
     case 'FAILED':
       return (
         <Button
           size="sm"
           variant="outline"
-          onClick={notifyRetryComingSoon}
+          onClick={() => retryMutation.mutate()}
+          disabled={retryMutation.isPending}
           className="border-fault/40 bg-fault-light text-fault-dark hover:bg-fault-light/70"
         >
-          <RefreshCw />
-          Reintentar
+          <RefreshCw className={cn(retryMutation.isPending && "animate-spin")} />
+          {retryMutation.isPending ? 'Reintentando...' : 'Reintentar'}
         </Button>
       );
 
