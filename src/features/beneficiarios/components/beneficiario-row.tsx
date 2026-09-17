@@ -68,7 +68,29 @@ export function BeneficiarioRow({ beneficiary, masked }: BeneficiarioRowProps) {
 
       {/* Grado */}
       <TableCell className="px-4 py-3 align-middle font-data text-[12.5px] text-ink-secondary">
-        {beneficiary.grade ?? '—'}
+        {(() => {
+          const rawGrade = beneficiary.grade;
+          if (!rawGrade) return '—';
+          const gradeMap: Record<string, string> = {
+            'INICIAL_3': 'Inicial 3 años',
+            'INICIAL_4': 'Inicial 4 años',
+            'INICIAL_5': 'Inicial 5 años',
+            '1RO_PRIMARIA': '1ro Primaria',
+            '2DO_PRIMARIA': '2do Primaria',
+            '3RO_PRIMARIA': '3ro Primaria',
+            '4TO_PRIMARIA': '4to Primaria',
+            '5TO_PRIMARIA': '5to Primaria',
+            '6TO_PRIMARIA': '6to Primaria',
+            '1RO_SECUNDARIA': '1ro Secundaria',
+            '2DO_SECUNDARIA': '2do Secundaria',
+            '3RO_SECUNDARIA': '3ro Secundaria',
+            '4TO_SECUNDARIA': '4to Secundaria',
+            '5TO_SECUNDARIA': '5to Secundaria',
+            'SUPERIOR': 'Educación Superior',
+            'NINGUNO': 'Ninguno',
+          };
+          return gradeMap[rawGrade] || rawGrade;
+        })()}
       </TableCell>
 
       {/* Acciones */}
