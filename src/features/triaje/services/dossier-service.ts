@@ -29,7 +29,7 @@ export const dossierService = {
     const backendPayload = {
       files: [
         {
-          file_id: payload.file.source_id,
+          source_id: payload.file.source_id,
           file_name: payload.file.file_name,
         }
       ],
