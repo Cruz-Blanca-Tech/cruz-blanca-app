@@ -60,6 +60,19 @@ function getByPath(obj: unknown, path: string): unknown {
 }
 
 /**
+ * Género del maestro (MDM) → valor del select del formulario de corrección.
+ * El maestro serializa el enum (`MALE`/`FEMALE`) pero el campo `beneficiary.gender`
+ * del formulario solo ofrece `F`/`M`; sin esta normalización el select se queda
+ * vacío ("me quita el género") aunque el maestro sí tenga el dato. Valores no
+ * representables (`OTHER`/`UNKNOWN`/vacíos) se dejan en `''` como "no consignado".
+ */
+function mdmGenderToForm(gender: string | null | undefined): string {
+  if (gender === 'MALE') return 'M';
+  if (gender === 'FEMALE') return 'F';
+  return '';
+}
+
+/**
  * Controlador de la pantalla de corrección de un expediente EDUCA. Concentra todo
  * el estado de servidor (5 queries + mutación), el ciclo de vida del formulario,
  * la cadena de derivaciones de validación, el estado de interacción visor↔campo,
@@ -177,7 +190,7 @@ export function useCaseCorrection({
       form.setValue('beneficiary.first_name', snap.first_name, { shouldDirty: true });
       form.setValue('beneficiary.last_name', snap.last_name, { shouldDirty: true });
       form.setValue('beneficiary.birth_date', snap.birth_date ?? '', { shouldDirty: true });
-      form.setValue('beneficiary.gender', snap.gender ?? '', { shouldDirty: true });
+      form.setValue('beneficiary.gender', mdmGenderToForm(snap.gender), { shouldDirty: true });
       form.setValue('beneficiary.address', snap.address ?? '', { shouldDirty: true });
       // Padre/madre (por rol): misma persona → datos del maestro.
       const parents: Record<
