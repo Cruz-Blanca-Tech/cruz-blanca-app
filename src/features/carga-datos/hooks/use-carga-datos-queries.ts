@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { intakeKeys } from '@/shared/hooks/use-intake-queries';
+import { documentCatalogService } from '@/shared/services/document-catalog-service';
 import { cargaDatosService } from '../services/activities-service';
 import { batchesService } from '../services/batches-service';
 import type { CreateActivityRequest, CreateBatchRequest } from '../types';
@@ -24,7 +25,7 @@ const FIVE_MINUTES = 1000 * 60 * 5;
 export function useDocumentCatalog(enabled = true) {
   return useQuery({
     queryKey: cargaDatosKeys.documentCatalog,
-    queryFn: cargaDatosService.getDocumentCatalog,
+    queryFn: documentCatalogService.getDocumentCatalog,
     staleTime: FIVE_MINUTES,
     enabled,
   });

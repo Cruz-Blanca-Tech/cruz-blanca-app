@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import type { CreateActivityFormValues } from '../../schemas/create-activity-schema';
-import type { DocumentType } from '../../schemas/document-catalog-schema';
+import type { DocumentType } from '@/shared/schemas/document-catalog-schema';
 
 /** Color del valor del umbral según severidad (igual que el diseño de referencia). */
 function thresholdColor(pct: number): string {

@@ -49,6 +49,14 @@ export const API_PATHS = {
    */
   beneficiaries: '/api/v1/mdm/beneficiaries',
   /**
+   * Colegios del master (mismo `beneficiary_app` montado en `{API_V1_STR}/mdm`).
+   * El `school_router` se registra con prefijo `/schools` en ese mismo app (ver
+   * core_beneficiary_management/presentation/api/routes.py y school_router.py),
+   * así que la ruta real es `/api/v1/mdm/schools`. Lo consume el feature `mdm`
+   * (tabla de colegios y `SchoolSelect` de beneficiarios).
+   */
+  schools: '/api/v1/mdm/schools',
+  /**
    * Contexto Reporting & Analytics. El `reporting_app` se monta en
    * `{API_V1_STR}/reporting` (ver src/main.py), y sus routers (`operations`,
    * `demographics`) se incluyen SIN prefijo extra, así que las rutas reales son
