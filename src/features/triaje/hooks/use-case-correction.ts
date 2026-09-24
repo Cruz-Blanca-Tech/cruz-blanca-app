@@ -160,6 +160,15 @@ export function useCaseCorrection({
     const v = getByPath(watched, 'beneficiary.dni');
     return typeof v === 'string' ? v : '';
   }, [watched]);
+
+  // Advertencia: el DNI del beneficiario (editable, se puede desvincular del MDM)
+  // no coincide con el DNI con el que el lote AGRUPÓ este expediente. Avisa al
+  // revisor que la agrupación del lote quedó con un DNI distinto al del menor.
+  const dniGroupMismatch = useMemo(() => {
+    const current = (watchedDni || '').trim().toUpperCase();
+    const group = (dniReference || '').trim().toUpperCase();
+    return Boolean(current && group && current !== group);
+  }, [watchedDni, dniReference]);
   const [lookupDni, setLookupDni] = useState('');
   useEffect(() => {
     const trimmed = (watchedDni || '').trim();
@@ -484,6 +493,9 @@ export function useCaseCorrection({
     mdmMatch: mdmSnap,
     mdmLockedFieldIds,
     isMdmMatching: mdmQuery.isFetching,
+    // Advertencia de agrupación: DNI del beneficiario ≠ DNI de agrupación del lote
+    dniGroupMismatch,
+    beneficiaryDni: watchedDni,
     // Interacción visor ↔ campo
     activeGroup,
     setActiveGroup,
