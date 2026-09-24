@@ -12,6 +12,7 @@ export function useIsMounted(): boolean {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/rules-of-hooks
     setMounted(true);
   }, []);
 

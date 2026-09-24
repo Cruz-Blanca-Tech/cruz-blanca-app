@@ -1,9 +1,15 @@
 import type { BeneficiarySummary } from '../schemas/beneficiaries-list-schema';
+import {
+  getRelationshipLabel,
+  getGenderLabel,
+} from '@/lib/domain/enum-labels';
 
 /**
  * Helpers de presentación del listado de beneficiarios (nombre, iniciales,
  * enmascarado por rol y etiqueta de género). Son funciones puras sobre datos ya
  * tipados por el schema, así que no necesitan Zod.
+ *
+ * Las traducciones de enums se delegan a `@/lib/domain/enum-labels`.
  */
 
 /** Nombre completo mostrado en la tabla (`first_name` + `last_name`). */
@@ -47,16 +53,5 @@ export function maskName(fullName: string): string {
     .join(' ');
 }
 
-/** Etiquetas en español del enum `Gender` del backend. */
-const GENDER_LABELS: Record<NonNullable<BeneficiarySummary['gender']>, string> = {
-  MALE: 'Masculino',
-  FEMALE: 'Femenino',
-  OTHER: 'Otro',
-  UNKNOWN: 'Sin especificar',
-};
-
-/** Etiqueta legible del género; `—` cuando el backend no lo entrega. */
-export function getGenderLabel(gender: BeneficiarySummary['gender']): string {
-  if (!gender) return '—';
-  return GENDER_LABELS[gender];
-}
+// Re-exportados desde la capa de dominio compartida para compatibilidad.
+export { getGenderLabel, getRelationshipLabel as getRoleLabel };

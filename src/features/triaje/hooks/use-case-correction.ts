@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -29,6 +29,11 @@ import {
   type CorrectionGroup,
 } from '../lib/correction-form';
 import { isEducaCaseApproved } from '../schemas/educa-case-schema';
+import {
+  isBeneficiaryMinor,
+  isValidDni,
+  validateAdultsOnSubmit,
+} from '@/lib/domain/beneficiary-rules';
 import type {
   EnrichedDiscrepancy,
   SectionIssue,
@@ -78,6 +83,17 @@ export function useCaseCorrection({
     () => docsQuery.data?.pending_documents ?? [],
     [docsQuery.data]
   );
+  const previousPendingRef = useRef(pendingDocuments.length);
+  useEffect(() => {
+    // If pending documents dropped to 0 (meaning async OCR finished), refetch the Triage Case to get the new data
+    if (previousPendingRef.current > 0 && pendingDocuments.length === 0) {
+      caseQuery.refetch();
+      // Notificar al usuario que la IA terminó
+      toast.success('¡El reprocesamiento con IA ha finalizado!');
+    }
+    previousPendingRef.current = pendingDocuments.length;
+  }, [pendingDocuments.length, caseQuery]);
+
   const isIncomplete =
     caseData?.status === 'INCOMPLETE' ||
     pendingDocuments.length > 0 ||
@@ -98,15 +114,19 @@ export function useCaseCorrection({
   // Inicializa el formulario una sola vez por expediente (evita clobber en
   // refetches de foco). Tras guardar, el reset se hace explícito en onSuccess.
   const initializedCaseId = useRef<string | null>(null);
+  const lastUpdatedAt = useRef<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [replaceDocTarget, setReplaceDocTarget] = useState<{ code: string; name: string; skipOcr?: boolean } | null>(null);
 
   useEffect(() => {
-    if (caseData && !isIncomplete && initializedCaseId.current !== caseId) {
-      form.reset(dossierToFormValues(caseData.dossier_data));
-      initializedCaseId.current = caseId;
+    if (caseData) {
+      if (initializedCaseId.current !== caseId || lastUpdatedAt.current !== (caseData as any).updated_at) {
+        form.reset(dossierToFormValues(caseData.dossier_data));
+        initializedCaseId.current = caseId;
+        lastUpdatedAt.current = (caseData as any).updated_at;
+      }
     }
-  }, [caseData, caseId, form, isIncomplete]);
+  }, [caseData, caseId, form]);
 
   const descriptors = useMemo(
     () => (caseData ? buildCorrectionFields(caseData) : []),
@@ -228,18 +248,29 @@ export function useCaseCorrection({
       return;
     }
 
-    // 1. Validación estricta del DNI del beneficiario
+    // 1. DNI del beneficiario
     const beneficiaryDni = (values.beneficiary.dni || '').trim();
     if (!beneficiaryDni) {
       toast.error('No se puede guardar: El DNI del beneficiario es obligatorio.');
       return;
     }
-    if (!/^\d{8}$/.test(beneficiaryDni)) {
+    if (!isValidDni(beneficiaryDni)) {
       toast.error('No se puede guardar: El DNI del beneficiario debe tener exactamente 8 dígitos numéricos.');
       return;
     }
 
-    // 2. Validación de Apoderado (guardian) obligatorio y con DNI de 8 dígitos
+    // 2. Fecha de nacimiento: obligatoria y debe corresponder a un menor de edad
+    const minor = isBeneficiaryMinor(values.beneficiary.birth_date);
+    if (minor === null) {
+      toast.error('No se puede guardar: La fecha de nacimiento del beneficiario es obligatoria.');
+      return;
+    }
+    if (!minor) {
+      toast.error('No se puede guardar: El beneficiario debe ser menor de 18 años.');
+      return;
+    }
+
+    // 3. Apoderado obligatorio
     if (!values.guardian_ref || values.guardian_ref.trim() === '') {
       toast.error('No se puede guardar: Debe asignar un Apoderado al expediente.');
       return;
@@ -248,7 +279,7 @@ export function useCaseCorrection({
     const guardianIdx = Number(values.guardian_ref);
     const guardianAdult = values.adults[guardianIdx];
     if (!guardianAdult) {
-      toast.error('No se puede guardar: El apoderado seleccionado no es válido.');
+      toast.error('No se puede guardar: Debe seleccionar un Apoderado válido del expediente.');
       return;
     }
 
@@ -263,66 +294,18 @@ export function useCaseCorrection({
       toast.error('No se puede guardar: El apoderado asignado debe tener DNI obligatorio.');
       return;
     }
-
-    if (!/^\d{8}$/.test(guardianDni)) {
+    if (!isValidDni(guardianDni)) {
       toast.error(
         `No se puede guardar: El DNI "${guardianDni}" del apoderado debe tener exactamente 8 dígitos numéricos.`
       );
       return;
     }
 
-    // 3. Validación de formato y unicidad para todos los adultos
-    const seenDnis = new Map<string, string>();
-
-    for (let i = 0; i < values.adults.length; i++) {
-      const adult = values.adults[i];
-      const adDni = (adult.dni || '').trim();
-      const adName = (adult.full_name || '').trim();
-      const label =
-        adName ||
-        (adult.relationship === 'FATHER'
-          ? 'Padre'
-          : adult.relationship === 'MOTHER'
-          ? 'Madre'
-          : `Contacto ${i + 1}`);
-
-      if (!adDni) {
-        toast.error(
-          `No se puede guardar: El familiar '${label}' debe tener un DNI obligatorio de 8 dígitos. Si no corresponde registrarlo, elimínelo de la lista.`
-        );
-        return;
-      }
-
-      if (!/^\d{8}$/.test(adDni)) {
-        toast.error(
-          `No se puede guardar: El DNI "${adDni}" de '${label}' debe tener exactamente 8 dígitos numéricos.`
-        );
-        return;
-      }
-
-      if (!adName) {
-        toast.error(
-          `No se puede guardar: El familiar con DNI ${adDni} debe tener Nombre completo.`
-        );
-        return;
-      }
-
-      if (beneficiaryDni && adDni === beneficiaryDni) {
-        toast.error(
-          `No se puede guardar: El DNI ${adDni} de '${label}' coincide con el DNI del beneficiario.`
-        );
-        return;
-      }
-
-      if (seenDnis.has(adDni)) {
-        const prev = seenDnis.get(adDni);
-        toast.error(
-          `No se puede guardar: El DNI ${adDni} está repetido entre '${prev}' y '${label}'. Cada persona debe tener un DNI único.`
-        );
-        return;
-      }
-
-      seenDnis.set(adDni, label);
+    // 4. Validación de todos los adultos (centralizada en domain layer)
+    const adultsError = validateAdultsOnSubmit(values.adults, beneficiaryDni);
+    if (adultsError) {
+      toast.error(`No se puede guardar: ${adultsError}`);
+      return;
     }
 
     const payload = formValuesToDossier(values, caseData.dossier_data);

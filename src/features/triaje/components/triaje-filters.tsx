@@ -53,12 +53,14 @@ function FilterSelect({
 }: FilterSelectProps) {
   const items = [{ value: ALL_VALUE, label: allLabel }, ...options];
   const isDefault = value === null;
+  const currentValue = value ?? ALL_VALUE;
+  
+  const currentLabel = items.find(i => i.value === currentValue)?.label;
 
   return (
     <Select
-      value={value ?? ALL_VALUE}
+      value={currentValue}
       onValueChange={(next) => onChange(next === ALL_VALUE ? null : next)}
-      items={items}
       disabled={disabled}
     >
       <SelectTrigger
@@ -68,7 +70,9 @@ function FilterSelect({
         )}
       >
         <Icon className={isDefault ? 'text-ink-muted' : 'text-primary'} />
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder}>
+          {currentLabel}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {items.map((item) => (

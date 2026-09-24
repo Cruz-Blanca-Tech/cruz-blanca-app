@@ -55,7 +55,7 @@ const educationSchema = z.object({
   knows_read: z.boolean(),
   knows_write: z.boolean(),
   repeated_grade: z.boolean(),
-  learning_difficulties: z.boolean(),
+  learning_difficulties: z.boolean().nullable(),
 });
 
 /** Ficha médica. Los booleanos NO son nullable (default `false`). */

@@ -13,6 +13,7 @@ import type {
   EducaCase,
   EducaDossierData,
 } from '../schemas/educa-case-schema';
+import { getRelationshipLabel } from '@/lib/domain/enum-labels';
 
 /** Grupos que se renderizan como PESTAÑAS en el formulario de corrección. */
 export const CORRECTION_GROUPS = [
@@ -65,7 +66,7 @@ export interface CorrectionFormValues {
     knows_read: boolean;
     knows_write: boolean;
     repeated_grade: boolean;
-    learning_difficulties: boolean;
+    learning_difficulties: boolean | null;
   };
   medical: {
     allergies: string[];
@@ -116,10 +117,10 @@ export function emptyCorrectionValues(): CorrectionFormValues {
     education: {
       school: '',
       grade: '',
-      knows_read: false,
-      knows_write: false,
+      knows_read: true,
+      knows_write: true,
       repeated_grade: false,
-      learning_difficulties: false,
+      learning_difficulties: null,
     },
     medical: {
       allergies: [],
@@ -291,15 +292,11 @@ export function formValuesToDossier(
 }
 
 /**
- * Etiqueta legible del PARENTESCO base de un adulto. "Apoderado" y "contacto de
- * emergencia" NO son parentescos: son roles asignables (ver los selectores de la
- * pestaña Apoderado), así que cualquier adulto que no sea padre ni madre —incluido
- * el apoderado escaneado por OCR (rol `OTHER`)— se rotula "Otro".
+ * Etiqueta legible del parentesco de un adulto.
+ * Delegado a `@/lib/domain/enum-labels` (fuente única de verdad).
  */
 export function relationshipLabel(relationship: string): string {
-  if (relationship === 'FATHER') return 'Padre';
-  if (relationship === 'MOTHER') return 'Madre';
-  return 'Otro';
+  return getRelationshipLabel(relationship);
 }
 
 /** Índices de padre/madre dentro del array de adultos (`-1` si no existen). */

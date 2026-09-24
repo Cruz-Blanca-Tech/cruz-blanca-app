@@ -1,10 +1,11 @@
-import {
+import { Briefcase,
   Home,
   Users,
   Upload,
   Inbox,
   BarChart3,
   UserCog,
+  School,
   type LucideIcon,
 } from 'lucide-react';
 import { ROLES, type Role } from '@/features/auth/types';
@@ -51,6 +52,18 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Usuarios',
     href: '/usuarios',
     icon: UserCog,
+    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO],
+  },
+  {
+    label: 'Colegios (MDM)',
+    href: '/mdm/colegios',
+    icon: School,
+    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO],
+  },
+  {
+    label: 'Actividades (MDM)',
+    href: '/mdm/actividades',
+    icon: Briefcase,
     allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO],
   },
 ];

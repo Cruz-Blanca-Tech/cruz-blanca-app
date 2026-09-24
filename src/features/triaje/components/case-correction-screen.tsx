@@ -8,10 +8,12 @@ import {
   Lock,
   Loader2,
   OctagonAlert,
-  RefreshCw,
+  RefreshCw, Sparkles, Link as LinkIcon, TriangleAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState } from 'react';
 
 import { useCaseCorrection } from '../hooks/use-case-correction';
 import { useRetryCaseSync } from '../hooks/use-triaje-queries';
@@ -24,6 +26,8 @@ import { CaseCorrectionHeader } from './case-correction-header';
 import { IncompleteCasePanel } from './incomplete-case-panel';
 import { CaseCorrectionActions } from './case-correction-actions';
 import { UploadMissingDocModal } from './upload-missing-doc-modal';
+import { useUploadMissingDoc } from '../hooks/use-upload-missing-doc';
+import { useReprocessDossier } from '../hooks/use-reprocess-dossier';
 import { RejectCaseDialog } from './reject-case-dialog';
 import { DossierDocumentChecklist } from './dossier-document-checklist';
 
@@ -41,6 +45,8 @@ export function CaseCorrectionScreen({
 }: CaseCorrectionScreenProps) {
   const vm = useCaseCorrection({ batchId, caseId, dniReference });
   const retryCaseSync = useRetryCaseSync(caseId, batchId);
+  const reprocessMutation = useReprocessDossier(batchId, dniReference, caseId);
+  const [showWarningModal, setShowWarningModal] = useState(false);
 
   if (vm.isLoading) return <CaseCorrectionSkeleton />;
   if (vm.isError || !vm.caseData) return <CaseNotFound onBack={vm.goBackToBatch} />;
@@ -49,6 +55,30 @@ export function CaseCorrectionScreen({
   const isApproved = vm.caseData?.status === 'APPROVED';
   const isRejected = vm.caseData?.status === 'REJECTED';
   const isSyncFailed = vm.caseData?.sync_status === 'FAILED';
+  const aiInsightDiscrepancy = vm.enrichedDiscrepancies.find(d => d.severity === 'AI_INSIGHT' && d.fieldId === 'beneficiary.dni');
+  const isReprocessing = reprocessMutation.isPending;
+  const canEditForm = caseActions.canEdit && !isReprocessing;
+  const displayLockReason = isReprocessing ? 'Reprocesando expediente con Inteligencia Artificial. Por favor, espere unos segundos...' : caseActions.lockReason;
+
+  const handleValidationClick = async () => {
+    // 1. Validar reglas de la interfaz primero (campos vacíos, formatos incorrectos)
+    const isClientValid = await vm.form.trigger();
+    if (!isClientValid) {
+      // Si el formulario está roto en la pantalla, dejamos que onSubmit muestre los textos rojos y NO sacamos el modal.
+      vm.onSubmit();
+      return;
+    }
+
+    const hasWarnings = vm.enrichedDiscrepancies.some((d) => d.severity === 'WARNING' || d.severity === 'AI_INSIGHT');
+    const hasErrors = vm.enrichedDiscrepancies.some((d) => d.severity === 'ERROR');
+    
+    // Si la base de datos nos dice que no hay errores pero sí advertencias, y aún no está aprobado...
+    if (!hasErrors && hasWarnings && !isApproved) {
+      setShowWarningModal(true);
+    } else {
+      vm.onSubmit();
+    }
+  };
 
   const handleRetrySync = () => {
     retryCaseSync.mutate(undefined, {
@@ -62,7 +92,24 @@ export function CaseCorrectionScreen({
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-3 p-6">
+    <div className="relative flex flex-1 flex-col gap-3 p-6">
+      {/* Overlay de Carga (IA Reprocesando) local al área de trabajo */}
+      {(isReprocessing || vm.pendingDocuments.length > 0) && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 rounded-xl bg-white p-8 shadow-2xl">
+            <Loader2 className="size-12 animate-spin text-primary" />
+            <div className="text-center">
+              <h3 className="font-heading text-lg font-bold text-ink-primary">
+                El expediente se está procesando por la IA
+              </h3>
+              <p className="mt-1 text-sm text-ink-secondary">
+                {vm.pendingDocuments.length > 0 ? `Analizando ${vm.pendingDocuments.length} documento(s) en progreso...` : 'Enviando solicitud a la IA. Por favor espere...'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CaseCorrectionHeader
         caseData={vm.caseData}
         dniReference={dniReference}
@@ -76,12 +123,45 @@ export function CaseCorrectionScreen({
       />
 
       {/* Panel de validación */}
+      {aiInsightDiscrepancy && (
+        <div className="flex flex-col gap-2 rounded-lg border border-purple-200 bg-purple-50 p-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 size-5 shrink-0 text-purple-600" />
+              <div>
+                <h4 className="font-heading text-sm font-bold text-purple-900">
+                  Sugerencia de Inteligencia Artificial (Posible Duplicado)
+                </h4>
+                <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
+                  {aiInsightDiscrepancy.rule_description}
+                </p>
+              </div>
+            </div>
+            {caseActions.canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                onClick={() => {
+                  vm.form.setValue('beneficiary.dni', aiInsightDiscrepancy.expected_pattern || '', { shouldValidate: true, shouldDirty: true });
+                  toast.success('DNI actualizado con sugerencia de IA');
+                }}
+              >
+                <LinkIcon className="mr-2 size-4" />
+                Vincular (DNI: {aiInsightDiscrepancy.expected_pattern})
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       <CaseValidationPanel
         statuses={vm.statuses}
         discrepancies={vm.enrichedDiscrepancies}
         sectionIssues={vm.sectionIssues}
         onJumpField={vm.jumpToField}
         onJumpGroup={vm.setActiveGroup}
+        isApproved={isApproved}
       />
 
       {/* Banner de error de sincronización */}
@@ -202,7 +282,11 @@ export function CaseCorrectionScreen({
             }}
             isIncomplete={isIncomplete}
             onOpenUploadModal={() => vm.setIsUploadModalOpen(true)}
-            onOpenReplaceModal={(code, name, skipOcr) => vm.setReplaceDocTarget({ code, name, skipOcr })}
+            
+              onOpenReplaceModal={(code, name, skipOcr) => vm.setReplaceDocTarget({ code, name, skipOcr })}
+              
+              
+
           />
         </div>
 
@@ -218,11 +302,15 @@ export function CaseCorrectionScreen({
               />
             ) : (
               <>
-                {caseActions.lockReason && (
+                {displayLockReason && (
                   <div className="mb-2.5 flex shrink-0 items-start gap-2 rounded-md bg-info-light px-3 py-2">
-                    <Lock className="mt-0.5 size-3.5 shrink-0 text-info-dark" />
+                    {isReprocessing ? (
+                      <Loader2 className="mt-0.5 size-3.5 shrink-0 text-info-dark animate-spin" />
+                    ) : (
+                      <Lock className="mt-0.5 size-3.5 shrink-0 text-info-dark" />
+                    )}
                     <p className="font-sans text-[12.5px] text-info-dark">
-                      {caseActions.lockReason}
+                      {displayLockReason}
                     </p>
                   </div>
                 )}
@@ -230,7 +318,7 @@ export function CaseCorrectionScreen({
                   {/* `fieldset[disabled]` alcanza a todos los controles del
                       formulario, así el expediente cerrado se lee pero no se
                       edita. `contents` deja el layout flex intacto. */}
-                  <fieldset disabled={!caseActions.canEdit} className="contents">
+                  <fieldset disabled={!canEditForm} className="contents">
                     <CaseFieldsForm
                       fields={vm.descriptors}
                       validations={vm.validations}
@@ -250,12 +338,21 @@ export function CaseCorrectionScreen({
           <CaseCorrectionActions
             onBack={vm.goBackToBatch}
             onReject={() => vm.setRejectOpen(true)}
-            onSubmit={vm.onSubmit}
+            onSubmit={handleValidationClick}
             onNext={() => vm.nextCase && vm.goToCase(vm.nextCase)}
             hasNext={Boolean(vm.nextCase)}
             isSubmitting={vm.isSubmitting}
             isIncomplete={isIncomplete}
             canReject={caseActions.canReject}
+              onReprocess={() => {
+                  reprocessMutation.mutate(undefined, {
+                      onSuccess: () => {
+                        // El toast de éxito real se muestra ahora cuando el polling termina
+                        void vm.refetchCase();
+                      }
+                    });
+                }}
+              isReprocessing={reprocessMutation.isPending}
             canEdit={caseActions.canEdit}
           />
         </div>
@@ -295,6 +392,40 @@ export function CaseCorrectionScreen({
           fixedDocumentName={vm.replaceDocTarget.name}
         />
       )}
+
+      <Dialog open={showWarningModal} onOpenChange={setShowWarningModal}>
+        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden">
+          <div className="flex flex-col items-center gap-2 pt-8 px-6 text-center">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-warning-light border border-warning/20">
+              <TriangleAlert className="size-7 text-warning-dark" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-center text-lg font-heading text-ink-primary">
+                Advertencias Pendientes
+              </DialogTitle>
+              <DialogDescription className="text-center font-data text-sm text-ink-secondary mt-1 mb-4">
+                El expediente no tiene errores bloqueantes, pero aún mantiene <strong>algunas sugerencias o advertencias menores</strong>.
+                <br /><br />
+                ¿¿Deseas continuar y validar el expediente de todos modos?
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex bg-muted/30 px-6 py-4 flex-col-reverse sm:flex-row sm:justify-end gap-2 border-t border-border">
+            <Button variant="outline" onClick={() => setShowWarningModal(false)} className="w-full sm:w-auto font-sans font-semibold">
+              Revisar de nuevo
+            </Button>
+            <Button
+              className="w-full sm:w-auto bg-emerald-600 font-sans font-semibold text-white hover:bg-emerald-700"
+              onClick={() => {
+                setShowWarningModal(false);
+                vm.onSubmit();
+              }}
+            >
+              Sí, validar expediente
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
