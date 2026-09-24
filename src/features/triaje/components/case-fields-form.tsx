@@ -33,6 +33,17 @@ interface CaseFieldsFormProps {
   onFocusField: (id: string) => void;
   fieldRefs: React.RefObject<Record<string, HTMLDivElement | null>>;
   disabled?: boolean;
+  /**
+   * Ids de campos protegidos cuando el beneficiario YA está registrado en MDM:
+   * se renderizan bloqueados (valores del maestro, no editables). `null` = sin
+   * match, edición normal.
+   */
+  lockedFieldIds?: Set<string> | null;
+  /**
+   * Bloques padre/madre del editor de adultos cuando hay match MDM: sus filas
+   * quedan bloqueadas (solo el tutor/OTHER se puede editar/agregar/eliminar).
+   */
+  parentsLocked?: boolean;
 }
 
 function ConditionalFieldWrapper({
@@ -60,6 +71,8 @@ export function CaseFieldsForm({
   onFocusField,
   fieldRefs,
   disabled = false,
+  lockedFieldIds = null,
+  parentsLocked = false,
 }: CaseFieldsFormProps) {
   const activeFields = fields.filter((f) => f.group === activeGroup);
 
@@ -85,6 +98,8 @@ export function CaseFieldsForm({
           fieldRefs.current[field.id] = el;
         }}
         disabled={disabled}
+        locked={lockedFieldIds?.has(field.id) ?? false}
+        parentsLocked={parentsLocked}
       />
     );
 

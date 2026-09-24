@@ -6,14 +6,15 @@ import {
   useWatch,
   type FieldPath,
 } from 'react-hook-form';
-import {
-  AlertCircle,
-  CheckCircle2,
-  OctagonAlert,
-  Pencil,
-  TriangleAlert,
-  type LucideIcon,
-} from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Lock,
+  OctagonAlert,
+  Pencil,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -80,31 +81,43 @@ const STATUS_META: Record<FieldStatus, StatusMeta> = {
 
 const fieldName = (name: string) => name as FieldPath<CorrectionFormValues>;
 
-interface CaseFieldRowProps {
-  field: CorrectionFieldDescriptor;
-  status: FieldStatus;
-  message: string | null;
-  isActive: boolean;
-  onFocus: () => void;
-  registerRef: (el: HTMLDivElement | null) => void;
-  disabled?: boolean;
-}
+interface CaseFieldRowProps {
+  field: CorrectionFieldDescriptor;
+  status: FieldStatus;
+  message: string | null;
+  isActive: boolean;
+  onFocus: () => void;
+  registerRef: (el: HTMLDivElement | null) => void;
+  disabled?: boolean;
+  /**
+   * Campo protegido porque el beneficiario YA existe en MDM: el valor mostrado
+   * es el del maestro y no se puede editar (indicador visual de candado).
+   */
+  locked?: boolean;
+  /** Match MDM: bloquea las filas padre/madre del editor de adultos. */
+  parentsLocked?: boolean;
+}
 
 /** Fila de un campo del expediente: etiqueta + estado + control + observación. */
-export function CaseFieldRow({
-  field,
-  status,
-  message,
-  isActive,
-  onFocus,
-  registerRef,
-  disabled = false,
-}: CaseFieldRowProps) {
-  const { control } = useFormContext<CorrectionFormValues>();
-  const meta = STATUS_META[status];
-  const StatusIcon = meta.icon;
-  const flagged = status === 'warning' || status === 'error';
-  const birthDate = useWatch<CorrectionFormValues>({
+export function CaseFieldRow({
+  field,
+  status,
+  message,
+  isActive,
+  onFocus,
+  registerRef,
+  disabled = false,
+  locked = false,
+  parentsLocked = false,
+}: CaseFieldRowProps) {
+  const { control } = useFormContext<CorrectionFormValues>();
+  const meta = STATUS_META[status];
+  const StatusIcon = meta.icon;
+  const flagged = status === 'warning' || status === 'error';
+  // Un campo bloqueado por MDM se trata como deshabilitado en TODOS los
+  // controles (input/select/toggle), pero conserva su indicador visual propio.
+  const effectiveDisabled = disabled || locked;
+  const birthDate = useWatch<CorrectionFormValues>({
     control,
     name: 'beneficiary.birth_date',
   });
@@ -144,7 +157,13 @@ export function CaseFieldRow({
       <div className={cn("flex items-center justify-between gap-2", !isBool && "mb-1.5")}>
         <label className="flex items-center gap-1 font-sans text-[11.5px] font-medium text-ink-secondary leading-tight">
           <StatusIcon className={cn('size-3 shrink-0', meta.color)} />
-          {field.label}
+          {field.label}
+          {locked && (
+            <Lock
+              className="size-2.5 shrink-0 text-info-dark"
+              aria-label="Bloqueado: valor del maestro MDM (beneficiario ya registrado)"
+            />
+          )}
           {field.emergency && (
             <span className="font-data text-[10px] text-error shrink-0">
               • emergencia
@@ -163,7 +182,7 @@ export function CaseFieldRow({
                   <BoolToggle
                     value={(rhf.value as boolean | null) ?? (field.nullableBool ? null : false)}
                     nullable={Boolean(field.nullableBool)}
-                    disabled={disabled}
+                    disabled={effectiveDisabled}
                     onChange={rhf.onChange}
                   />
                 )}
@@ -196,7 +215,7 @@ export function CaseFieldRow({
               onChange={rhf.onChange}
               otrosLabel={field.otrosLabel}
               freeform={field.freeform}
-              disabled={disabled}
+              disabled={effectiveDisabled}
             />
           )}
         />
@@ -214,10 +233,10 @@ export function CaseFieldRow({
               <Select
                 value={(rhf.value as string) || null}
                 onValueChange={(value) => rhf.onChange(value ?? '')}
-                disabled={disabled}
+                disabled={effectiveDisabled}
               >
                 <SelectTrigger
-                  disabled={disabled}
+                  disabled={effectiveDisabled}
                   className={cn('h-8 w-full font-data text-[12.5px]', flagged && meta.border)}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -244,7 +263,7 @@ export function CaseFieldRow({
           }}
         />
       ) : field.control === 'adults_list' ? (
-        <AdultsListControl />
+        <AdultsListControl parentsLocked={parentsLocked} />
       ) : field.control === 'school_select' ? (
         <Controller
           control={control}
@@ -253,8 +272,8 @@ export function CaseFieldRow({
             <SchoolSelect
               value={(rhf.value as string) || ''}
               onChange={rhf.onChange}
-              disabled={disabled}
-              className={cn('h-8 font-data text-[12.5px]', flagged && meta.border)}
+              disabled={effectiveDisabled}
+              className={cn('h-8 font-data text-[12.5px]', locked && 'bg-slate-50 text-ink-muted/80', flagged && meta.border)}
             />
           )}
         />
@@ -283,9 +302,9 @@ export function CaseFieldRow({
                 onBlur={rhf.onBlur}
                 onClick={(e) => e.stopPropagation()}
                 onFocus={onFocus}
-                disabled={disabled}
+                disabled={effectiveDisabled}
                 placeholder={field.placeholder ?? 'Ingresar manualmente…'}
-                className={cn('h-8 font-data text-[12.5px]', flagged && meta.border)}
+                className={cn('h-8 font-data text-[12.5px]', locked && 'bg-slate-50 text-ink-muted/80', flagged && meta.border)}
               />
             );
           }}

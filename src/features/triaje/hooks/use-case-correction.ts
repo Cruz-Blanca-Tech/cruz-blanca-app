@@ -12,6 +12,7 @@ import {
   useEducaCase,
   useSubmitCorrection,
 } from './use-triaje-queries';
+import { useMdmBeneficiaryMatch } from './use-mdm-match';
 import { formatBatchDate } from '../lib/format-batch-date';
 import {
   buildCorrectionFields,
@@ -134,6 +135,121 @@ export function useCaseCorrection({
   );
 
   const watched = useWatch({ control: form.control });
+
+  // ── Match MDM ──────────────────────────────────────────────────────────────
+  // Cuando el DNI del expediente coincide con un beneficiario YA registrado en
+  // el maestro (datos "revisados), la pantalla: (1) rellena los campos
+  // protegidos (identidad y padre/madre) con los valores del MDM — el maestro es
+  // la verdad, no el OCR — y (2) los bloquea para que no se corrompan. El DNI en
+  // sí NO se bloquea: si el revisor determina que no es la misma persona, lo
+  // corrige/desvincula y todos los campos vuelven a la baseline del expediente.
+  const watchedDni = useMemo(() => {
+    const v = getByPath(watched, 'beneficiary.dni');
+    return typeof v === 'string' ? v : '';
+  }, [watched]);
+  const [lookupDni, setLookupDni] = useState('');
+  useEffect(() => {
+    const trimmed = (watchedDni || '').trim();
+    if (!isValidDni(trimmed)) {
+      setLookupDni('');
+      return;
+    }
+    const timer = setTimeout(() => setLookupDni(trimmed), 350);
+    return () => clearTimeout(timer);
+  }, [watchedDni]);
+  const mdmQuery = useMdmBeneficiaryMatch(lookupDni);
+  const mdmSnap = mdmQuery.data?.exists ? (mdmQuery.data.beneficiary ?? null) : null;
+
+  // Baseline del expediente (dossier tal como vino del backend): se restaura si
+  // el revisor desvincula el DNI (el match desaparece).
+  const dossierBaseline = useMemo(
+    () => (caseData ? dossierToFormValues(caseData.dossier_data) : null),
+    [caseData]
+  );
+  const mdmAppliedRef = useRef(false);
+
+  useEffect(() => {
+    const match = mdmQuery.data;
+    const snap = match?.exists ? (match.beneficiary ?? null) : null;
+
+    if (snap) {
+      mdmAppliedRef.current = true;
+      form.setValue('beneficiary.first_name', snap.first_name, { shouldDirty: true });
+      form.setValue('beneficiary.last_name', snap.last_name, { shouldDirty: true });
+      form.setValue('beneficiary.birth_date', snap.birth_date ?? '', { shouldDirty: true });
+      form.setValue('beneficiary.gender', snap.gender ?? '', { shouldDirty: true });
+      form.setValue('beneficiary.address', snap.address ?? '', { shouldDirty: true });
+      // Padre/madre (por rol): misma persona → datos del maestro.
+      const parents: Record<
+        string,
+        { full_name: string; dni: string; phone?: string | null } | undefined
+      > = {
+        FATHER: snap.relatives.find((r) => r.relationship === 'FATHER'),
+        MOTHER: snap.relatives.find((r) => r.relationship === 'MOTHER'),
+      };
+      const adults = form.getValues('adults');
+      adults.forEach((adult, i) => {
+        if (adult.relationship !== 'FATHER' && adult.relationship !== 'MOTHER') return;
+        const parent = parents[adult.relationship];
+        if (!parent) return;
+        form.setValue(`adults.${i}.full_name`, parent.full_name, { shouldDirty: true });
+        form.setValue(`adults.${i}.dni`, parent.dni, { shouldDirty: true });
+        form.setValue(`adults.${i}.phone`, parent.phone ?? '', { shouldDirty: true });
+      });
+      return;
+    }
+
+    // Sin match: si antes SÍ lo había (el revisor cambió/borró el DNI para
+    // desvincular), restauramos los valores originales del expediente.
+    if (mdmAppliedRef.current) {
+      mdmAppliedRef.current = false;
+      const base = dossierBaseline;
+      if (base) {
+        form.setValue('beneficiary.first_name', base.beneficiary.first_name, { shouldDirty: true });
+        form.setValue('beneficiary.last_name', base.beneficiary.last_name, { shouldDirty: true });
+        form.setValue('beneficiary.birth_date', base.beneficiary.birth_date, { shouldDirty: true });
+        form.setValue('beneficiary.gender', base.beneficiary.gender, { shouldDirty: true });
+        form.setValue('beneficiary.address', base.beneficiary.address, { shouldDirty: true });
+        const parents: Record<
+          string,
+          { full_name: string; dni: string; phone: string } | undefined
+        > = {
+          FATHER: base.adults.find((a) => a.relationship === 'FATHER'),
+          MOTHER: base.adults.find((a) => a.relationship === 'MOTHER'),
+        };
+        const adults = form.getValues('adults');
+        adults.forEach((adult, i) => {
+          if (adult.relationship !== 'FATHER' && adult.relationship !== 'MOTHER') return;
+          const parent = parents[adult.relationship];
+          if (!parent) return;
+          form.setValue(`adults.${i}.full_name`, parent.full_name, { shouldDirty: true });
+          form.setValue(`adults.${i}.dni`, parent.dni, { shouldDirty: true });
+          form.setValue(`adults.${i}.phone`, parent.phone, { shouldDirty: true });
+        });
+      }
+    }
+  }, [mdmQuery.data, dossierBaseline, form]);
+
+  const mdmLockedFieldIds = useMemo(() => {
+    if (!mdmSnap) return null;
+    // No se bloquea `beneficiary.dni` (llave de desvinculación) ni los tutores
+    // (rol OTHER sigue siendo editable/agregable desde el triaje).
+    return new Set<string>([
+      'beneficiary.first_name',
+      'beneficiary.last_name',
+      'beneficiary.birth_date',
+      'beneficiary.gender',
+      'beneficiary.address',
+      'padre.full_name',
+      'padre.dni',
+      'padre.phone',
+      'padre.empty',
+      'madre.full_name',
+      'madre.dni',
+      'madre.phone',
+      'madre.empty',
+    ]);
+  }, [mdmSnap]);
 
   const validations = useMemo(() => {
     const map = new Map<string, FieldValidation>();
@@ -351,6 +467,10 @@ export function useCaseCorrection({
     groupIssues,
     onSubmit,
     isSubmitting: submitCorrection.isPending,
+    // Match MDM (beneficiario ya registrado en el maestro)
+    mdmMatch: mdmSnap,
+    mdmLockedFieldIds,
+    isMdmMatching: mdmQuery.isFetching,
     // Interacción visor ↔ campo
     activeGroup,
     setActiveGroup,

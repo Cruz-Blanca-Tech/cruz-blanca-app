@@ -1,7 +1,7 @@
 'use client';
 
 import { Controller, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
-import { Plus, X, OctagonAlert } from 'lucide-react';
+import { Lock, Plus, X, OctagonAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -15,8 +15,16 @@ import {
 import type { CorrectionFormValues } from '../lib/correction-form';
 import { getRelationshipLabel } from '@/lib/domain/enum-labels';
 
-/** Editor de adultos relacionados: alta/baja + asignación de apoderado/emergencia. */
-export function AdultsListControl() {
+/** Editor de adultos relacionados: alta/baja + asignación de apoderado/emergencia. */
+export function AdultsListControl({
+  parentsLocked = false,
+}: {
+  /**
+   * Match MDM: las filas padre/madre quedan BLOQUEADAS (valores del maestro, no
+   * se editan ni eliminan); solo el tutor (rol OTHER) se puede editar/agregar.
+   */
+  parentsLocked?: boolean;
+}) {
   const { control, setValue } = useFormContext<CorrectionFormValues>();
   const { fields, append, remove } = useFieldArray({
     control,
@@ -111,7 +119,14 @@ export function AdultsListControl() {
       )}
       {fields.map((field, index) => {
         const isGuardian = guardianRef === String(index);
-        const isEmergency = emergencyRef === String(index);
+        const isEmergency = emergencyRef === String(index);
+        const adult = watchedAdults[index];
+        const isParent =
+          adult?.relationship === 'FATHER' || adult?.relationship === 'MOTHER';
+        // Match MDM: padre/madre vienen del maestro → bloqueados (no se editan
+        // ni eliminan). Mínimo exigido: 1 adulto (no se puede borrar el último).
+        const rowLocked = parentsLocked && isParent;
+        const isLastAdult = fields.length === 1;
 
         return (
           <div key={field.id} className="group relative flex flex-col gap-3 rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
@@ -120,7 +135,13 @@ export function AdultsListControl() {
                 <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-[9px] text-primary">
                   {index + 1}
                 </span>
-                Contacto
+                Contacto
+                {rowLocked && (
+                  <span className="ml-auto inline-flex items-center gap-1 rounded-sm bg-info-light px-1.5 py-0.5 font-data text-[10px] font-semibold text-info-dark">
+                    <Lock className="size-2.5" />
+                    Registrado en MDM
+                  </span>
+                )}
               </h4>
               <button
                 type="button"
@@ -145,7 +166,7 @@ export function AdultsListControl() {
                   }
                 }}
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted transition-all hover:bg-error-light hover:text-error"
-                title="Eliminar contacto"
+                title="Eliminar contacto" hidden={rowLocked || isLastAdult}
               >
                 <X className="size-3.5" />
                 <span className="font-sans text-[11px] font-medium">Eliminar</span>
@@ -159,7 +180,7 @@ export function AdultsListControl() {
                 render={({ field: rhf }) => (
                   <div className="flex flex-col gap-1.5">
                     <label className="font-sans text-[10.5px] font-semibold text-ink-secondary">Nombre completo</label>
-                    <Input {...rhf} placeholder="Ej. Juan Pérez" className="h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20" />
+                    <Input {...rhf} disabled={rowLocked} placeholder="Ej. Juan Pérez" className="h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20" />
                   </div>
                 )}
               />
@@ -169,8 +190,8 @@ export function AdultsListControl() {
                 render={({ field: rhf }) => (
                   <div className="flex flex-col gap-1.5">
                     <label className="font-sans text-[10.5px] font-semibold text-ink-secondary">Parentesco</label>
-                    <Select value={rhf.value || ''} onValueChange={rhf.onChange}>
-                      <SelectTrigger className="h-8 font-data text-[12.5px] shadow-sm focus:ring-primary/20">
+                    <Select value={rhf.value || ''} onValueChange={rhf.onChange} disabled={rowLocked}>
+                      <SelectTrigger disabled={rowLocked} className="h-8 font-data text-[12.5px] shadow-sm focus:ring-primary/20">
                         <SelectValue placeholder="Seleccionar...">
                           {(() => {
                             const val = rhf.value as string | null;
@@ -198,7 +219,7 @@ export function AdultsListControl() {
                         DNI {isGuardian && <span className="text-error font-bold">* (Obligatorio apoderado)</span>}
                       </label>
                       <Input
-                        inputMode="numeric"
+                        disabled={rowLocked} inputMode="numeric"
                         maxLength={8}
                         value={rhf.value || ''}
                         onChange={(e) => {
@@ -227,7 +248,7 @@ export function AdultsListControl() {
                 render={({ field: rhf }) => (
                   <div className="flex flex-col gap-1.5">
                     <label className="font-sans text-[10.5px] font-semibold text-ink-secondary">Teléfono</label>
-                    <Input {...rhf} placeholder="Ej. 987654321" className="h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20" />
+                    <Input {...rhf} disabled={rowLocked} placeholder="Ej. 987654321" className="h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20" />
                   </div>
                 )}
               />
