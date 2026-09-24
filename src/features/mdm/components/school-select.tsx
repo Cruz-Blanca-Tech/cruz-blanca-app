@@ -1,7 +1,5 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import {
   Select,
   SelectContent,
@@ -11,18 +9,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-export interface School {
-  id: string;
-  name: string;
-  location: string | null;
-  phone: string | null;
-  is_active: boolean;
-}
-
-const fetchSchools = async (): Promise<School[]> => {
-  const { data } = await axios.get('/api/proxy/api/v1/mdm/schools');
-  return data.filter((s: School) => s.is_active);
-};
+import { useSchools } from '../hooks/use-mdm-queries';
 
 interface SchoolSelectProps {
   value: string;
@@ -31,21 +18,30 @@ interface SchoolSelectProps {
   className?: string;
 }
 
+/** Selector de colegio del maestro MDM (solo colegios activos). */
 export function SchoolSelect({ value, onChange, disabled, className }: SchoolSelectProps) {
-  const { data: schools = [], isLoading } = useQuery({
-    queryKey: ['mdm', 'schools'],
-    queryFn: fetchSchools,
-  });
+  const { data: schools = [], isLoading } = useSchools();
+
+  const activeSchools = schools.filter((school) => school.is_active);
 
   return (
-    <Select value={value || undefined} onValueChange={(val) => val && onChange(val)} disabled={disabled || isLoading}>
-      <SelectTrigger 
-        className={cn("w-full bg-transparent border-transparent shadow-none text-left font-data text-sm", className)}
+    <Select
+      value={value || undefined}
+      onValueChange={(val) => val && onChange(val)}
+      disabled={disabled || isLoading}
+    >
+      <SelectTrigger
+        className={cn(
+          'w-full bg-transparent border-transparent shadow-none text-left font-data text-sm',
+          className
+        )}
       >
-        <SelectValue placeholder={isLoading ? 'Cargando colegios...' : 'Seleccionar colegio'} />
+        <SelectValue
+          placeholder={isLoading ? 'Cargando colegios...' : 'Seleccionar colegio'}
+        />
       </SelectTrigger>
       <SelectContent>
-        {schools.map(school => (
+        {activeSchools.map((school) => (
           <SelectItem key={school.id} value={school.name}>
             {school.name}
           </SelectItem>
