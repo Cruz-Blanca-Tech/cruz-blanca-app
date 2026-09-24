@@ -16,8 +16,11 @@ import { VisualizadorBanner } from './visualizador-banner';
 /** Beneficiarios por página (el listado del backend pagina con `skip`/`limit`). */
 const PAGE_SIZE = 20;
 
+import { useRouter } from 'next/navigation';
+
 /** Orquestador de la pantalla de Beneficiarios (ruta /beneficiarios). */
 export function BeneficiariosScreen() {
+  const router = useRouter();
   const [page, setPage] = useState(0); // 0-based
 
   // El rol Visualizador enmascara automáticamente los datos personales (sin
@@ -47,13 +50,10 @@ export function BeneficiariosScreen() {
               : 'Gestión y consulta de registros'}
           </p>
         </div>
-        {/* TODO: enlazar a la pantalla de registro cuando exista. Por ahora es un
-            placeholder deshabilitado. */}
         <Button
           size="lg"
-          disabled
           className="shrink-0"
-          title="La pantalla de registro estará disponible próximamente"
+          onClick={() => router.push('/beneficiarios/nuevo')}
         >
           <UserPlus />
           Nuevo registro

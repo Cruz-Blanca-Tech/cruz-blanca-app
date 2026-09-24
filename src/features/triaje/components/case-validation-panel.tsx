@@ -5,6 +5,7 @@ import {
   CornerDownRight,
   OctagonAlert,
   TriangleAlert,
+  Sparkles,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -12,12 +13,10 @@ import type { FieldStatus } from '../lib/correction-fields';
 import type { TriageDiscrepancy } from '../schemas/triage-discrepancy-schema';
 import type { CorrectionGroup } from '../lib/correction-form';
 
-/** Discrepancia enriquecida con el id del campo al que salta (si se mapeó). */
 export interface EnrichedDiscrepancy extends TriageDiscrepancy {
   fieldId: string | null;
 }
 
-/** Observación a nivel de sección (de `validation_issues`). */
 export interface SectionIssue {
   text: string;
   group: CorrectionGroup;
@@ -25,6 +24,7 @@ export interface SectionIssue {
 }
 
 interface CaseValidationPanelProps {
+  isApproved?: boolean;
   statuses: FieldStatus[];
   discrepancies: EnrichedDiscrepancy[];
   sectionIssues: SectionIssue[];
@@ -35,15 +35,16 @@ interface CaseValidationPanelProps {
 const SEVERITY_LABEL: Record<string, string> = {
   ERROR: 'Error',
   WARNING: 'Advertencia',
+  AI_INSIGHT: 'Sugerencia IA',
 };
 
-/** Panel de validación: conteos por estado + lista de observaciones con salto. */
 export function CaseValidationPanel({
   statuses,
   discrepancies,
   sectionIssues,
   onJumpField,
   onJumpGroup,
+  isApproved,
 }: CaseValidationPanelProps) {
   const total = statuses.length;
   const segments = [
@@ -111,15 +112,33 @@ export function CaseValidationPanel({
         )}
       </div>
 
-      {observations > 0 && (
+      {isApproved ? (
+        <div className="mt-4 border-t border-dashed border-border pt-4 pb-2 text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
+            <ClipboardList className="size-5 text-success-dark" />
+          </div>
+          <h4 className="font-heading text-[13px] font-semibold text-ink-primary">Expediente Validado</h4>
+          <p className="mt-1 font-data text-[11px] leading-snug text-ink-secondary">
+            Cero errores bloqueantes. Se han aceptado las {observations} observaciones restantes.
+          </p>
+        </div>
+      ) : observations > 0 ? (
         <div className="mt-3 border-t border-dashed border-border pt-2.5">
           <div className="mb-2 flex items-center gap-1.5 font-heading text-[11.5px] font-semibold text-ink-primary">
             <ClipboardList className="size-3.5 text-primary" />
-            {observations} observaciones de validación
+            {observations} observaciones de validacion
           </div>
           <div className="flex flex-col gap-1.5">
-            {discrepancies.map((d, i) => {
+            {[...discrepancies]
+              .sort((a, b) => {
+                const prio = { ERROR: 1, WARNING: 2, AI_INSIGHT: 3, INFO: 4 };
+                const pA = prio[a.severity as keyof typeof prio] || 99;
+                const pB = prio[b.severity as keyof typeof prio] || 99;
+                return pA - pB;
+              })
+              .map((d, i) => {
               const isError = d.severity === 'ERROR';
+              const isAi = d.severity === 'AI_INSIGHT';
               const jumpable = Boolean(d.fieldId);
               return (
                 <div
@@ -127,47 +146,26 @@ export function CaseValidationPanel({
                   onClick={() => d.fieldId && onJumpField(d.fieldId)}
                   className={cn(
                     'flex items-start gap-2 rounded-md border p-2',
-                    isError
-                      ? 'border-error/20 bg-error-light'
-                      : 'border-warning/20 bg-warning-light',
+                    isError ? 'border-error/20 bg-error-light' : isAi ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : 'border-warning/20 bg-warning-light',
                     jumpable && 'cursor-pointer'
                   )}
                 >
-                  {isError ? (
-                    <OctagonAlert className="mt-0.5 size-3.5 shrink-0 text-error" />
-                  ) : (
-                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
-                  )}
+                  {isError ? (<OctagonAlert className="mt-0.5 size-3.5 shrink-0 text-error" />) : isAi ? (<Sparkles className="mt-0.5 size-3.5 shrink-0 text-purple-600" />) : (<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />)}
                   <div className="min-w-0 flex-1">
                     <div className="font-data text-[11.5px] leading-snug text-ink-primary">
                       <strong
-                        className={isError ? 'text-error-dark' : 'text-warning-dark'}
+                        className={isError ? 'text-error-dark' : isAi ? 'text-purple-700' : 'text-warning-dark'}
                       >
                         {SEVERITY_LABEL[d.severity] ?? d.severity}
                       </strong>{' '}
-                      · {d.rule_description}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap gap-2.5 font-data text-[10.5px] text-ink-muted">
-                      <span>
-                        Campo:{' '}
-                        <strong className="text-ink-secondary">
-                          {d.field_name}
-                        </strong>
-                      </span>
-                      {d.expected_pattern && (
-                        <span>Esperado: {d.expected_pattern}</span>
-                      )}
-                      {d.actual_value && <span>Leído: {d.actual_value}</span>}
-                      {d.document_code && (
-                        <span className="opacity-70">[{d.document_code}]</span>
-                      )}
+                      - {d.rule_description}
                     </div>
                   </div>
                   {jumpable && (
                     <CornerDownRight
                       className={cn(
                         'mt-0.5 size-3.5 shrink-0',
-                        isError ? 'text-error' : 'text-warning'
+                        isError ? 'text-error' : isAi ? 'text-purple-600' : 'text-warning'
                       )}
                     />
                   )}
@@ -183,11 +181,11 @@ export function CaseValidationPanel({
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                 <div className="min-w-0 flex-1">
                   <div className="font-data text-[11.5px] leading-snug text-ink-primary">
-                    <strong className="text-warning-dark">Observación</strong> ·{' '}
+                    <strong className="text-warning-dark">Observacion</strong> -{' '}
                     {s.text}
                   </div>
                   <div className="mt-0.5 font-data text-[10.5px] text-ink-muted">
-                    Sección:{' '}
+                    Seccion:{' '}
                     <strong className="text-ink-secondary">{s.section}</strong>
                   </div>
                 </div>
@@ -196,7 +194,7 @@ export function CaseValidationPanel({
             ))}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

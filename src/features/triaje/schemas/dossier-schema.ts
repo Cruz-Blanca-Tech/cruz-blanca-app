@@ -25,8 +25,16 @@ export type UploadMissingDocPayload = z.infer<typeof uploadMissingDocPayloadSche
 
 /** Respuesta del POST `.../documents`. */
 export const uploadMissingDocResultSchema = z.object({
+  batch_id: z.string(),
+  dni_reference: z.string(),
+  dossier_status: z.string(),
+  added_documents_count: z.number(),
+  rejected_documents_count: z.number(),
+  failed_files: z.array(z.object({
+    file_name: z.string(),
+    reason: z.string()
+  })),
   message: z.string(),
-  document_id: z.string(),
 });
 export type UploadMissingDocResult = z.infer<typeof uploadMissingDocResultSchema>;
 

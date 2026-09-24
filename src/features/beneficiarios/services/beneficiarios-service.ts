@@ -45,4 +45,38 @@ export const beneficiariosService = {
       'el listado de beneficiarios'
     );
   },
+
+  /**
+   * POST /beneficiaries/ — crea manualmente un nuevo beneficiario sin OCR.
+   */
+  async createBeneficiary(payload: unknown): Promise<unknown> {
+    const data = await apiClient.post(API_PATHS.beneficiaries, payload);
+    return data;
+  },
+
+  /**
+   * PATCH /beneficiaries/{id} — actualiza la información del beneficiario.
+   */
+  async updateBeneficiary(id: string, payload: unknown): Promise<unknown> {
+    const data = await apiClient.patch(`${API_PATHS.beneficiaries}/${id}`, payload);
+    return data;
+  },
+
+  /**
+   * GET /beneficiaries/{id} — obtiene el perfil completo del beneficiario.
+   */
+  async getBeneficiary(id: string): Promise<unknown> {
+    const data = await apiClient.get(`${API_PATHS.beneficiaries}/${id}`);
+    return data;
+  },
+
+  /**
+   * GET /beneficiaries/adults/search — busca adultos por DNI o nombre
+   */
+  async searchAdult(query: string): Promise<unknown> {
+    const data = await apiClient.get(`${API_PATHS.beneficiaries}/adults/search`, {
+      params: { query }
+    });
+    return data;
+  },
 };

@@ -1,4 +1,4 @@
-import { Files } from 'lucide-react';
+import { Files, User } from 'lucide-react';
 
 import type { BatchListItem } from '../schemas/batches-list-schema';
 import { formatBatchDate } from '../lib/format-batch-date';
@@ -26,9 +26,20 @@ export function BatchRow({ batch }: BatchRowProps) {
       {/* Contenido principal (Izquierda) */}
       <div className="flex-1 min-w-0 flex flex-col gap-2.5">
         
-        {/* Fila de metadatos: Programa y Fecha */}
-        <div className="flex items-center gap-2 font-data text-[11.5px] font-medium text-ink-muted">
+        {/* Fila de metadatos: Programa, Usuario y Fecha */}
+        <div className="flex items-center gap-2 font-data text-[11.5px] font-medium text-ink-muted flex-wrap">
           <ProgramBadge name={batch.program_name} />
+          
+          {batch.created_by_name && (
+            <>
+              <span className="text-slate-300">&bull;</span>
+              <span className="flex items-center gap-1 text-slate-500">
+                <User className="size-3" />
+                {batch.created_by_name}
+              </span>
+            </>
+          )}
+
           <span className="text-slate-300">&bull;</span>
           <span title={absolute}>{relative || absolute}</span>
         </div>

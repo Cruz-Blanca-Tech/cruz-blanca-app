@@ -120,6 +120,7 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   // Si se resetea la actividad o se pierde, regresar a 'config'
   useEffect(() => {
     if (!hasActivity && subStep === 'upload') {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       setSubStep('config');
     }
   }, [hasActivity, subStep]);

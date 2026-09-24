@@ -10,6 +10,7 @@ import {
   OctagonAlert,
   Plus,
   RefreshCw,
+  Loader2,
   MoreVertical,
   ImagePlus,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ interface CaseDocViewerProps {
   isIncomplete: boolean;
   onOpenUploadModal: () => void;
   onOpenReplaceModal?: (code: string, name: string, skip_ocr?: boolean) => void;
+  onReprocessDoc?: (code: string, name: string) => void;
 }
 
 const MIN_ZOOM = 0.5;
@@ -188,47 +190,7 @@ export function CaseDocViewer({
             <ImageIcon className="size-3.5 shrink-0 text-primary" />
             <span className="truncate">{activeDoc?.file_name}</span>
           </div>
-          {onOpenReplaceModal && (
-            <DropdownMenu>
-              <DropdownMenuTrigger 
-                className={`${buttonVariants({ variant: 'outline', size: 'sm' })} h-7 px-2 text-[11px] text-ink-muted hover:text-primary hover:border-primary/40 transition-colors cursor-pointer`}
-              >
-                <MoreVertical className="size-3" />
-                <span className="ml-1">Opciones</span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuItem 
-                  className="cursor-pointer py-2"
-                  onClick={() => onOpenReplaceModal(
-                    activeDoc?.code ?? 'DESCONOCIDO', 
-                    activeDoc?.name ?? activeDoc?.file_name ?? 'Documento',
-                    true
-                  )}
-                >
-                  <ImagePlus className="mr-2 size-4 text-muted-foreground" />
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium">Subir imagen (Sin OCR)</span>
-                    <span className="text-[10px] text-muted-foreground">Conserva tus correcciones manuales.</span>
-                  </div>
-                </DropdownMenuItem>
-                
-                <DropdownMenuItem 
-                  className="cursor-pointer py-2 text-primary focus:bg-primary/5 focus:text-primary"
-                  onClick={() => onOpenReplaceModal(
-                    activeDoc?.code ?? 'DESCONOCIDO', 
-                    activeDoc?.name ?? activeDoc?.file_name ?? 'Documento',
-                    false
-                  )}
-                >
-                  <RefreshCw className="mr-2 size-4" />
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium">Extraer datos con IA</span>
-                    <span className="text-[10px] opacity-70">Sobreescribe el formulario con el OCR.</span>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button
@@ -258,6 +220,7 @@ export function CaseDocViewer({
           >
             <Plus />
           </Button>
+          
           <Button
             type="button"
             variant="outline"
@@ -267,6 +230,23 @@ export function CaseDocViewer({
           >
             Ajustar
           </Button>
+          {onOpenReplaceModal && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 border-primary/20 text-primary hover:bg-brand-50 font-medium"
+              onClick={() => onOpenReplaceModal(activeDoc?.code ?? 'DESCONOCIDO', activeDoc?.file_name ?? 'Documento', true)}
+              title="Cambiar imagen manualmente conservando datos"
+            >
+              <ImagePlus className="mr-1.5 size-3.5" />
+              Editar Imagen
+            </Button>
+          )}
+          
+
+          
+
         </div>
       </div>
 

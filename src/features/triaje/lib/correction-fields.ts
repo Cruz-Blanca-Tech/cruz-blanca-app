@@ -51,6 +51,7 @@ export type FieldControl =
   | 'text'
   | 'date'
   | 'select'
+  | 'school_select'
   | 'bool'
   | 'multi'
   | 'readonly'
@@ -63,6 +64,13 @@ export interface CorrectionFieldDescriptor {
   name: string | null;
   label: string;
   group: CorrectionGroup;
+  /** Agrupación visual (opcional) para renderizar campos dentro de una tarjeta o sección. */
+  cardGroup?: string;
+  /** Renderizado condicional basado en otro campo. */
+  showIf?: {
+    name: string;
+    equals: unknown;
+  };
   control: FieldControl;
   /** Opciones de `select` (con value/label) o `multi` (labels). */
   selectOptions?: SelectOption[];
@@ -281,7 +289,7 @@ export function buildCorrectionFields(
       name: 'education.school',
       label: 'Colegio',
       group: 'Educación',
-      control: 'text',
+      control: 'school_select',
     },
     {
       id: 'education.grade',
@@ -335,6 +343,7 @@ export function buildCorrectionFields(
       label: '¿Dificultades de aprendizaje?',
       group: 'Educación',
       control: 'bool',
+      nullableBool: true,
     },
 
     // Salud
@@ -346,6 +355,7 @@ export function buildCorrectionFields(
       control: 'multi',
       multiOptions: INSURANCE_OPTIONS,
       otrosLabel: 'Otro — ¿Cuál?',
+      cardGroup: 'Seguro',
     },
     {
       id: 'medical.allergies',
@@ -356,6 +366,7 @@ export function buildCorrectionFields(
       multiOptions: ALLERGY_OPTIONS,
       otrosLabel: 'Otros — ¿Qué?',
       emptyOk: true,
+      cardGroup: 'Alergias, Enfermedades y Vacunas',
     },
     {
       id: 'medical.diseases',
@@ -366,6 +377,7 @@ export function buildCorrectionFields(
       multiOptions: DISEASE_OPTIONS,
       otrosLabel: 'Otros',
       emptyOk: true,
+      cardGroup: 'Alergias, Enfermedades y Vacunas',
     },
     {
       id: 'medical.vaccines',
@@ -377,6 +389,7 @@ export function buildCorrectionFields(
       freeform: true,
       otrosLabel: 'Agregar vacuna',
       emptyOk: true,
+      cardGroup: 'Alergias, Enfermedades y Vacunas',
     },
     {
       id: 'medical.medications',
@@ -388,6 +401,7 @@ export function buildCorrectionFields(
       freeform: true,
       otrosLabel: 'Agregar medicamento',
       emptyOk: true,
+      cardGroup: 'Alergias, Enfermedades y Vacunas',
     },
     {
       id: 'medical.has_been_operated',
@@ -395,6 +409,7 @@ export function buildCorrectionFields(
       label: '¿Ha sido operado?',
       group: 'Salud',
       control: 'bool',
+      cardGroup: 'Intervenciones Médicas',
     },
     {
       id: 'medical.operation_reason',
@@ -402,8 +417,10 @@ export function buildCorrectionFields(
       label: 'Motivo de operación',
       group: 'Salud',
       control: 'text',
-      placeholder: 'Sin motivo registrado',
+      placeholder: 'Indicar motivo...',
       emptyOk: true,
+      cardGroup: 'Intervenciones Médicas',
+      showIf: { name: 'medical.has_been_operated', equals: true },
     },
     {
       id: 'medical.has_been_hospitalized',
@@ -411,6 +428,7 @@ export function buildCorrectionFields(
       label: '¿Ha sido hospitalizado?',
       group: 'Salud',
       control: 'bool',
+      cardGroup: 'Intervenciones Médicas',
     },
     {
       id: 'medical.hospitalization_reason',
@@ -418,8 +436,10 @@ export function buildCorrectionFields(
       label: 'Motivo de hospitalización',
       group: 'Salud',
       control: 'text',
-      placeholder: 'Sin motivo registrado',
+      placeholder: 'Indicar motivo...',
       emptyOk: true,
+      cardGroup: 'Intervenciones Médicas',
+      showIf: { name: 'medical.has_been_hospitalized', equals: true },
     },
 
     // Religión y permisos (booleanos nullable)

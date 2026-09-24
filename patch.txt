@@ -1,0 +1,92 @@
+  const isBool = field.control === 'bool';
+
+  const statusChip = (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 font-data text-[9.5px] font-semibold whitespace-nowrap',
+        meta.chipBg,
+        meta.color
+      )}
+    >
+      <span className={cn('size-1 rounded-full bg-current')} />
+      {meta.label}
+    </span>
+  );
+
+  return (
+    <div
+      ref={registerRef}
+      onClick={onFocus}
+      className={cn(
+        'cursor-pointer rounded-md border bg-white p-2.5 transition-colors',
+        isActive
+          ? 'border-primary bg-accent ring-2 ring-primary/15'
+          : flagged
+            ? meta.border
+            : 'border-border'
+      )}
+    >
+      <div className={cn("flex items-center justify-between gap-2", !isBool && "mb-1.5")}>
+        <label className="flex items-center gap-1 font-sans text-[11.5px] font-medium text-ink-secondary leading-tight">
+          <StatusIcon className={cn('size-3 shrink-0', meta.color)} />
+          {field.label}
+          {field.emergency && (
+            <span className="font-data text-[10px] text-error shrink-0">
+               emergencia
+            </span>
+          )}
+        </label>
+        
+        {isBool ? (
+          <div className="flex items-center gap-2 shrink-0">
+            {statusChip}
+            <div className="w-[120px]">
+              <Controller
+                control={control}
+                name={fieldName(field.name!)}
+                render={({ field: rhf }) => (
+                  <BoolToggle
+                    value={(rhf.value as boolean | null) ?? (field.nullableBool ? null : false)}
+                    nullable={Boolean(field.nullableBool)}
+                    disabled={disabled}
+                    onChange={rhf.onChange}
+                  />
+                )}
+              />
+            </div>
+          </div>
+        ) : (
+          statusChip
+        )}
+      </div>
+
+      {!isBool && (
+        <>
+          {field.control === 'readonly' ? (
+            <Input
+              readOnly
+              disabled
+              value={field.derive === 'age' ? ageFromIso(String(birthDate ?? ''), new Date()) : ''}
+              placeholder={field.placeholder}
+              className="h-8 bg-slate-50 font-data text-[12.5px]"
+            />
+          ) : field.control === 'multi' ? (
+            <Controller
+              control={control}
+              name={fieldName(field.name!)}
+              render={({ field: rhf }) => (
+                <MultiSelect
+                  options={field.multiOptions ?? []}
+                  value={(rhf.value as string[]) ?? []}
+                  onChange={rhf.onChange}
+                  otrosLabel={field.otrosLabel}
+                  freeform={field.freeform}
+                  disabled={disabled}
+                />
+              )}
+            />
+          ) : field.control === 'select' ? (
+            <Controller
+              control={control}
+              name={fieldName(field.name!)}
+              render={({ field: rhf }) => {

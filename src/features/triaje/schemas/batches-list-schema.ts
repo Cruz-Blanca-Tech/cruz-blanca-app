@@ -36,6 +36,7 @@ export const batchListItemSchema = z.object({
   description: z.string().nullable(),
   activity_name: z.string().nullable(),
   program_name: z.string().nullable(),
+  created_by_name: z.string().nullable().optional(),
   triage_summary: batchTriageSummarySchema,
   failure_reason: z.string().nullable().optional(),
 });

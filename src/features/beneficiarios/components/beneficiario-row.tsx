@@ -13,6 +13,8 @@ import {
   maskName,
 } from '../lib/beneficiario-format';
 
+import { useRouter } from 'next/navigation';
+
 interface BeneficiarioRowProps {
   beneficiary: BeneficiarySummary;
   /** El rol Visualizador enmascara nombre y DNI. */
@@ -21,6 +23,7 @@ interface BeneficiarioRowProps {
 
 /** Una fila de la tabla de beneficiarios. */
 export function BeneficiarioRow({ beneficiary, masked }: BeneficiarioRowProps) {
+  const router = useRouter();
   const fullName = getFullName(beneficiary);
 
   return (
@@ -95,17 +98,16 @@ export function BeneficiarioRow({ beneficiary, masked }: BeneficiarioRowProps) {
 
       {/* Acciones */}
       <TableCell className="px-4 py-3 text-right align-middle">
-        {/* TODO: enlazar a /beneficiarios/[id] cuando exista la pantalla de
-            detalle del beneficiario. Por ahora es un placeholder deshabilitado. */}
-        <Button
-          size="sm"
-          variant="outline"
-          disabled
-          title="El perfil del beneficiario estará disponible próximamente"
-        >
-          <Eye />
-          Ver perfil
-        </Button>
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => router.push(`/beneficiarios/${beneficiary.id}`)}
+          >
+            <Eye className="mr-1 h-4 w-4" />
+            Perfil
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );

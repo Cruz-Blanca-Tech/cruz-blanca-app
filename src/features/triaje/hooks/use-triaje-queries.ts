@@ -172,6 +172,10 @@ export function useCaseDocuments(
       caseCorrectionService.getCaseDocuments(batchId as string, dniRef as string),
     enabled: Boolean(batchId) && Boolean(dniRef),
     staleTime: FIVE_MINUTES,
+    refetchInterval: (query) => {
+      const pending = query.state.data?.pending_documents?.length ?? 0;
+      return pending > 0 ? 3000 : false;
+    }
   });
 }
 
@@ -273,8 +277,8 @@ export function useRetryBatch(batchId: string) {
   return useMutation({
     mutationFn: () => triajeBatchesService.retryBatch(batchId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: triajeKeys.list._def });
-      queryClient.invalidateQueries({ queryKey: triajeKeys.summary._def });
+      queryClient.invalidateQueries({ queryKey: triajeKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: triajeKeys.summaries() });
       invalidateBatchState(queryClient, batchId);
     },
   });

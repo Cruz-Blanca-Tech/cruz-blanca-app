@@ -1,6 +1,7 @@
 'use client';
 
-import { ListChecks } from 'lucide-react';
+import { ListChecks, User, Users, BookOpen, HeartPulse, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { useFormContext, useWatch } from 'react-hook-form';
 
 import { cn } from '@/lib/utils';
 import type {
@@ -10,11 +11,21 @@ import type {
 import { CORRECTION_GROUPS, type CorrectionGroup } from '../lib/correction-form';
 import { CaseFieldRow } from './case-field-row';
 
+const GROUP_ICONS: Record<CorrectionGroup, LucideIcon | null> = {
+  'Beneficiario': User,
+  'Contactos y Apoderado': Users,
+  'Educación': BookOpen,
+  'Salud': HeartPulse,
+  'Religión y permisos': ShieldCheck,
+  'Padre': null,
+  'Madre': null,
+  'Apoderado': null,
+  'Otro': null,
+};
+
 interface CaseFieldsFormProps {
   fields: CorrectionFieldDescriptor[];
-  /** Estado de validación por id de campo (para pintar cada fila y los conteos). */
   validations: Map<string, FieldValidation>;
-  /** Nº de incidencias (errores/advertencias) por grupo, para el badge del tab. */
   groupIssues: Record<CorrectionGroup, number>;
   activeGroup: CorrectionGroup;
   onSelectGroup: (group: CorrectionGroup) => void;
@@ -24,7 +35,21 @@ interface CaseFieldsFormProps {
   disabled?: boolean;
 }
 
-/** Formulario del expediente por grupos (tabs) + filas de campo. */
+function ConditionalFieldWrapper({
+  field,
+  children,
+}: {
+  field: CorrectionFieldDescriptor;
+  children: React.ReactNode;
+}) {
+  const { control } = useFormContext();
+  const showIf = field.showIf!;
+  const watchedValue = useWatch({ control, name: showIf.name });
+
+  if (watchedValue !== showIf.equals) return null;
+  return <>{children}</>;
+}
+
 export function CaseFieldsForm({
   fields,
   validations,
@@ -38,21 +63,53 @@ export function CaseFieldsForm({
 }: CaseFieldsFormProps) {
   const activeFields = fields.filter((f) => f.group === activeGroup);
 
+  // Agrupar campos por `cardGroup`. Los que no tienen van al grupo 'default'.
+  const groupedFields = activeFields.reduce((acc, field) => {
+    const groupName = field.cardGroup || 'default';
+    if (!acc[groupName]) acc[groupName] = [];
+    acc[groupName].push(field);
+    return acc;
+  }, {} as Record<string, CorrectionFieldDescriptor[]>);
+
+  const renderField = (field: CorrectionFieldDescriptor) => {
+    const validation = validations.get(field.id);
+    const row = (
+      <CaseFieldRow
+        key={field.id}
+        field={field}
+        status={validation?.status ?? 'ok'}
+        message={validation?.message ?? null}
+        isActive={activeFieldId === field.id}
+        onFocus={() => onFocusField(field.id)}
+        registerRef={(el) => {
+          fieldRefs.current[field.id] = el;
+        }}
+        disabled={disabled}
+      />
+    );
+
+    if (field.showIf) {
+      return (
+        <ConditionalFieldWrapper key={field.id} field={field}>
+          {row}
+        </ConditionalFieldWrapper>
+      );
+    }
+    return row;
+  };
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="mb-2 flex items-center gap-2 font-heading text-[13.5px] font-semibold text-ink-primary">
         <ListChecks className="size-3.5 text-primary" />
         Campos del expediente
-        <span className="ml-auto font-data text-[10.5px] font-normal text-ink-muted">
-          Click sobre un DNI para ver su documento
-        </span>
       </div>
 
-      {/* Tabs de grupo */}
       <div className="mb-2.5 flex shrink-0 flex-wrap gap-1.5">
         {CORRECTION_GROUPS.map((group) => {
           const active = group === activeGroup;
           const issues = groupIssues[group] ?? 0;
+          const GroupIcon = GROUP_ICONS[group];
           return (
             <button
               key={group}
@@ -65,6 +122,7 @@ export function CaseFieldsForm({
                   : 'border-border bg-white text-ink-secondary hover:bg-muted'
               )}
             >
+              {GroupIcon && <GroupIcon className="size-3.5" />}
               {group}
               {issues > 0 && (
                 <span
@@ -83,22 +141,32 @@ export function CaseFieldsForm({
         })}
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-1">
-        {activeFields.map((field) => {
-          const validation = validations.get(field.id);
+      <div className="flex-1 overflow-y-auto pr-1 space-y-4 pb-4">
+        {Object.entries(groupedFields).map(([cardName, fieldsInGroup]) => {
+          if (cardName === 'default') {
+            return (
+              <div key={cardName} className="space-y-1.5">
+                {fieldsInGroup.map(renderField)}
+              </div>
+            );
+          }
+
+          const isGridCard = cardName === 'Alergias, Enfermedades y Vacunas';
+
           return (
-            <CaseFieldRow
-              key={field.id}
-              field={field}
-              status={validation?.status ?? 'ok'}
-              message={validation?.message ?? null}
-              isActive={activeFieldId === field.id}
-              onFocus={() => onFocusField(field.id)}
-              registerRef={(el) => {
-                fieldRefs.current[field.id] = el;
-              }}
-              disabled={disabled}
-            />
+            <div
+              key={cardName}
+              className="rounded-xl border bg-slate-50/50 p-3 shadow-sm space-y-2.5"
+            >
+              <h4 className="font-heading text-[11px] font-bold uppercase tracking-wider text-ink-muted/80 ml-1">
+                {cardName}
+              </h4>
+              <div className={cn(
+                isGridCard ? "grid grid-cols-1 2xl:grid-cols-3 xl:grid-cols-2 gap-2" : "space-y-1.5"
+              )}>
+                {fieldsInGroup.map(renderField)}
+              </div>
+            </div>
           );
         })}
       </div>

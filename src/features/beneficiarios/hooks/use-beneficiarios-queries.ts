@@ -1,6 +1,6 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   beneficiariosService,
   type BeneficiariesListFilters,
@@ -36,5 +36,62 @@ export function useBeneficiaries(filters?: BeneficiariesListFilters) {
     queryFn: () => beneficiariosService.getBeneficiaries(filters),
     placeholderData: keepPreviousData,
     staleTime: FIVE_MINUTES,
+  });
+}
+
+/**
+ * GET /beneficiaries/{id} — obtiene un beneficiario específico
+ */
+export function useBeneficiary(id: string) {
+  return useQuery({
+    queryKey: [...beneficiariosKeys.all, 'detail', id] as const,
+    queryFn: () => beneficiariosService.getBeneficiary(id),
+    enabled: !!id,
+    staleTime: FIVE_MINUTES,
+  });
+}
+
+/**
+ * Mutación para crear un beneficiario manualmente.
+ */
+export function useCreateBeneficiaryMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: unknown) => beneficiariosService.createBeneficiary(data),
+    onSuccess: () => {
+      // Invalida todas las listas para que se refresque la tabla
+      queryClient.invalidateQueries({ queryKey: beneficiariosKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Mutación para editar un beneficiario manualmente.
+ */
+export function useUpdateBeneficiaryMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
+      beneficiariosService.updateBeneficiary(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: beneficiariosKeys.lists() });
+      queryClient.invalidateQueries({
+        queryKey: [...beneficiariosKeys.all, 'detail', id],
+      });
+    },
+  });
+}
+
+/**
+ * GET /beneficiaries/adults/search — busca un adulto por DNI o Nombre
+ */
+export function useSearchAdult(query: string) {
+  return useQuery({
+    queryKey: [...beneficiariosKeys.all, 'adults', 'search', query] as const,
+    queryFn: () => beneficiariosService.searchAdult(query),
+    enabled: true, // Search even if query is empty
+    retry: false, // Don't retry on 404
   });
 }
