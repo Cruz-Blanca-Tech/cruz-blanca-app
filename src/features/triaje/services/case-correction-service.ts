@@ -14,6 +14,10 @@ import {
   caseDocumentsSchema,
   type CaseDocuments,
 } from '../schemas/case-documents-schema';
+import {
+  mdmBeneficiaryMatchSchema,
+  type MdmBeneficiaryMatch,
+} from '../schemas/mdm-match-schema';
 
 /**
  * Servicio de CORRECCIÓN de un expediente EDUCA (contexto de Triaje). Cubre la
@@ -31,6 +35,19 @@ export const caseCorrectionService = {
   async getEducaCase(caseId: string): Promise<EducaCase> {
     const data = await apiClient.get(`${API_PATHS.educa}/${caseId}`);
     return parseApiResponse(educaCaseSchema, data, 'el expediente EDUCA');
+  },
+
+  /**
+   * GET /mdm/beneficiaries/by-dni/{dni} — ¿el DNI del expediente ya existe en el
+   * dato máster? Devuelve `{ exists, beneficiary }` con un snapshot LIGERO de
+   * identidad y familiares del maestro. Lo consume la pantalla de corrección:
+   * si `exists=true`, los campos protegidos (identidad + padre/madre) se
+   * rellenan con los valores del maestro y se bloquean; si no, es un
+   * beneficiario nuevo y se edita con normalidad.
+   */
+  async getMdmBeneficiaryMatch(dni: string): Promise<MdmBeneficiaryMatch> {
+    const data = await apiClient.get(`${API_PATHS.beneficiaries}/by-dni/${dni}`);
+    return parseApiResponse(mdmBeneficiaryMatchSchema, data, 'el beneficiario por DNI');
   },
 
   /**

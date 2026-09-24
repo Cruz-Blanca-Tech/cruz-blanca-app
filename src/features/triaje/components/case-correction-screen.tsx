@@ -8,7 +8,7 @@ import {
   Lock,
   Loader2,
   OctagonAlert,
-  RefreshCw, Sparkles, Link as LinkIcon, TriangleAlert,
+  RefreshCw, Sparkles, UserCheck, Link as LinkIcon, TriangleAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -151,6 +151,30 @@ export function CaseCorrectionScreen({
                 Vincular (DNI: {aiInsightDiscrepancy.expected_pattern})
               </Button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Banner: beneficiario ya registrado en el maestro (MDM) — identidad y
+              familiares bloqueados con los valores del maestro */}
+      {vm.mdmMatch && (
+        <div className="flex flex-col gap-1.5 rounded-lg border border-info/30 bg-info-light px-4 py-3 shadow-sm">
+          <div className="flex items-start gap-3">
+            <UserCheck className="mt-0.5 size-5 shrink-0 text-info-dark" />
+            <div>
+              <h4 className="font-heading text-sm font-bold text-info-dark">
+                Beneficiario ya registrado en MDM
+              </h4>
+              <p className="mt-0.5 font-data text-xs leading-relaxed text-info-dark/90">
+                El DNI <span className="font-bold">{vm.mdmMatch.dni}</span> corresponde a{' '}
+                <span className="font-bold">
+                  {vm.mdmMatch.first_name} {vm.mdmMatch.last_name}
+                </span>
+                , ya inscrito en el registro maestro. Los campos de identidad y los familiares
+                (padre/madre) se rellenaron desde el MDM y están bloqueados: al aprobar solo se
+                actualizarán los datos operativos de la actividad. Puedes añadir un tutor adicional.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -328,6 +352,8 @@ export function CaseCorrectionScreen({
                       activeFieldId={vm.activeFieldId}
                       onFocusField={vm.focusField}
                       fieldRefs={vm.fieldRefs}
+                        lockedFieldIds={vm.mdmLockedFieldIds}
+                        parentsLocked={Boolean(vm.mdmMatch)}
                     />
                   </fieldset>
                 </FormProvider>
