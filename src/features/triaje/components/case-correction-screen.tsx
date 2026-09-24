@@ -179,6 +179,28 @@ export function CaseCorrectionScreen({
         </div>
       )}
 
+      {/* Banner: el DNI del beneficiario no coincide con el DNI de agrupación del
+              lote — el revisor corrigió/devinculó el DNI y la agrupación quedó distinta */}
+      {vm.dniGroupMismatch && (
+        <div className="flex flex-col gap-1.5 rounded-lg border border-warning/40 bg-warning-light px-4 py-3 shadow-sm">
+          <div className="flex items-start gap-3">
+            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning-dark" />
+            <div>
+              <h4 className="font-heading text-sm font-bold text-warning-dark">
+                El DNI del beneficiario no coincide con el DNI de agrupación del lote
+              </h4>
+              <p className="mt-0.5 font-data text-xs leading-relaxed text-warning-dark/90">
+                Este expediente fue agrupado con el DNI{' '}
+                <span className="font-bold">{dniReference}</span>, pero el beneficiario ahora registra{' '}
+                <span className="font-bold">{vm.beneficiaryDni || dniReference}</span>. Verifica que el
+                DNI corregido corresponda a la misma persona; si lo guardas así, el expediente quedará
+                vinculado a una agrupación distinta en el lote.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CaseValidationPanel
         statuses={vm.statuses}
         discrepancies={vm.enrichedDiscrepancies}
