@@ -49,6 +49,12 @@ interface CaseFieldsFormProps {
    * del lote). Reactiva al valor del DNI; se renderiza solo en la fila del DNI.
    */
   dniInline?: { kind: 'info' | 'warning'; text: string } | null;
+  /**
+   * Verificación MDM en curso para el DNI del beneficiario (debounce de 350ms +
+   * fetch): muestra un spinner "Buscando en MDM…" dentro del campo DNI mientras
+   * se consulta el maestro.
+   */
+  isMdmMatching?: boolean;
 }
 
 function ConditionalFieldWrapper({
@@ -79,6 +85,7 @@ export function CaseFieldsForm({
   lockedFieldIds = null,
   parentsLocked = false,
   dniInline = null,
+  isMdmMatching = false,
 }: CaseFieldsFormProps) {
   const activeFields = fields.filter((f) => f.group === activeGroup);
 
@@ -107,6 +114,7 @@ export function CaseFieldsForm({
         locked={lockedFieldIds?.has(field.id) ?? false}
         parentsLocked={parentsLocked}
         dniInline={field.id === 'beneficiary.dni' ? dniInline : null}
+        isMdmMatching={field.id === 'beneficiary.dni' ? isMdmMatching : false}
       />
     );
 
