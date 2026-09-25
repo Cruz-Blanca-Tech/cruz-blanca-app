@@ -69,7 +69,10 @@ export function CaseCorrectionScreen({
       return;
     }
 
-    const hasWarnings = vm.enrichedDiscrepancies.some((d) => d.severity === 'WARNING' || d.severity === 'AI_INSIGHT');
+    // Las sugerencias IA (AI_INSIGHT) son propuestas, no bloqueos: ya viven en su
+    // sección colapsada del panel y NO deben abrir el modal de advertencias al
+    // aprobar. Solo las advertencias reales (WARNING) abren el modal.
+    const hasWarnings = vm.enrichedDiscrepancies.some((d) => d.severity === 'WARNING');
     const hasErrors = vm.enrichedDiscrepancies.some((d) => d.severity === 'ERROR');
     
     // Si la base de datos nos dice que no hay errores pero sí advertencias, y aún no está aprobado...
@@ -361,6 +364,7 @@ export function CaseCorrectionScreen({
                         lockedFieldIds={vm.mdmLockedFieldIds}
                         parentsLocked={Boolean(vm.mdmMatch)}
                         dniInline={vm.dniInline}
+                        isMdmMatching={vm.isMdmMatching}
                     />
                   </fieldset>
                 </FormProvider>
@@ -437,7 +441,7 @@ export function CaseCorrectionScreen({
                 Advertencias Pendientes
               </DialogTitle>
               <DialogDescription className="text-center font-data text-sm text-ink-secondary mt-1 mb-4">
-                El expediente no tiene errores bloqueantes, pero aún mantiene <strong>algunas sugerencias o advertencias menores</strong>.
+                El expediente no tiene errores bloqueantes, pero aún mantiene <strong>algunas advertencias menores</strong>.
                 <br /><br />
                 ¿¿Deseas continuar y validar el expediente de todos modos?
               </DialogDescription>
