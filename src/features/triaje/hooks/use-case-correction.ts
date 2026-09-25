@@ -161,14 +161,6 @@ export function useCaseCorrection({
     return typeof v === 'string' ? v : '';
   }, [watched]);
 
-  // Advertencia: el DNI del beneficiario (editable, se puede desvincular del MDM)
-  // no coincide con el DNI con el que el lote AGRUPÓ este expediente. Avisa al
-  // revisor que la agrupación del lote quedó con un DNI distinto al del menor.
-  const dniGroupMismatch = useMemo(() => {
-    const current = (watchedDni || '').trim().toUpperCase();
-    const group = (dniReference || '').trim().toUpperCase();
-    return Boolean(current && group && current !== group);
-  }, [watchedDni, dniReference]);
   const [lookupDni, setLookupDni] = useState('');
   useEffect(() => {
     const trimmed = (watchedDni || '').trim();
@@ -181,6 +173,43 @@ export function useCaseCorrection({
   }, [watchedDni]);
   const mdmQuery = useMdmBeneficiaryMatch(lookupDni);
   const mdmSnap = mdmQuery.data?.exists ? (mdmQuery.data.beneficiary ?? null) : null;
+
+  // Advertencia de agrupación (rediseño condicional+inline):
+  //   - se oculta si hay match MDM (la identidad la confirma el maestro, no hace
+  //     falta avisar por la agrupación) o si el caso ya está aprobado (antes el
+  //     banner persistía en cada visita al expediente aprobado);
+  //   - sin match ni aprobación, se muestra como nota inline de una línea bajo el
+  //     campo DNI (ver `dniInline`), no como banner.
+  const isApprovedStatus = caseData?.status === 'APPROVED';
+  const dniGroupMismatch = useMemo(() => {
+    if (mdmSnap || isApprovedStatus) return false;
+    const current = (watchedDni || '').trim().toUpperCase();
+    const group = (dniReference || '').trim().toUpperCase();
+    return Boolean(current && group && current !== group);
+  }, [watchedDni, dniReference, mdmSnap, isApprovedStatus]);
+
+  // Línea ancla bajo el campo DNI (una sola, nunca dos a la vez):
+  //   - info (match MDM): "Registrado en MDM como X — identidad desde el maestro
+  //     · Cambiar DNI para desvincular". Reactiva al valor del DNI: si el revisor
+  //     lo cambia y deja de haber match, la línea desaparece (no es un banner).
+  //   - warning (agrupación): solo sin match y con caso editable.
+  const dniInline = useMemo(() => {
+    if (mdmSnap) {
+      const snapName = [mdmSnap.first_name, mdmSnap.last_name].filter(Boolean).join(' ');
+      return {
+        kind: 'info' as const,
+        text: `Registrado en MDM como ${snapName || mdmSnap.dni || ''} — identidad desde el maestro · Cambiar DNI para desvincular`,
+      };
+    }
+    if (dniGroupMismatch) {
+      const current = (watchedDni || '').trim().toUpperCase();
+      return {
+        kind: 'warning' as const,
+        text: `Este expediente fue agrupado con el DNI ${dniReference}, pero el beneficiario ahora registra ${current || dniReference}. Verifica la agrupación del lote.`,
+      };
+    }
+    return null;
+  }, [mdmSnap, dniGroupMismatch, watchedDni, dniReference]);
 
   // Baseline del expediente (dossier tal como vino del backend): se restaura si
   // el revisor desvincula el DNI (el match desaparece).
@@ -495,6 +524,8 @@ export function useCaseCorrection({
     isMdmMatching: mdmQuery.isFetching,
     // Advertencia de agrupación: DNI del beneficiario ≠ DNI de agrupación del lote
     dniGroupMismatch,
+    // Línea ancla bajo el campo DNI (info con match MDM / warning por agrupación)
+    dniInline,
     beneficiaryDni: watchedDni,
     // Interacción visor ↔ campo
     activeGroup,

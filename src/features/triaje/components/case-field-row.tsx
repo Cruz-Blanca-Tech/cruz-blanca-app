@@ -96,6 +96,14 @@ interface CaseFieldRowProps {
   locked?: boolean;
   /** Match MDM: bloquea las filas padre/madre del editor de adultos. */
   parentsLocked?: boolean;
+  /**
+   * Línea ancla de nivel info/advertencia bajo el campo DNI (única, reactiva):
+   *   - info: "Registrado en MDM como X — identidad desde el maestro..." cuando
+   *     el DNI del formulario tiene match MDM;
+   *   - warning: agrupación del lote con DNI distinto (sin match MDM y caso
+   *     editable), en sustitución del antiguo banner.
+   */
+  dniInline?: { kind: 'info' | 'warning'; text: string } | null;
 }
 
 /** Fila de un campo del expediente: etiqueta + estado + control + observación. */
@@ -109,6 +117,7 @@ export function CaseFieldRow({
   disabled = false,
   locked = false,
   parentsLocked = false,
+  dniInline = null,
 }: CaseFieldRowProps) {
   const { control } = useFormContext<CorrectionFormValues>();
   const meta = STATUS_META[status];
@@ -326,6 +335,32 @@ export function CaseFieldRow({
         </div>
       ) : null}
 
+      {/* Línea ancla bajo el DNI: info con match MDM o warning de agrupación. */}
+      {dniInline && (
+        <div
+          className={cn(
+            'mt-1 flex items-start gap-1 rounded-sm px-1.5 py-1',
+            dniInline.kind === 'warning'
+              ? 'border border-warning/20 bg-warning-light'
+              : 'border border-info/20 bg-info-light'
+          )}
+        >
+          {dniInline.kind === 'warning' ? (
+            <TriangleAlert className="mt-0.5 size-2.5 shrink-0 text-warning-dark" />
+          ) : (
+            <CheckCircle2 className="mt-0.5 size-2.5 shrink-0 text-info-dark" />
+          )}
+          <span
+            className={cn(
+              'font-data text-[10.5px] leading-snug',
+              dniInline.kind === 'warning' ? 'text-warning-dark' : 'text-info-dark'
+            )}
+          >
+            {dniInline.text}
+          </span>
+        </div>
+      )}
+
       {/* Advertencia de edad: solo bajo el campo birth_date, en tiempo real */}
       {field.id === 'beneficiary.birth_date' && (() => {
         const minor = isBeneficiaryMinor(birthDate as string | null | undefined);
