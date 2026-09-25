@@ -174,6 +174,23 @@ export function useCaseCorrection({
   const mdmQuery = useMdmBeneficiaryMatch(lookupDni);
   const mdmSnap = mdmQuery.data?.exists ? (mdmQuery.data.beneficiary ?? null) : null;
 
+  // DNI observado normalizado: solo cuenta si es un DNI válido de 8 dígitos.
+  const watchedDniValid = useMemo(() => {
+    const trimmed = (watchedDni || '').trim();
+    return isValidDni(trimmed) ? trimmed : '';
+  }, [watchedDni]);
+
+  // Indicador "buscando en MDM…" junto al campo DNI. Cubre TANTO el debounce de
+  // 350ms (DNI observado aún no disparó el lookup) COMO el fetch en curso, para
+  // que el revisor siempre sepa que el match se está consultando (sin delay
+  // silencioso). Se apaga con el primer dato resuelto del DNI observado.
+  const isMdmMatching = useMemo(
+    () =>
+      Boolean(watchedDniValid) &&
+      (mdmQuery.isFetching || watchedDniValid !== lookupDni),
+    [watchedDniValid, lookupDni, mdmQuery.isFetching]
+  );
+
   // Advertencia de agrupación (rediseño condicional+inline):
   //   - se oculta si hay match MDM (la identidad la confirma el maestro, no hace
   //     falta avisar por la agrupación) o si el caso ya está aprobado (antes el
@@ -194,6 +211,10 @@ export function useCaseCorrection({
   //     lo cambia y deja de haber match, la línea desaparece (no es un banner).
   //   - warning (agrupación): solo sin match y con caso editable.
   const dniInline = useMemo(() => {
+    // Mientras verificamos el maestro no pintamos línea ancla: el spinner
+    // "Buscando en MDM…" dentro del campo es el único indicador durante el
+    // lookup (evita que la advertencia de agrupación parpadee y desaparezca).
+    if (isMdmMatching) return null;
     if (mdmSnap) {
       const snapName = [mdmSnap.first_name, mdmSnap.last_name].filter(Boolean).join(' ');
       return {
@@ -209,7 +230,7 @@ export function useCaseCorrection({
       };
     }
     return null;
-  }, [mdmSnap, dniGroupMismatch, watchedDni, dniReference]);
+  }, [isMdmMatching, mdmSnap, dniGroupMismatch, watchedDni, dniReference]);
 
   // Baseline del expediente (dossier tal como vino del backend): se restaura si
   // el revisor desvincula el DNI (el match desaparece).
@@ -521,7 +542,7 @@ export function useCaseCorrection({
     // Match MDM (beneficiario ya registrado en el maestro)
     mdmMatch: mdmSnap,
     mdmLockedFieldIds,
-    isMdmMatching: mdmQuery.isFetching,
+    isMdmMatching,
     // Advertencia de agrupación: DNI del beneficiario ≠ DNI de agrupación del lote
     dniGroupMismatch,
     // Línea ancla bajo el campo DNI (info con match MDM / warning por agrupación)
