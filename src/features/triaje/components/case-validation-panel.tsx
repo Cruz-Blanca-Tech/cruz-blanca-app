@@ -1,6 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import {
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   CornerDownRight,
   OctagonAlert,
@@ -46,6 +49,7 @@ export function CaseValidationPanel({
   onJumpGroup,
   isApproved,
 }: CaseValidationPanelProps) {
+  const [aiOpen, setAiOpen] = useState(false);
   const total = statuses.length;
   const segments = [
     {
@@ -77,7 +81,13 @@ export function CaseValidationPanel({
       bar: 'bg-ink-muted',
     },
   ];
-  const observations = discrepancies.length + sectionIssues.length;
+
+  // Separación por severidad: el panel ya no mezcla todo. Las SUGERENCIAS IA
+  // viven en una sección propia colapsable (con contador) para no "bombardear"
+  // al revisor; errores/advertencias + observaciones quedan en la lista principal.
+  const aiInsights = discrepancies.filter((d) => d.severity === 'AI_INSIGHT');
+  const hardDiscrepancies = discrepancies.filter((d) => d.severity !== 'AI_INSIGHT');
+  const observations = hardDiscrepancies.length + sectionIssues.length;
 
   return (
     <div className="rounded-md border border-border bg-white px-3.5 py-2.5">
@@ -119,26 +129,26 @@ export function CaseValidationPanel({
           </div>
           <h4 className="font-heading text-[13px] font-semibold text-ink-primary">Expediente Validado</h4>
           <p className="mt-1 font-data text-[11px] leading-snug text-ink-secondary">
-            Cero errores bloqueantes. Se han aceptado las {observations} observaciones restantes.
+            Cero errores bloqueantes. Se han aceptado las {observations} observaciones restantes
+            {aiInsights.length > 0 ? ` y ${aiInsights.length} sugerencia${aiInsights.length === 1 ? '' : 's'} de IA` : ''}.
           </p>
         </div>
-      ) : observations > 0 ? (
+      ) : observations > 0 || aiInsights.length > 0 ? (
         <div className="mt-3 border-t border-dashed border-border pt-2.5">
           <div className="mb-2 flex items-center gap-1.5 font-heading text-[11.5px] font-semibold text-ink-primary">
             <ClipboardList className="size-3.5 text-primary" />
-            {observations} observaciones de validacion
+            {observations} observaciones de validación
           </div>
           <div className="flex flex-col gap-1.5">
-            {[...discrepancies]
+            {[...hardDiscrepancies]
               .sort((a, b) => {
-                const prio = { ERROR: 1, WARNING: 2, AI_INSIGHT: 3, INFO: 4 };
+                const prio = { ERROR: 1, WARNING: 2, INFO: 4 };
                 const pA = prio[a.severity as keyof typeof prio] || 99;
                 const pB = prio[b.severity as keyof typeof prio] || 99;
                 return pA - pB;
               })
               .map((d, i) => {
               const isError = d.severity === 'ERROR';
-              const isAi = d.severity === 'AI_INSIGHT';
               const jumpable = Boolean(d.fieldId);
               return (
                 <div
@@ -146,15 +156,15 @@ export function CaseValidationPanel({
                   onClick={() => d.fieldId && onJumpField(d.fieldId)}
                   className={cn(
                     'flex items-start gap-2 rounded-md border p-2',
-                    isError ? 'border-error/20 bg-error-light' : isAi ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : 'border-warning/20 bg-warning-light',
+                    isError ? 'border-error/20 bg-error-light' : 'border-warning/20 bg-warning-light',
                     jumpable && 'cursor-pointer'
                   )}
                 >
-                  {isError ? (<OctagonAlert className="mt-0.5 size-3.5 shrink-0 text-error" />) : isAi ? (<Sparkles className="mt-0.5 size-3.5 shrink-0 text-purple-600" />) : (<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />)}
+                  {isError ? (<OctagonAlert className="mt-0.5 size-3.5 shrink-0 text-error" />) : (<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />)}
                   <div className="min-w-0 flex-1">
                     <div className="font-data text-[11.5px] leading-snug text-ink-primary">
                       <strong
-                        className={isError ? 'text-error-dark' : isAi ? 'text-purple-700' : 'text-warning-dark'}
+                        className={isError ? 'text-error-dark' : 'text-warning-dark'}
                       >
                         {SEVERITY_LABEL[d.severity] ?? d.severity}
                       </strong>{' '}
@@ -165,7 +175,7 @@ export function CaseValidationPanel({
                     <CornerDownRight
                       className={cn(
                         'mt-0.5 size-3.5 shrink-0',
-                        isError ? 'text-error' : isAi ? 'text-purple-600' : 'text-warning'
+                        isError ? 'text-error' : 'text-warning'
                       )}
                     />
                   )}
@@ -193,6 +203,58 @@ export function CaseValidationPanel({
               </div>
             ))}
           </div>
+
+          {/* Sugerencias de IA: colapsadas por defecto, con contador, para no
+              saturar al revisor (solo se expanden si quiere verlas). */}
+          {aiInsights.length > 0 && (
+            <div className="mt-2.5 rounded-md border border-purple-200 bg-purple-50/60">
+              <button
+                type="button"
+                onClick={() => setAiOpen((v) => !v)}
+                className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left"
+              >
+                <span className="inline-flex items-center gap-1.5 font-heading text-[11.5px] font-semibold text-purple-800">
+                  <Sparkles className="size-3.5 text-purple-600" />
+                  {aiInsights.length} sugerencia{aiInsights.length === 1 ? '' : 's'} de IA
+                </span>
+                {aiOpen ? (
+                  <ChevronDown className="size-3.5 shrink-0 text-purple-600" />
+                ) : (
+                  <ChevronRight className="size-3.5 shrink-0 text-purple-600" />
+                )}
+              </button>
+              {aiOpen && (
+                <div className="flex flex-col gap-1.5 border-t border-purple-200 px-2.5 py-2">
+                  {aiInsights.map((d, i) => {
+                    const jumpable = Boolean(d.fieldId);
+                    return (
+                      <div
+                        key={`ai-${i}`}
+                        onClick={() => d.fieldId && onJumpField(d.fieldId)}
+                        className={cn(
+                          'flex items-start gap-2 rounded-md border border-purple-200 bg-white p-2',
+                          jumpable && 'cursor-pointer hover:bg-purple-50'
+                        )}
+                      >
+                        <Sparkles className="mt-0.5 size-3.5 shrink-0 text-purple-600" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-data text-[11.5px] leading-snug text-ink-primary">
+                            <strong className="text-purple-700">
+                              {SEVERITY_LABEL[d.severity] ?? d.severity}
+                            </strong>{' '}
+                            - {d.rule_description}
+                          </div>
+                        </div>
+                        {jumpable && (
+                          <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-purple-600" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : null}
     </div>

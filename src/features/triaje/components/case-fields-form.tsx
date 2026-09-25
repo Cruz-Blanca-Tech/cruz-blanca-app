@@ -44,6 +44,11 @@ interface CaseFieldsFormProps {
    * quedan bloqueadas (solo el tutor/OTHER se puede editar/agregar/eliminar).
    */
   parentsLocked?: boolean;
+  /**
+   * Línea ancla bajo el campo DNI (info con match MDM / warning por agrupación
+   * del lote). Reactiva al valor del DNI; se renderiza solo en la fila del DNI.
+   */
+  dniInline?: { kind: 'info' | 'warning'; text: string } | null;
 }
 
 function ConditionalFieldWrapper({
@@ -73,6 +78,7 @@ export function CaseFieldsForm({
   disabled = false,
   lockedFieldIds = null,
   parentsLocked = false,
+  dniInline = null,
 }: CaseFieldsFormProps) {
   const activeFields = fields.filter((f) => f.group === activeGroup);
 
@@ -100,6 +106,7 @@ export function CaseFieldsForm({
         disabled={disabled}
         locked={lockedFieldIds?.has(field.id) ?? false}
         parentsLocked={parentsLocked}
+        dniInline={field.id === 'beneficiary.dni' ? dniInline : null}
       />
     );
 

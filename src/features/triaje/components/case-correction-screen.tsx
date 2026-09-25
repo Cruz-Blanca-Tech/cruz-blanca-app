@@ -122,8 +122,38 @@ export function CaseCorrectionScreen({
         onNavigate={vm.goToCase}
       />
 
-      {/* Panel de validación */}
-      {aiInsightDiscrepancy && (
+      {/* Panel de identidad unificado — reemplaza al antiguo banner MDM azul y a
+          la sugerencia IA morada por separado. Un SOLO panel con dos modos:
+            - Modo A (match MDM): identidad ya registrada en el maestro, campos
+              protegidos con los valores del maestro (datos "revisados").
+            - Modo B (sugerencia IA fuzzy, sin match): "Quizá este beneficiario
+              es → {nombre} · DNI {dni}" con botón Vincular.
+          El aviso de DNI ≠ DNI de agrupación ya no es banner: es una línea
+          inline bajo el campo DNI (ver `dniInline`), y se oculta con match MDM
+          o caso aprobado. */}
+      {vm.mdmMatch && (
+        <div className="flex flex-col gap-1.5 rounded-lg border border-info/30 bg-info-light px-4 py-3 shadow-sm">
+          <div className="flex items-start gap-3">
+            <UserCheck className="mt-0.5 size-5 shrink-0 text-info-dark" />
+            <div>
+              <h4 className="font-heading text-sm font-bold text-info-dark">
+                Beneficiario ya registrado en MDM
+              </h4>
+              <p className="mt-0.5 font-data text-xs leading-relaxed text-info-dark/90">
+                El DNI <span className="font-bold">{vm.mdmMatch.dni}</span> corresponde a{' '}
+                <span className="font-bold">
+                  {vm.mdmMatch.first_name} {vm.mdmMatch.last_name}
+                </span>
+                , ya inscrito en el registro maestro. La identidad y los familiares
+                (padre/madre) se rellenaron desde el MDM y están bloqueados: al aprobar
+                solo se actualizarán los datos operativos de la actividad. Puedes añadir
+                un tutor adicional.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {!vm.mdmMatch && aiInsightDiscrepancy && (
         <div className="flex flex-col gap-2 rounded-lg border border-purple-200 bg-purple-50 p-4 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -151,52 +181,6 @@ export function CaseCorrectionScreen({
                 Vincular (DNI: {aiInsightDiscrepancy.expected_pattern})
               </Button>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Banner: beneficiario ya registrado en el maestro (MDM) — identidad y
-              familiares bloqueados con los valores del maestro */}
-      {vm.mdmMatch && (
-        <div className="flex flex-col gap-1.5 rounded-lg border border-info/30 bg-info-light px-4 py-3 shadow-sm">
-          <div className="flex items-start gap-3">
-            <UserCheck className="mt-0.5 size-5 shrink-0 text-info-dark" />
-            <div>
-              <h4 className="font-heading text-sm font-bold text-info-dark">
-                Beneficiario ya registrado en MDM
-              </h4>
-              <p className="mt-0.5 font-data text-xs leading-relaxed text-info-dark/90">
-                El DNI <span className="font-bold">{vm.mdmMatch.dni}</span> corresponde a{' '}
-                <span className="font-bold">
-                  {vm.mdmMatch.first_name} {vm.mdmMatch.last_name}
-                </span>
-                , ya inscrito en el registro maestro. Los campos de identidad y los familiares
-                (padre/madre) se rellenaron desde el MDM y están bloqueados: al aprobar solo se
-                actualizarán los datos operativos de la actividad. Puedes añadir un tutor adicional.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Banner: el DNI del beneficiario no coincide con el DNI de agrupación del
-              lote — el revisor corrigió/devinculó el DNI y la agrupación quedó distinta */}
-      {vm.dniGroupMismatch && (
-        <div className="flex flex-col gap-1.5 rounded-lg border border-warning/40 bg-warning-light px-4 py-3 shadow-sm">
-          <div className="flex items-start gap-3">
-            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning-dark" />
-            <div>
-              <h4 className="font-heading text-sm font-bold text-warning-dark">
-                El DNI del beneficiario no coincide con el DNI de agrupación del lote
-              </h4>
-              <p className="mt-0.5 font-data text-xs leading-relaxed text-warning-dark/90">
-                Este expediente fue agrupado con el DNI{' '}
-                <span className="font-bold">{dniReference}</span>, pero el beneficiario ahora registra{' '}
-                <span className="font-bold">{vm.beneficiaryDni || dniReference}</span>. Verifica que el
-                DNI corregido corresponda a la misma persona; si lo guardas así, el expediente quedará
-                vinculado a una agrupación distinta en el lote.
-              </p>
-            </div>
           </div>
         </div>
       )}
@@ -376,6 +360,7 @@ export function CaseCorrectionScreen({
                       fieldRefs={vm.fieldRefs}
                         lockedFieldIds={vm.mdmLockedFieldIds}
                         parentsLocked={Boolean(vm.mdmMatch)}
+                        dniInline={vm.dniInline}
                     />
                   </fieldset>
                 </FormProvider>
