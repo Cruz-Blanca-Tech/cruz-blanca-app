@@ -9,7 +9,7 @@ import type {
   FieldValidation,
 } from '../lib/correction-fields';
 import { CORRECTION_GROUPS, type CorrectionGroup } from '../lib/correction-form';
-import { CaseFieldRow } from './case-field-row';
+import { CaseFieldRow, type DniInlineLine } from './case-field-row';
 
 const GROUP_ICONS: Record<CorrectionGroup, LucideIcon | null> = {
   'Beneficiario': User,
@@ -46,9 +46,10 @@ interface CaseFieldsFormProps {
   parentsLocked?: boolean;
   /**
    * Línea ancla bajo el campo DNI (info con match MDM / warning por agrupación
-   * del lote). Reactiva al valor del DNI; se renderiza solo en la fila del DNI.
+   * del lote, con la acción de un clic que lo resuelve). Reactiva al valor del DNI;
+   * se renderiza solo en la fila del DNI.
    */
-  dniInline?: { kind: 'info' | 'warning'; text: string } | null;
+  dniInline?: DniInlineLine | null;
   /**
    * Verificación MDM en curso para el DNI del beneficiario (debounce de 350ms +
    * fetch): muestra un spinner "Buscando en MDM…" dentro del campo DNI mientras

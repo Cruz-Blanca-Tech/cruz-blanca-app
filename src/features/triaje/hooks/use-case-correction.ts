@@ -222,6 +222,22 @@ export function useCaseCorrection({
     return Boolean(current && group && current !== group);
   }, [watchedDni, dniReference, mdmSnap, isApprovedStatus]);
 
+  /**
+   * Usa el DNI de agrupación del lote como DNI del beneficiario (1 clic).
+   *
+   * Es la acción que acompaña al aviso inline de agrupación: cuando el maestro ya
+   * corrobora ese DNI, el backend además lo propone como sugerencia de IA (tarjeta
+   * morada del beneficiario). Este botón cubre el resto de los casos —incluido el
+   * DNI vacío del expediente— donde la evidencia documental del lote es la única
+   * disponible y el revisor decide usarla.
+   */
+  const useGroupDniAsBeneficiary = useCallback(() => {
+    const group = (dniReference || '').trim().toUpperCase();
+    if (!group) return;
+    form.setValue('beneficiary.dni', group, { shouldValidate: true, shouldDirty: true });
+    toast.success('DNI del beneficiario actualizado con el DNI de agrupación del lote');
+  }, [dniReference, form]);
+
   // Línea ancla bajo el campo DNI (una sola, nunca dos a la vez):
   //   - info (match MDM): "Registrado en MDM como X — identidad desde el maestro
   //     · Cambiar DNI para desvincular". Reactiva al valor del DNI: si el revisor
@@ -244,10 +260,18 @@ export function useCaseCorrection({
       return {
         kind: 'warning' as const,
         text: `Este expediente fue agrupado con el DNI ${dniReference}, pero el beneficiario ahora registra ${current || dniReference}. Verifica la agrupación del lote.`,
+        action: { label: `Usar DNI del lote (${dniReference})`, run: useGroupDniAsBeneficiary },
       };
     }
     return null;
-  }, [isMdmMatching, mdmSnap, dniGroupMismatch, watchedDni, dniReference]);
+  }, [
+    isMdmMatching,
+    mdmSnap,
+    dniGroupMismatch,
+    watchedDni,
+    dniReference,
+    useGroupDniAsBeneficiary,
+  ]);
 
   // Baseline del expediente (dossier tal como vino del backend): se restaura si
   // el revisor desvincula el DNI (el match desaparece).
