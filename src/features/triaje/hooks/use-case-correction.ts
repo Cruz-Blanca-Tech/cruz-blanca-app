@@ -59,11 +59,15 @@ interface UseCaseCorrectionParams {
 export interface AdultAiInsight {
   /** Índice dentro de `related_adults.adults` (mismo orden en form y dossier). */
   adultIndex: number;
-  /** DNI del candidato en el maestro. */
+  /** DNI del candidato (maestro o ficha de un hermano del lote). '' si solo hay teléfono. */
   dni: string;
   /** Nombre del candidato en el maestro (parseado de la descripción). */
   name: string;
   description: string;
+  /** Teléfono sugerido (contacto de emergencia desde el maestro, o desde la ficha de un hermano del lote). */
+  phone?: string;
+  /** Descripción de la sugerencia de teléfono (cuando no hay sugerencia de DNI). */
+  phoneDescription?: string;
 }
 
 /** Valor por dot-path dentro de los valores observados del formulario. */
@@ -367,18 +371,50 @@ export function useCaseCorrection({
     const insights: AdultAiInsight[] = [];
     for (const d of enrichedDiscrepancies) {
       if (d.severity !== 'AI_INSIGHT') continue;
-      const matched = d.field_name?.match(/^related_adults\.adults\[(\d+)\]\.dni$/);
-      if (!matched) continue;
-      const adultIndex = Number(matched[1]);
-      const desc = d.rule_description ?? '';
-      // Formato fijo del backend: "Quizá este adulto es → {nombre} · DNI {dni}."
-      const parsed = desc.match(/Quizá este adulto es → (.+?) · DNI ([0-9]{1,8})/);
-      insights.push({
-        adultIndex,
-        dni: d.expected_pattern ?? '',
-        name: parsed ? parsed[1].trim() : '',
-        description: desc,
-      });
+      const idxMatch = d.field_name?.match(/^related_adults\.adults\[(\d+)\]\.(dni|phone)$/);
+      if (idxMatch) {
+        const adultIndex = Number(idxMatch[1]);
+        const field = idxMatch[2]; // 'dni' | 'phone'
+        const desc = d.rule_description ?? '';
+        // Formato fijo del backend para DNI: "Quizá este adulto es → {nombre} · DNI {dni}."
+        const parsedDni = desc.match(/Quizá este adulto es → (.+?) · DNI ([0-9]{1,8})/);
+        const expectedPhone = d.expected_pattern ?? '';
+        // Aseguramos que solo este campo (dni/phone) quede en esta sugerencia
+        // por índice; si ya existe la insight para ese índice, mergeamos.
+        const existing = insights.find((i) => i.adultIndex === adultIndex);
+        if (field === 'dni') {
+          const base: AdultAiInsight = {
+            adultIndex,
+            dni: d.expected_pattern ?? '',
+            name: parsedDni ? parsedDni[1].trim() : '',
+            description: desc,
+          };
+          if (existing) {
+            existing.dni = base.dni;
+            existing.name = base.name;
+            existing.description = base.description;
+          } else {
+            insights.push(base);
+          }
+        } else if (field === 'phone') {
+          if (existing) {
+            existing.phone = expectedPhone || undefined;
+            existing.phoneDescription = desc;
+          } else {
+            insights.push({
+              adultIndex,
+              dni: '',
+              name: '',
+              description: desc,
+              phone: expectedPhone || undefined,
+              phoneDescription: desc,
+            });
+          }
+        }
+        continue;
+      }
+      // Los AI_INSIGHT agregados (sin índice, p. ej. "related_adults.adults") no
+      // tienen acción por adulto: los excluye el panel y no se muestran aquí.
     }
     return insights.sort((a, b) => a.adultIndex - b.adultIndex);
   }, [enrichedDiscrepancies]);
@@ -398,6 +434,17 @@ export function useCaseCorrection({
       } else {
         toast.success('DNI del adulto actualizado con la sugerencia de IA');
       }
+    },
+    [form]
+  );
+
+  const applyAdultPhone = useCallback(
+    (adultIndex: number, phone: string) => {
+      form.setValue(`adults.${adultIndex}.phone` as `adults.${number}.phone`, phone, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      toast.success('Teléfono del adulto actualizado con la sugerencia de IA');
     },
     [form]
   );
@@ -591,9 +638,10 @@ export function useCaseCorrection({
     validations,
     statuses,
     enrichedDiscrepancies,
-    // Sugerencias IA por adulto (apoderado) + acción Vincular
+    // Sugerencias IA por adulto (apoderado) + acciones Vincular / Aplicar teléfono
     adultAiInsights,
     linkAdult,
+    applyAdultPhone,
     sectionIssues,
     groupIssues,
     onSubmit,

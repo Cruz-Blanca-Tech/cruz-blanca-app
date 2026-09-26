@@ -8,7 +8,7 @@ import {
   Lock,
   Loader2,
   OctagonAlert,
-  RefreshCw, Sparkles, UserCheck, Link as LinkIcon, TriangleAlert,
+  RefreshCw, Sparkles, UserCheck, Link as LinkIcon, TriangleAlert, Phone as PhoneIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -188,22 +188,25 @@ export function CaseCorrectionScreen({
         </div>
       )}
 
-      {/* Sugerencias IA por ADULTO (padre/madre/apoderado): el backend las emite
-          solo cuando el DNI difiere del maestro (DNI idéntico → match MDM
-          touchless, sin sugerencia). "Vincular" corrige el DNI de ese adulto
-          concreto; el teléfono queda editable y actualiza el maestro. */}
+      {/* Sugerencias IA por ADULTO (padre/madre/apoderado). El backend las emite
+          solo cuando el dato de esa ficha NO se pudo resolver con el maestro: DNI
+          distinto (DNI idéntico → match MDM touchless, sin sugerencia) o DNI/teléfono
+          Ausentes. "Vincular" corrige el DNI de ese adulto concreto; "Aplicar
+          teléfono" completa el teléfono (regla de contactos o ficha de un hermano
+          del mismo lote). Ambos usan el maestro/ficha del hermano como fuente. */}
       {vm.adultAiInsights.length > 0 && (
         <div className="flex flex-col gap-3 rounded-lg border border-purple-200 bg-purple-50 p-4 shadow-sm">
           <div className="flex items-start gap-3">
             <Sparkles className="mt-0.5 size-5 shrink-0 text-purple-600" />
             <div>
               <h4 className="font-heading text-sm font-bold text-purple-900">
-                Sugerencias de IA por adulto (posible DNI mal escaneado)
+                Sugerencias de IA por adulto (posible DNI mal escaneado o dato faltante)
               </h4>
               <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
                 El apoderado (padre/madre) podría ya estar registrado en el maestro
-                con otro DNI. Vincular corrige el DNI de ese contacto; su nombre e
-                identidad quedan a cargo del maestro.
+                (o en la ficha de un hermano/a del mismo lote) con otro DNI o un
+                teléfono. Vincular corrige el DNI; Aplicar teléfono completa el dato
+                de contacto. Su nombre e identidad quedan a cargo de la fuente.
               </p>
             </div>
           </div>
@@ -214,18 +217,33 @@ export function CaseCorrectionScreen({
                 className="flex flex-col gap-2 rounded-md border border-purple-200 bg-white/80 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 <p className="font-data text-xs leading-relaxed text-purple-900">
-                  {s.description}
+                  {s.description || s.phoneDescription}
                 </p>
                 {caseActions.canEdit && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
-                    onClick={() => vm.linkAdult(s.adultIndex, s.dni, s.name || undefined)}
-                  >
-                    <LinkIcon className="mr-2 size-4" />
-                    Vincular (DNI: {s.dni})
-                  </Button>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {s.dni && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                        onClick={() => vm.linkAdult(s.adultIndex, s.dni, s.name || undefined)}
+                      >
+                        <LinkIcon className="mr-2 size-4" />
+                        Vincular (DNI: {s.dni})
+                      </Button>
+                    )}
+                    {s.phone && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                        onClick={() => vm.applyAdultPhone(s.adultIndex, s.phone as string)}
+                      >
+                        <PhoneIcon className="mr-2 size-4" />
+                        Aplicar teléfono ({s.phone})
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
