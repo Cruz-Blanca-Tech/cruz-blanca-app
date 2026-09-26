@@ -128,17 +128,13 @@ export function useCaseCorrection({
   // Inicializa el formulario una sola vez por expediente (evita clobber en
   // refetches de foco). Tras guardar, el reset se hace explícito en onSuccess.
   const initializedCaseId = useRef<string | null>(null);
-  const lastUpdatedAt = useRef<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [replaceDocTarget, setReplaceDocTarget] = useState<{ code: string; name: string; skipOcr?: boolean } | null>(null);
 
   useEffect(() => {
-    if (caseData) {
-      if (initializedCaseId.current !== caseId || lastUpdatedAt.current !== (caseData as any).updated_at) {
-        form.reset(dossierToFormValues(caseData.dossier_data));
-        initializedCaseId.current = caseId;
-        lastUpdatedAt.current = (caseData as any).updated_at;
-      }
+    if (caseData && initializedCaseId.current !== caseId) {
+      form.reset(dossierToFormValues(caseData.dossier_data));
+      initializedCaseId.current = caseId;
     }
   }, [caseData, caseId, form]);
 
@@ -164,11 +160,11 @@ export function useCaseCorrection({
   const [lookupDni, setLookupDni] = useState('');
   useEffect(() => {
     const trimmed = (watchedDni || '').trim();
-    if (!isValidDni(trimmed)) {
-      setLookupDni('');
-      return;
-    }
-    const timer = setTimeout(() => setLookupDni(trimmed), 350);
+    const timer = setTimeout(() => {
+      // Limpia el lookup cuando el DNI deja de ser válido (evita consultar el
+      // último DNI válido) y lo actualiza con debounce en caso contrario.
+      setLookupDni(isValidDni(trimmed) ? trimmed : '');
+    }, 350);
     return () => clearTimeout(timer);
   }, [watchedDni]);
   const mdmQuery = useMdmBeneficiaryMatch(lookupDni);
