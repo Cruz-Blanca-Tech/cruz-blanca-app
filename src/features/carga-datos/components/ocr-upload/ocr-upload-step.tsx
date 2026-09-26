@@ -117,13 +117,17 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   const documentsLoading =
     hasActivity && (activities.isLoading || documentCatalog.isLoading);
 
-  // Si se resetea la actividad o se pierde, regresar a 'config'
-  useEffect(() => {
-    if (!hasActivity && subStep === 'upload') {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Si se resetea la actividad o se pierde, regresar a 'config'. Se ajusta el
+  // estado durante el render (patrón React) en lugar de un useEffect con
+  // setState síncrono (regla react-hooks/set-state-in-effect).
+  const [lastJumpFlag, setLastJumpFlag] = useState<boolean | null>(null);
+  const shouldJumpToConfig = !hasActivity && subStep === 'upload';
+  if (shouldJumpToConfig !== lastJumpFlag) {
+    setLastJumpFlag(shouldJumpToConfig);
+    if (shouldJumpToConfig) {
       setSubStep('config');
     }
-  }, [hasActivity, subStep]);
+  }
 
   const fileValidation = useBatchFileValidation(files, documents);
 
