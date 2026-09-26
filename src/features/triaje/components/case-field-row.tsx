@@ -82,6 +82,21 @@ const STATUS_META: Record<FieldStatus, StatusMeta> = {
 
 const fieldName = (name: string) => name as FieldPath<CorrectionFormValues>;
 
+/**
+ * Línea ancla de nivel info/advertencia bajo el campo DNI (única, reactiva):
+ *   - info: "Registrado en MDM como X — identidad desde el maestro..." cuando el
+ *     DNI del formulario tiene match MDM;
+ *   - warning: agrupación del lote con DNI distinto (sin match MDM y caso
+ *     editable), en sustitución del antiguo banner.
+ *
+ * `action` es el atajo de un clic que resuelve el aviso (ej. "Usar DNI del lote").
+ */
+export interface DniInlineLine {
+  kind: 'info' | 'warning';
+  text: string;
+  action?: { label: string; run: () => void };
+}
+
 interface CaseFieldRowProps {
   field: CorrectionFieldDescriptor;
   status: FieldStatus;
@@ -98,13 +113,11 @@ interface CaseFieldRowProps {
   /** Match MDM: bloquea las filas padre/madre del editor de adultos. */
   parentsLocked?: boolean;
   /**
-   * Línea ancla de nivel info/advertencia bajo el campo DNI (única, reactiva):
-   *   - info: "Registrado en MDM como X — identidad desde el maestro..." cuando
-   *     el DNI del formulario tiene match MDM;
-   *   - warning: agrupación del lote con DNI distinto (sin match MDM y caso
-   *     editable), en sustitución del antiguo banner.
+   * Línea ancla bajo el campo DNI. El botón de la acción hereda el `disabled` del
+   * fieldset que envuelve al formulario, así que en un expediente cerrado no se
+   * puede usar.
    */
-  dniInline?: { kind: 'info' | 'warning'; text: string } | null;
+  dniInline?: DniInlineLine | null;
   /**
    * Verificación MDM en curso del DNI del beneficiario: muestra un spinner sutil
    * "Buscando en MDM…" dentro del campo (debounce de 350ms + fetch) para que el
@@ -391,6 +404,15 @@ export function CaseFieldRow({
           >
             {dniInline.text}
           </span>
+          {dniInline.action && (
+            <button
+              type="button"
+              onClick={dniInline.action.run}
+              className="ml-auto shrink-0 self-center rounded-sm border border-warning/40 bg-white px-1.5 py-0.5 font-sans text-[10.5px] font-semibold text-warning-dark transition-colors hover:bg-warning-light disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {dniInline.action.label}
+            </button>
+          )}
         </div>
       )}
 
