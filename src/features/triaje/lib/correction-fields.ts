@@ -247,6 +247,9 @@ export function buildCorrectionFields(
       matchDocCodes: ['DNIBE'],
     },
     {
+      // DATO DEL MAESTRO: con el DNI ya registrado, el valor se rellena con el del
+      // MDM y el campo se bloquea (`mdmLockedFieldIds`); solo queda editable si el
+      // maestro no tiene fecha, para poder completarla.
       id: 'beneficiary.birth_date',
       name: 'beneficiary.birth_date',
       label: 'Fecha de nacimiento',
