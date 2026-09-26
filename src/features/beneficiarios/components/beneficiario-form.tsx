@@ -267,21 +267,7 @@ export function BeneficiarioForm({ initialData: rawInitialData, isEdit }: Benefi
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="birth_date">Fecha de nac. *</Label>
-                  <Input
-                    id="birth_date"
-                    type="date"
-                    // Dato del maestro: se carga una sola vez (en el alta) y después
-                    // no se puede modificar. `readOnly` en vez de `disabled` para que
-                    // el valor siga viajando en el payload.
-                    readOnly={isEdit}
-                    className={isEdit ? 'opacity-70' : undefined}
-                    {...register('birth_date')}
-                  />
-                  {isEdit && (
-                    <p className="text-xs text-muted-foreground">
-                      La fecha de nacimiento viene del dato máster y no se modifica.
-                    </p>
-                  )}
+                  <Input id="birth_date" type="date" {...register('birth_date')} />
                   {errors.birth_date && (
                     <p className="text-xs font-medium text-destructive">{errors.birth_date.message}</p>
                   )}

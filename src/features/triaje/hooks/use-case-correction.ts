@@ -289,11 +289,12 @@ export function useCaseCorrection({
       mdmAppliedRef.current = true;
       form.setValue('beneficiary.first_name', snap.first_name, { shouldDirty: true });
       form.setValue('beneficiary.last_name', snap.last_name, { shouldDirty: true });
-      // La fecha de nacimiento es DATO DEL MAESTRO y no se edita: si el maestro
-      // tiene fecha, manda la suya. Si NO tiene, no se pisa la de la ficha (el
-      // campo queda editable — ver `mdmLockedFieldIds` — para que el revisor pueda
-      // completarla: hay un ERROR de completitud que si no haría el caso
-      // inaprobable).
+      // La fecha de nacimiento es DATO DEL MAESTRO: si el maestro tiene fecha,
+      // manda la suya y el campo queda bloqueado (ver `mdmLockedFieldIds`). Si
+      // está mal, se corrige en MDM (/beneficiarios), nunca desde acá. Si el
+      // maestro NO tiene, no se pisa la de la ficha y el campo queda editable
+      // para que el revisor la complete (si no, el ERROR de completitud haría el
+      // caso inaprobable).
       if (snap.birth_date) {
         form.setValue('beneficiary.birth_date', snap.birth_date, { shouldDirty: true });
       }
@@ -370,8 +371,8 @@ export function useCaseCorrection({
     ]);
     // La fecha de nacimiento se bloquea SOLO si el maestro la tiene. Sin fecha en el
     // maestro, bloquear en vacío dejaría el caso con el ERROR "fecha obligatoria"
-    // sin forma de resolverlo; se deja editable y al aprobar se completa la del
-    // maestro (el backend nunca pisa una fecha ya cargada).
+    // sin forma de resolverlo; se deja editable y al aprobar se carga en el maestro
+    // (que solo se completa si estaba vacía: una fecha ya existente no se pisa).
     if (mdmSnap.birth_date) locked.add('beneficiary.birth_date');
     return locked;
   }, [mdmSnap]);
