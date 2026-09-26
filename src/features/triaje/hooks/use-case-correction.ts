@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -47,6 +47,23 @@ interface UseCaseCorrectionParams {
   batchId: string;
   caseId: string;
   dniReference: string;
+}
+
+/** Sugerencia IA no-bloqueante para un adulto/apoderado del expediente.
+ *
+ * El backend la emite con `field_name = "related_adults.adults[i].dni"` (índice
+ * del adulto dentro de dossier_data) cuando el DNI difiere del maestro pero el
+ * nombre coincide (probable DNI mal escaneado). El botón "Vincular" corrige el
+ * DNI de ESE adulto; la identidad (nombre) queda a cargo del maestro.
+ */
+export interface AdultAiInsight {
+  /** Índice dentro de `related_adults.adults` (mismo orden en form y dossier). */
+  adultIndex: number;
+  /** DNI del candidato en el maestro. */
+  dni: string;
+  /** Nombre del candidato en el maestro (parseado de la descripción). */
+  name: string;
+  description: string;
 }
 
 /** Valor por dot-path dentro de los valores observados del formulario. */
@@ -342,6 +359,49 @@ export function useCaseCorrection({
     [discrepancies, descriptors]
   );
 
+  // Sugerencias IA para ADULTOS (padre/madre/apoderado): el backend emite
+  // `related_adults.adults[i].dni` solo cuando el DNI de la ficha NO existe en el
+  // maestro (DNI idéntico → match MDM touchless, no se sugiere nada). Son
+  // no-bloqueantes; el botón "Vincular" corrige el DNI de ese adulto concreto.
+  const adultAiInsights = useMemo<AdultAiInsight[]>(() => {
+    const insights: AdultAiInsight[] = [];
+    for (const d of enrichedDiscrepancies) {
+      if (d.severity !== 'AI_INSIGHT') continue;
+      const matched = d.field_name?.match(/^related_adults\.adults\[(\d+)\]\.dni$/);
+      if (!matched) continue;
+      const adultIndex = Number(matched[1]);
+      const desc = d.rule_description ?? '';
+      // Formato fijo del backend: "Quizá este adulto es → {nombre} · DNI {dni}."
+      const parsed = desc.match(/Quizá este adulto es → (.+?) · DNI ([0-9]{1,8})/);
+      insights.push({
+        adultIndex,
+        dni: d.expected_pattern ?? '',
+        name: parsed ? parsed[1].trim() : '',
+        description: desc,
+      });
+    }
+    return insights.sort((a, b) => a.adultIndex - b.adultIndex);
+  }, [enrichedDiscrepancies]);
+
+  /** Corrige el DNI (y el nombre de maestro si viene) del adulto i-ésimo del form. */
+  const linkAdult = useCallback(
+    (adultIndex: number, dni: string, name?: string) => {
+      form.setValue(`adults.${adultIndex}.dni` as `adults.${number}.dni`, dni, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      if (name) {
+        form.setValue(`adults.${adultIndex}.full_name` as `adults.${number}.full_name`, name, {
+          shouldDirty: true,
+        });
+        toast.success('Adulto vinculado: DNI y nombre actualizados con el maestro');
+      } else {
+        toast.success('DNI del adulto actualizado con la sugerencia de IA');
+      }
+    },
+    [form]
+  );
+
   const sectionIssues = useMemo<SectionIssue[]>(() => {
     if (!caseData) return [];
     const dd = caseData.dossier_data;
@@ -531,6 +591,9 @@ export function useCaseCorrection({
     validations,
     statuses,
     enrichedDiscrepancies,
+    // Sugerencias IA por adulto (apoderado) + acción Vincular
+    adultAiInsights,
+    linkAdult,
     sectionIssues,
     groupIssues,
     onSubmit,
