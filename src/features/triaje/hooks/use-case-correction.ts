@@ -289,7 +289,14 @@ export function useCaseCorrection({
       mdmAppliedRef.current = true;
       form.setValue('beneficiary.first_name', snap.first_name, { shouldDirty: true });
       form.setValue('beneficiary.last_name', snap.last_name, { shouldDirty: true });
-      form.setValue('beneficiary.birth_date', snap.birth_date ?? '', { shouldDirty: true });
+      // La fecha de nacimiento es DATO DEL MAESTRO y no se edita: si el maestro
+      // tiene fecha, manda la suya. Si NO tiene, no se pisa la de la ficha (el
+      // campo queda editable — ver `mdmLockedFieldIds` — para que el revisor pueda
+      // completarla: hay un ERROR de completitud que si no haría el caso
+      // inaprobable).
+      if (snap.birth_date) {
+        form.setValue('beneficiary.birth_date', snap.birth_date, { shouldDirty: true });
+      }
       form.setValue('beneficiary.gender', mdmGenderToForm(snap.gender), { shouldDirty: true });
       form.setValue('beneficiary.address', snap.address ?? '', { shouldDirty: true });
       // Padre/madre (por rol): misma persona → datos del maestro.
@@ -347,10 +354,9 @@ export function useCaseCorrection({
     if (!mdmSnap) return null;
     // No se bloquea `beneficiary.dni` (llave de desvinculación) ni los tutores
     // (rol OTHER sigue siendo editable/agregable desde el triaje).
-    return new Set<string>([
+    const locked = new Set<string>([
       'beneficiary.first_name',
       'beneficiary.last_name',
-      'beneficiary.birth_date',
       'beneficiary.gender',
       'beneficiary.address',
       'padre.full_name',
@@ -362,6 +368,12 @@ export function useCaseCorrection({
       'madre.phone',
       'madre.empty',
     ]);
+    // La fecha de nacimiento se bloquea SOLO si el maestro la tiene. Sin fecha en el
+    // maestro, bloquear en vacío dejaría el caso con el ERROR "fecha obligatoria"
+    // sin forma de resolverlo; se deja editable y al aprobar se completa la del
+    // maestro (el backend nunca pisa una fecha ya cargada).
+    if (mdmSnap.birth_date) locked.add('beneficiary.birth_date');
+    return locked;
   }, [mdmSnap]);
 
   const validations = useMemo(() => {
