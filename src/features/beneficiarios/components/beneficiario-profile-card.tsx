@@ -447,19 +447,10 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
                 </>
               </FieldSlot>
 
-              {/* Fecha Nacimiento — dato del maestro, inmutable tras el alta: solo
-                  editable en el ALTA (isCreate), nunca al editar el beneficiario. */}
-              <FieldSlot label="Fecha de Nacimiento" required={isCreate} editing={isCreate}
-                view={
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{b?.birth_date || '—'}</p>
-                    {!isCreate && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Proviene del dato máster y no se modifica.
-                      </p>
-                    )}
-                  </div>
-                }>
+              {/* Fecha Nacimiento — el MDM es su dueño: aquí se corrige si está mal.
+                  El triaje no la toca (ver `useMdmBeneficiaryMatch`). */}
+              <FieldSlot label="Fecha de Nacimiento" required={isEditing('personal')} editing={isEditing('personal')}
+                view={<p className="text-sm font-medium">{b?.birth_date || '—'}</p>}>
                 <>
                   <Input type="date" {...register('birth_date')} />
                   {errors.birth_date && <p className="text-xs text-destructive mt-1">{errors.birth_date.message}</p>}
