@@ -90,14 +90,21 @@ export function CustomDrivePickerModal({
     return () => clearTimeout(timer);
   }, [searchQuery, currentFolder.id, isOpen, token, fetchContent]);
 
-  useEffect(() => {
-    if (isOpen && token) {
+  // Reset del estado local al abrir el modal. En lugar de un useEffect con
+  // setState síncrono (regla react-hooks/set-state-in-effect), se ajusta el
+  // estado durante el render comparando con la última apertura (patrón React:
+  // "adjusting state when a prop changes").
+  const [lastOpenKey, setLastOpenKey] = useState<string | null>(null);
+  const openKey = isOpen && token ? `open:${token}` : 'closed';
+  if (openKey !== lastOpenKey) {
+    setLastOpenKey(openKey);
+    if (openKey !== 'closed') {
       setHistory([{ id: 'app_root', name: 'Google Drive' }]);
       setSelectedIds(new Set());
       setSearchQuery('');
       setFiles(ROOT_NODES);
     }
-  }, [isOpen, token]);
+  }
 
   const handleFolderClick = (folder: DriveFile) => {
     if (loading) return;

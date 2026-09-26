@@ -63,17 +63,17 @@ export function MultiSelectCreatable({
       )}
 
       {/* Input Control */}
-      <CreatableSelect
+      <CreatableSelect<Option, true>
         instanceId={instanceId}
         isMulti
         controlShouldRenderValue={false} // Don't render tags inside the input
         placeholder={placeholder}
-        options={options as any}
+        options={options}
         value={[]} // Always empty so it doesn't show selected items inside
-        onChange={(newValue: any, actionMeta: any) => {
+        onChange={(newValue, actionMeta) => {
           if (actionMeta.action === 'select-option' || actionMeta.action === 'create-option') {
-            const addedValues = newValue.map((v: any) => v.value);
-            const newUniqueValues = addedValues.filter((v: any) => !value.includes(v));
+            const addedValues = newValue.map((v) => v.value);
+            const newUniqueValues = addedValues.filter((v) => !value.includes(v));
             if (newUniqueValues.length > 0) {
               onChange([...value, ...newUniqueValues]);
             }

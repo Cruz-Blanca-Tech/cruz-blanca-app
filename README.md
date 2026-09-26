@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# cruz-blanca-app — Frontend (Next.js) de Cruz Blanca
 
-## Getting Started
+Aplicación web del sistema de gestión documental de la Asociación Cruz Blanca
+(proyecto de tesis). Consume el backend (FastAPI, repo `backend-api`) y cubre
+los flujos de **carga de lotes + OCR**, **triaje y corrección manual** de
+expedientes y la gestión/monitoreo del maestro de beneficiarios (MDM).
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+ (el Dockerfile usa `node:20-alpine`)
+- Backend corriendo localmente (`backend-api`) o una URL base remota
+
+## Puesta en marcha local
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+La URL del backend se configura por variable de entorno
+(`NEXT_PUBLIC_BACKEND_BASE_URL`; en local el frontend usa un proxy
+`/api/proxy` hacia el backend) y se inyecta como build-arg en el despliegue.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Script | Descripción |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción (Next.js) |
+| `npm run start` | Servir el build de producción |
+| `npm run lint` | ESLint (debe dar 0 errores; los warnings no bloquean) |
+| `npm run typecheck` | `tsc --noEmit` (typecheck estricto) |
 
-To learn more about Next.js, take a look at the following resources:
+## Módulos principales
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **`src/features/triaje`** — pantalla de corrección de expedientes EDUCA:
+  match con el maestro (MDM) al escribir el DNI (spinner "Buscando en MDM…"),
+  campos de identidad protegidos ante match, sección de sugerencias IA
+  (AI_INSIGHT) y banners de agrupación/errores. Los endpoints están en
+  `src/features/triaje/services/*`.
+- **`src/features/carga-datos`** — subida de lotes desde Google Drive y OCR.
+- **`src/shared` / `src/components/ui`** — infraestructura compartida
+  (cliente API, parseo zod, hooks) y kit de UI.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Despliegue y automatización
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **CI** (`.github/workflows/ca-cruzblanca-frontend-AutoDeployTrigger.yml`):
+  job `quality` (`typecheck` + `lint`) + job `build-and-deploy` (Docker →
+  Azure Container Apps `ca-cruzblanca-frontend`).
+- **Flujo de ramas**: `feat/*` → PR a `develop` → PR a `master`; el push a
+  `main`/`master` dispara el deploy automático.
