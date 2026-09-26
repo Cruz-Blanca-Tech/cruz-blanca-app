@@ -85,7 +85,14 @@ export function CaseValidationPanel({
   // Separación por severidad: el panel ya no mezcla todo. Las SUGERENCIAS IA
   // viven en una sección propia colapsable (con contador) para no "bombardear"
   // al revisor; errores/advertencias + observaciones quedan en la lista principal.
-  const aiInsights = discrepancies.filter((d) => d.severity === 'AI_INSIGHT');
+  const aiInsights = discrepancies.filter(
+    (d) =>
+      d.severity === 'AI_INSIGHT' &&
+      // Los AI_INSIGHT de ADULTO viven en la tarjeta de sugerencia con botón
+      // "Vincular" (pantalla de corrección); se excluyen del listado para no
+      // duplicar información sin acción.
+      !d.field_name?.startsWith('related_adults.adults')
+  );
   const hardDiscrepancies = discrepancies.filter((d) => d.severity !== 'AI_INSIGHT');
   const observations = hardDiscrepancies.length + sectionIssues.length;
 
