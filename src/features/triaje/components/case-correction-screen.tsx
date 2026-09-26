@@ -188,6 +188,51 @@ export function CaseCorrectionScreen({
         </div>
       )}
 
+      {/* Sugerencias IA por ADULTO (padre/madre/apoderado): el backend las emite
+          solo cuando el DNI difiere del maestro (DNI idéntico → match MDM
+          touchless, sin sugerencia). "Vincular" corrige el DNI de ese adulto
+          concreto; el teléfono queda editable y actualiza el maestro. */}
+      {vm.adultAiInsights.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-purple-200 bg-purple-50 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Sparkles className="mt-0.5 size-5 shrink-0 text-purple-600" />
+            <div>
+              <h4 className="font-heading text-sm font-bold text-purple-900">
+                Sugerencias de IA por adulto (posible DNI mal escaneado)
+              </h4>
+              <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
+                El apoderado (padre/madre) podría ya estar registrado en el maestro
+                con otro DNI. Vincular corrige el DNI de ese contacto; su nombre e
+                identidad quedan a cargo del maestro.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            {vm.adultAiInsights.map((s) => (
+              <div
+                key={s.adultIndex}
+                className="flex flex-col gap-2 rounded-md border border-purple-200 bg-white/80 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+              >
+                <p className="font-data text-xs leading-relaxed text-purple-900">
+                  {s.description}
+                </p>
+                {caseActions.canEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                    onClick={() => vm.linkAdult(s.adultIndex, s.dni, s.name || undefined)}
+                  >
+                    <LinkIcon className="mr-2 size-4" />
+                    Vincular (DNI: {s.dni})
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <CaseValidationPanel
         statuses={vm.statuses}
         discrepancies={vm.enrichedDiscrepancies}

@@ -247,8 +247,8 @@ export function AdultsListControl({
                 name={`adults.${index}.phone`}
                 render={({ field: rhf }) => (
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-sans text-[10.5px] font-semibold text-ink-secondary">Teléfono</label>
-                    <Input {...rhf} disabled={rowLocked} placeholder="Ej. 987654321" className="h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20" />
+                    <label className="flex items-center gap-1 font-sans text-[10.5px] font-semibold text-ink-secondary">Teléfono {rowLocked && (<span className="font-normal normal-case text-info-dark">(editable — actualiza el maestro)</span>)}</label>
+                    <Input {...rhf} placeholder="Ej. 987654321" className="h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20" />
                   </div>
                 )}
               />
