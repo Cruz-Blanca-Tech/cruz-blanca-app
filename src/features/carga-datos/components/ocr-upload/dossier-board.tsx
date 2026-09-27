@@ -439,9 +439,6 @@ export function DossierBoard({
         item={viewer?.item ?? null}
         presetKey={viewer?.presetKey}
         presetCode={viewer?.presetCode}
-        // Con clave ya decidida (archivo de un expediente, o hueco que se está
-        // completando) no tiene sentido ofrecer cambiar de expediente.
-        lockKey={Boolean(viewer?.presetKey) || Boolean(viewer?.item.dni)}
         knownKeys={knownKeys}
         codes={allCodes}
         codeNames={codeNames}
