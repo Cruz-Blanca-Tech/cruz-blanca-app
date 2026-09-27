@@ -1,21 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ArrowLeft,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  Info,
-  Loader2,
-  ScanLine,
-  Upload,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Info, Loader2, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -37,11 +27,14 @@ import type {
 
 import { ExpectedDocuments } from './expected-documents';
 import { GoogleDrivePicker } from './google-drive-picker';
-import { FileValidationPreview } from './file-validation-preview';
+import { DossierBoard } from './dossier-board';
 import { FileNamingHelp } from './file-naming-help';
 import { OcrHelpNote } from './ocr-help-note';
 import { ProgramActivityStep } from './program-activity-step';
-import { useBatchFileValidation } from '../../hooks/use-batch-file-validation';
+import {
+  composeFileName,
+  useBatchFileValidation,
+} from '../../hooks/use-batch-file-validation';
 
 interface OcrUploadStepProps {
   /**
@@ -55,27 +48,75 @@ interface OcrUploadStepProps {
 export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   const selectedProgramId = useCargaDatosStore((s) => s.selectedProgramId);
   const selectedActivityId = useCargaDatosStore((s) => s.selectedActivityId);
+  const files = useCargaDatosStore((s) => s.pickedFiles);
+  const originalNames = useCargaDatosStore((s) => s.originalNames);
+  const addPickedFiles = useCargaDatosStore((s) => s.addPickedFiles);
+  const renamePickedFile = useCargaDatosStore((s) => s.renamePickedFile);
+  const removePickedFile = useCargaDatosStore((s) => s.removePickedFile);
 
   // Subfase interna: 'config' (Programa y Actividad) | 'upload' (Subida de archivos y Lote)
   const [subStep, setSubStep] = useState<'config' | 'upload'>('config');
-  const [showGuideInUpload, setShowGuideInUpload] = useState(false);
 
-  const [files, setFiles] = useState<PickedFile[]>([]);
   const [description, setDescription] = useState('');
   const createBatch = useCreateBatch();
 
-  const handlePick = useCallback((picked: PickedFile[]) => {
-    // Fusiona y deduplica por source_id (el Picker puede reabrirse varias veces).
-    setFiles((prev) => {
-      const bySourceId = new Map(prev.map((f) => [f.source_id, f]));
-      for (const file of picked) bySourceId.set(file.source_id, file);
-      return Array.from(bySourceId.values());
-    });
-  }, []);
+  const handlePick = useCallback(
+    (picked: PickedFile[]) => addPickedFiles(picked),
+    [addPickedFiles]
+  );
 
-  const handleRemove = useCallback((sourceId: string) => {
-    setFiles((prev) => prev.filter((f) => f.source_id !== sourceId));
-  }, []);
+  const handleRemove = useCallback(
+    (sourceId: string) => removePickedFile(sourceId),
+    [removePickedFile]
+  );
+
+  /**
+   * Coloca un archivo en un expediente con un tipo de documento.
+   *
+   * Solo se cambia el `file_name`, que es de donde el backend saca la clave de
+   * agrupación y el código (`RawFileMapper` toma el nombre tal cual viene del
+   * cliente; los bytes se bajan por `source_id`). El archivo no se renombra en
+   * Drive: el nombre que importa es el que tiene dentro del sistema.
+   */
+  const handleAssign = useCallback(
+    (sourceId: string, key: string, code: string) => {
+      const current = files.find((f) => f.source_id === sourceId);
+      if (!current) return false;
+      const nextName = composeFileName(key, code, current.file_name);
+      if (nextName === current.file_name) return false;
+      renamePickedFile(sourceId, nextName);
+      return true;
+    },
+    [files, renamePickedFile]
+  );
+
+  /**
+   * Si el archivo tiene un nombre al cual volver, distinto del actual.
+   *
+   * Es la condición para que un intercambio sea posible: si el nombre original
+   * ya es el nombre asignado (el archivo venía de Drive bien nombrado), no hay
+   * a qué deshacer el renombrado, y el archivo no quedaría sin destino.
+   */
+  const handleCanUnassign = useCallback(
+    (sourceId: string) => {
+      const original = originalNames[sourceId];
+      const current = files.find((f) => f.source_id === sourceId);
+      return Boolean(original && current && original !== current.file_name);
+    },
+    [files, originalNames]
+  );
+
+  /** Devuelve un archivo a la bandeja restaurando el nombre que tenía en Drive. */
+  const handleUnassign = useCallback(
+    (sourceId: string) => {
+      const original = originalNames[sourceId];
+      const current = files.find((f) => f.source_id === sourceId);
+      if (!original || !current || original === current.file_name) return false;
+      renamePickedFile(sourceId, original);
+      return true;
+    },
+    [files, originalNames, renamePickedFile]
+  );
 
   const programs = usePrograms();
   const activities = useActivities(
@@ -128,14 +169,8 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
     }
   }
 
-  const fileValidation = useBatchFileValidation(files, documents);
 
-  const handleDiscardInvalid = useCallback(() => {
-    const validSourceIds = new Set(
-      fileValidation.validFiles.map((v) => v.file.source_id)
-    );
-    setFiles((prev) => prev.filter((f) => validSourceIds.has(f.source_id)));
-  }, [fileValidation.validFiles]);
+  const fileValidation = useBatchFileValidation(files, documents);
 
   // Validación centralizada del Paso 1: programa/actividad (store), archivos
   // (picker) y descripción (local) se validan con un único schema Zod.
@@ -145,10 +180,11 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
     description,
   });
   // El bloqueo por expedientes incompletos es deliberado y se queda: es el
-  // control de calidad de la carga. El operador ve qué documento falta (chip
-  // ✗) y tiene dos salidas limpias — subirlo, o quitar el expediente entero
-  // con la ✕ y seguir sin él. Subir un lote con expedientes a medias solo
-  // produce casos que hay que reparar después.
+  // control de calidad de la carga. El operador ve exactamente qué documento
+  // falta (el hueco `✗` del tablero) y tiene tres salidas limpias — arrastrarle
+  // un archivo, elegirlo con un clic, o quitar el expediente entero con la ✕ y
+  // seguir sin él. Subir un lote con expedientes a medias solo produce casos
+  // que hay que reparar después.
   //
   // El backend tampoco aborta el lote (nunca lo hizo bien: tumbaba a los
   // expedientes completos junto con el incompleto), pero marca el incompleto
@@ -174,20 +210,10 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
       return;
     }
 
-    if (fileValidation.hasInvalidFiles) {
-      toast.info(
-        `Se enviarán ${fileValidation.validCount} archivo(s) válidos (${fileValidation.invalidCount} inválido(s) ignorados).`
-      );
-    }
-
-    // Nota: `canProceed` exige `!hasIncompleteDossiers`, así que un lote con
-    // expedientes incompletos nunca llega acá. Antes había un toast que lo
-    // decía ("se procesarán y podrás anexar los faltantes en Triaje") pero
-    // era inalcanzable y además mentía: el backend ya no deja pasar un
-    // expediente incompleto, lo deja en triaje pidiendo el documento que
-    // falta.
-
-    // Enviamos únicamente los archivos válidos al backend para proteger la extracción
+    // Enviamos únicamente los archivos válidos al backend para proteger la
+    // extracción. Los que están en la bandeja sin destino NO se avisan acá con
+    // un toast: la bandeja es permanente y visible en la misma pantalla, así
+    // que el conteo no se pierde a los cuatro segundos.
     const payload = {
       ...validation.data,
       files: fileValidation.validFiles.map((v) => v.file),
@@ -216,265 +242,261 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6 overflow-y-auto custom-scrollbar">
-      <header className="flex flex-col gap-1">
-        <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-          Nueva Digitalización
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Carga una ficha escaneada para extraer sus datos automáticamente.
-        </p>
-      </header>
-
-      <Card className="mx-auto w-full max-w-3xl">
-        <CardContent className="flex flex-col gap-5 pt-6">
-          {subStep === 'config' ? (
-            /* FASE 1: Selección de Programa y Actividad + Requisitos */
-            <div className="flex flex-col gap-5">
-              <div className="flex items-center justify-between border-b border-border pb-4">
+    <div className="flex flex-1 flex-col overflow-y-auto custom-scrollbar">
+      <div className="flex-1 px-6 py-5">
+        <Card className="mx-auto w-full max-w-5xl">
+          <CardContent className="flex flex-col gap-5 pt-6">
+            {subStep === 'config' ? (
+              /* FASE 1: Selección de Programa y Actividad + Requisitos */
+              <div className="flex flex-col gap-5">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                     1
                   </span>
                   <div>
-                    <h2 className="font-heading text-base font-semibold text-foreground">
-                      Destino de la Digitalización
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      Selecciona a qué programa y actividad pertenecen los documentos antes de subirlos.
+                    <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
+                      Nueva Digitalización
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                      Escaneá los documentos, revisá cómo se agruparon y
+                      extraemos los datos de cada ficha.
                     </p>
                   </div>
                 </div>
-                <Badge variant="outline" className="font-mono text-xs">
-                  Paso 1 de 2
-                </Badge>
-              </div>
 
-              <ProgramActivityStep />
+                <ProgramActivityStep />
 
-              {hasActivity ? (
-                <div className="flex flex-col gap-5 pt-2">
-                  <ExpectedDocuments
-                    documents={documents}
-                    programLabel={programLabel}
-                    activityLabel={activity?.name}
-                    hasActivity={hasActivity}
-                    isLoading={documentsLoading}
-                  />
+                {hasActivity ? (
+                  <div className="flex flex-col gap-5 pt-2">
+                    <ExpectedDocuments
+                      documents={documents}
+                      programLabel={programLabel}
+                      activityLabel={activity?.name}
+                      hasActivity={hasActivity}
+                      isLoading={documentsLoading}
+                    />
 
-                  <FileNamingHelp documents={documents} />
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-slate-50 px-4.5 py-6">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
-                    <Info className="size-4.5" />
+                    <FileNamingHelp documents={documents} />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Selecciona un programa y actividad
-                    </p>
-                    <p className="mt-0.5 font-data text-xs text-muted-foreground">
-                      Al elegir la actividad podrás ver los documentos requeridos y la convención de nombres para tus archivos.
-                    </p>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-slate-50 px-4.5 py-6">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                      <Info className="size-4.5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Selecciona un programa y actividad
+                      </p>
+                      <p className="mt-0.5 font-data text-xs text-muted-foreground">
+                        Al elegir la actividad vas a ver qué documentos hay que
+                        subir y cómo se nombran.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <footer className="flex items-center justify-between gap-3 border-t border-border pt-4">
-                <Button variant="ghost" size="sm" disabled>
-                  <ArrowLeft className="size-4 mr-1" />
-                  Anterior
-                </Button>
-
-                <div className="flex items-center gap-3">
-                  {!hasActivity && (
-                    <span className="hidden font-data text-xs text-muted-foreground sm:inline">
-                      Selecciona el programa y la actividad para continuar
-                    </span>
-                  )}
-                  <Button
-                    size="lg"
-                    disabled={!hasActivity || documentsLoading}
-                    onClick={() => setSubStep('upload')}
-                  >
-                    Continuar a Subir Archivos
-                    <ArrowRight className="size-4 ml-1" />
+                <footer className="flex items-center justify-between gap-3 border-t border-border pt-4">
+                  <Button variant="ghost" size="sm" disabled>
+                    <ArrowLeft className="size-4 mr-1" />
+                    Anterior
                   </Button>
-                </div>
-              </footer>
-            </div>
-          ) : (
-            /* FASE 2: Subida de Archivos y Confirmación del Lote */
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-4 border-b border-border pb-4">
-                <div className="flex items-center justify-between">
+
+                  <div className="flex items-center gap-3">
+                    {!hasActivity && (
+                      <span className="hidden font-data text-xs text-muted-foreground sm:inline">
+                        Selecciona el programa y la actividad para continuar
+                      </span>
+                    )}
+                    <Button
+                      size="lg"
+                      disabled={!hasActivity || documentsLoading}
+                      onClick={() => setSubStep('upload')}
+                    >
+                      Continuar a Subir Archivos
+                      <ArrowRight className="size-4 ml-1" />
+                    </Button>
+                  </div>
+                </footer>
+              </div>
+            ) : (
+              /* FASE 2: Subida de Archivos y Confirmación del Lote */
+              <div className="flex flex-col gap-5">
+                {/* Destino del lote. Sticky dentro de la tarjeta: es el dato
+                    que decide si los códigos de los archivos son válidos, y
+                    antes quedaba arriba de una lista de 233 filas. */}
+                {hasActivity && (
+                  <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-primary/25 bg-primary/5 px-3.5 py-2.5">
+                    <span className="rounded bg-primary px-1.5 py-0.5 font-data text-[10px] font-bold tracking-wider text-primary-foreground uppercase">
+                      Programa
+                    </span>
+                    <span className="font-heading text-sm font-semibold text-foreground">
+                      {programLabel ?? '—'}
+                    </span>
+                    <span className="hidden h-4 w-px bg-primary/25 sm:block" />
+                    <span className="rounded bg-primary px-1.5 py-0.5 font-data text-[10px] font-bold tracking-wider text-primary-foreground uppercase">
+                      Actividad
+                    </span>
+                    <span className="font-heading text-sm font-semibold text-foreground">
+                      {activity?.name ?? '—'}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSubStep('config')}
+                      className="ml-auto h-7 text-xs font-medium text-primary hover:bg-primary/10"
+                      disabled={createBatch.isPending}
+                    >
+                      <ArrowLeft className="size-3.5 mr-1" />
+                      Cambiar actividad
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                    <span className="flex size-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                       2
                     </span>
                     <div>
                       <h2 className="font-heading text-base font-semibold text-foreground">
-                        Carga de Documentos y Lote
+                        Archivos del lote
                       </h2>
                       <p className="text-xs text-muted-foreground">
-                        Selecciona los archivos escaneados desde Google Drive para iniciar la extracción.
+                        Tomalos de Google Drive. Después revisá los expedientes y
+                        corregí lo que haga falta.
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    Paso 2 de 2
-                  </Badge>
+                  <GoogleDrivePicker
+                    fileCount={files.length}
+                    onPick={handlePick}
+                    disabled={createBatch.isPending}
+                  />
                 </div>
 
-                {/* Banner de resumen de la actividad seleccionada */}
-                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                    <div>
-                      <span className="text-xs font-medium text-muted-foreground">Programa:</span>{' '}
-                      <span className="font-semibold text-foreground">{programLabel ?? '—'}</span>
+                {files.length > 0 && (
+                  <>
+                    {/* Estado del lote en una línea. Es la respuesta a la
+                        pregunta que el operador se hace primero —¿qué se va a
+                        subir?— y antes solo se respondía con un toast de cuatro
+                        segundos o con el conteo enterrado en "N archivos
+                        seleccionados". */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-muted/40 px-3.5 py-2 font-data text-xs">
+                      <span>
+                        <strong className="text-base text-foreground">
+                          {files.length}
+                        </strong>{' '}
+                        <span className="text-muted-foreground">seleccionados</span>
+                      </span>
+                      <span className="h-3 w-px bg-border" />
+                      <span>
+                        <strong className="text-base text-success-dark">
+                          {fileValidation.validCount}
+                        </strong>{' '}
+                        <span className="text-muted-foreground">
+                          se van a subir
+                        </span>
+                      </span>
+                      {fileValidation.invalidCount > 0 && (
+                        <>
+                          <span className="h-3 w-px bg-border" />
+                          <span>
+                            <strong className="text-base text-warning-dark">
+                              {fileValidation.invalidCount}
+                            </strong>{' '}
+                            <span className="text-muted-foreground">
+                              sin destino (a la derecha)
+                            </span>
+                          </span>
+                        </>
+                      )}
+                      <span className="h-3 w-px bg-border" />
+                      <span>
+                        <strong className="text-base text-foreground">
+                          {fileValidation.dossierCount}
+                        </strong>{' '}
+                        <span className="text-muted-foreground">
+                          expedientes
+                        </span>
+                      </span>
                     </div>
-                    <div className="hidden h-4 w-px bg-border sm:block" />
-                    <div>
-                      <span className="text-xs font-medium text-muted-foreground">Actividad:</span>{' '}
-                      <span className="font-semibold text-foreground">{activity?.name ?? '—'}</span>
-                    </div>
-                  </div>
+
+                    <DossierBoard
+                      validation={fileValidation}
+                      onAssign={handleAssign}
+                      onUnassign={handleUnassign}
+                      onRemoveFile={handleRemove}
+                      canUnassign={handleCanUnassign}
+                      disabled={createBatch.isPending}
+                    />
+                  </>
+                )}
+
+                {/* Descripción del lote */}
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="batch-description">
+                    Descripción del lote <span className="text-destructive">*</span>
+                  </Label>
+                  <Textarea
+                    id="batch-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Ej. Lote de fichas recibidas el 28/06 en la jornada de Comas — turno mañana. Notas para el equipo de revisión…"
+                    rows={2}
+                    className="resize-y"
+                    disabled={createBatch.isPending}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Acompaña al lote durante todo el flujo; es visible en el
+                    triaje y la revisión.
+                  </p>
+                </div>
+
+                <OcrHelpNote />
+
+                <footer className="flex items-center justify-between gap-3 border-t border-border pt-4">
                   <Button
-                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => setSubStep('config')}
-                    className="h-8 text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
                     disabled={createBatch.isPending}
                   >
-                    <ArrowLeft className="size-3.5 mr-1" />
-                    Cambiar actividad
+                    <ArrowLeft className="size-4 mr-1" />
+                    Anterior
                   </Button>
-                </div>
 
-                {/* Acordeón para consultar la guía de nombres y documentos requeridos */}
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowGuideInUpload((prev) => !prev)}
-                    className="flex items-center justify-between rounded-md border border-dashed border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Info className="size-3.5 text-primary" />
-                      {showGuideInUpload
-                        ? 'Ocultar requisitos y guía de nomenclatura'
-                        : 'Ver requisitos y guía de nomenclatura de esta actividad'}
-                    </span>
-                    {showGuideInUpload ? (
-                      <ChevronUp className="size-3.5" />
-                    ) : (
-                      <ChevronDown className="size-3.5" />
+                  <div className="flex items-center gap-3">
+                    {!canProceed && !createBatch.isPending && (
+                      <span className="hidden max-w-72 text-right font-data text-xs font-medium text-destructive sm:block">
+                        {files.length === 0
+                          ? 'Falta seleccionar archivos de Drive'
+                          : fileValidation.validCount === 0
+                            ? 'No hay archivos con formato o código válido'
+                            : fileValidation.hasIncompleteDossiers
+                              ? 'Faltan documentos en algunos expedientes'
+                              : 'Falta ingresar la descripción del lote'}
+                      </span>
                     )}
-                  </button>
-
-                  {showGuideInUpload && (
-                    <div className="flex flex-col gap-4 rounded-lg border border-border bg-slate-50/50 p-3 pt-4">
-                      <ExpectedDocuments
-                        documents={documents}
-                        programLabel={programLabel}
-                        activityLabel={activity?.name}
-                        hasActivity={hasActivity}
-                        isLoading={documentsLoading}
-                      />
-                      <FileNamingHelp documents={documents} />
-                    </div>
-                  )}
-                </div>
+                    <Button
+                      size="lg"
+                      onClick={handleSubmit}
+                      disabled={!canProceed || createBatch.isPending}
+                    >
+                      {createBatch.isPending ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <ScanLine />
+                      )}
+                      {createBatch.isPending ? 'Iniciando…' : 'Iniciar extracción'}
+                    </Button>
+                  </div>
+                </footer>
               </div>
-
-              {/* Selector de Google Drive */}
-              <div className="flex flex-col gap-2">
-                <h3 className="flex items-center gap-2 font-heading text-sm font-medium text-foreground">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-secondary text-primary">
-                    <Upload className="size-3.5" />
-                  </span>
-                  Archivos a digitalizar
-                </h3>
-                <GoogleDrivePicker
-                  files={files}
-                  onPick={handlePick}
-                  onRemove={handleRemove}
-                  disabled={createBatch.isPending}
-                />
-              </div>
-
-              <FileValidationPreview
-                validation={fileValidation}
-                onRemoveFile={handleRemove}
-                onDiscardInvalid={handleDiscardInvalid}
-                disabled={createBatch.isPending}
-              />
-
-              {/* Descripción del lote */}
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="batch-description">
-                  Descripción del lote <span className="text-destructive">*</span>
-                </Label>
-                <Textarea
-                  id="batch-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Ej. Lote de fichas recibidas el 28/06 en la jornada de Comas — turno mañana. Notas para el equipo de revisión…"
-                  rows={3}
-                  className="resize-y"
-                  disabled={createBatch.isPending}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Esta nota acompaña al lote durante todo el flujo y es visible en el
-                  triaje y la revisión.
-                </p>
-              </div>
-
-              <OcrHelpNote />
-
-              <footer className="flex items-center justify-between gap-3 border-t border-border pt-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSubStep('config')}
-                  disabled={createBatch.isPending}
-                >
-                  <ArrowLeft className="size-4 mr-1" />
-                  Anterior
-                </Button>
-
-                <div className="flex items-center gap-3">
-                  {!canProceed && !createBatch.isPending && (
-                    <span className="hidden font-data text-xs font-medium text-destructive sm:inline">
-                      {files.length === 0
-                        ? 'Falta seleccionar archivos de Drive'
-                        : fileValidation.validCount === 0
-                          ? 'No hay archivos con formato o código válido'
-                          : fileValidation.hasIncompleteDossiers
-                            ? 'Error: Tienes expedientes incompletos (revisa el cuadro arriba)'
-                            : !description.trim()
-                              ? 'Falta ingresar la descripción del lote'
-                              : 'Falta completar campos requeridos'}
-                    </span>
-                  )}
-                  <Button
-                    size="lg"
-                    onClick={handleSubmit}
-                    disabled={!canProceed || createBatch.isPending}
-                  >
-                    {createBatch.isPending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <ScanLine />
-                    )}
-                    {createBatch.isPending ? 'Iniciando…' : 'Iniciar extracción'}
-                  </Button>
-                </div>
-              </footer>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
