@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useImperativeHandle, useState, type Ref } from 'react';
 import { AlertCircle, FolderOpen, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,19 @@ interface GoogleDrivePickerProps {
   fileCount: number;
   onPick: (files: PickedFile[]) => void;
   disabled?: boolean;
+  /**
+   * Abre el selector desde afuera. La galería de huecos tiene su propio botón
+   * "Agregar desde Drive" y necesita dispararlo sin que el operador vuelva a
+   * la cabecera a buscar el botón.
+   *
+   * Es un `ref` como prop a secas, sin `forwardRef`: es lo que hace React 19.
+   */
+  ref?: Ref<GoogleDrivePickerHandle>;
+}
+
+/** Lo que el tablero necesita para abrir el selector de Drive. */
+export interface GoogleDrivePickerHandle {
+  openPicker: () => void;
 }
 
 /**
@@ -27,6 +40,7 @@ export function GoogleDrivePicker({
   fileCount,
   onPick,
   disabled = false,
+  ref,
 }: GoogleDrivePickerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(CONFIG_ERROR);
@@ -52,6 +66,8 @@ export function GoogleDrivePicker({
       setLoading(false);
     }
   }, []);
+
+  useImperativeHandle(ref, () => ({ openPicker: handleOpen }), [handleOpen]);
 
   return (
     <div className="flex flex-col gap-2">
