@@ -24,7 +24,10 @@ import type {
   DossierGroup,
   ValidatedFileItem,
 } from '../../hooks/use-batch-file-validation';
-import { DocumentViewerDialog } from './document-viewer-dialog';
+import {
+  DocumentViewerDialog,
+  type AssignmentDestination,
+} from './document-viewer-dialog';
 
 /**
  * MIME propio para el arrastre. Usar `text/plain` haría que el navegador
@@ -132,6 +135,23 @@ export function DossierBoard({
   );
   const incompleteCount = dossierCount - completeDossierCount;
   const knownKeys = useMemo(() => dossierGroups.map((g) => g.dni), [dossierGroups]);
+  /**
+   * Los huecos que hay que llenar, para ofrecerlos como destino dentro del
+   * visor. Sale del mismo `orderedGroups` que el tablero, así la lista del
+   * diálogo y las filas de arriba cuentan la misma historia en el mismo orden:
+   * primero los expedientes que bloquean el lote.
+   *
+   * Solo huecos libres: los preoccupied no van, porque "cambiar el tipo de un
+   * archivo que ya está asignado" se resuelve en el formulario de abajo, que
+   * viene con la clave y el tipo cargados y es cambiar un chip.
+   */
+  const destinations = useMemo<AssignmentDestination[]>(
+    () =>
+      orderedGroups.flatMap((group) =>
+        group.missingCodes.map((code) => ({ key: group.dni, code }))
+      ),
+    [orderedGroups]
+  );
   const allCodes = useMemo(
     () => [...requiredCodes, ...optionalCodes],
     [requiredCodes, optionalCodes]
@@ -442,6 +462,7 @@ export function DossierBoard({
         knownKeys={knownKeys}
         codes={allCodes}
         codeNames={codeNames}
+        destinations={destinations}
         onApply={(sourceId, key, code) => {
           place(sourceId, { key, code, id: `${key}|${code}` });
           setViewer(null);

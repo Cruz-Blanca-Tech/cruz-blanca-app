@@ -134,6 +134,23 @@ function getDriveToken(google: GoogleApi): Promise<string> {
 }
 
 /**
+ * Token de Drive **solo si ya está en caché**. No pide uno nuevo.
+ *
+ * Para el visor de documentos: abrir un archivo no puede abrir una ventana de
+ * consentimiento de Google en medio de la pantalla de trabajo. `prompt: ''` de
+ * GSI es silencioso únicamente si el permiso ya se concedió alguna vez; si
+ * nunca se concedió, GSI igual cae al flujo interactivo y salta el popup. Si
+ * no hay token no se muestra la imagen —que es lo que pasaba antes, siempre,
+ * con Drive privado— pero sin la intromisión. Para volver a tener imágenes el
+ * operador tiene que pasar por "Agregar más de Drive", que es donde el permiso
+ * se concede y es un momento en que un popup tiene sentido.
+ */
+export function peekDriveToken(): string | null {
+  const cached = getCachedToken();
+  return cached && cached.expiresAt > Date.now() ? cached.value : null;
+}
+
+/**
  * Abre la sesión de Drive de punta a punta: carga GSI, valida que la API esté
  * disponible y devuelve un access token (silencioso si ya se concedió el
  * permiso). Centraliza la secuencia que antes duplicaba cada picker en su

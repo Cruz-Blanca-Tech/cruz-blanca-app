@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
   ImageOff,
   Loader2,
-  Pencil,
   Trash2,
 } from 'lucide-react';
 
@@ -21,6 +20,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { peekDriveToken } from '@/shared/drive/drive-auth';
+import { fetchDriveFileBlob } from '@/shared/drive/drive-api';
 
 import {
   assignProblem,
@@ -29,6 +30,12 @@ import {
 } from '../../hooks/use-batch-file-validation';
 
 const DATALIST_ID = 'dossier-keys-for-assign';
+
+/** Un hueco libre de un expediente: el destino de un clic. */
+export interface AssignmentDestination {
+  key: string;
+  code: string;
+}
 
 export interface DocumentViewerDialogProps {
   /** Archivo a ver. `null` mantiene el diálogo cerrado. */
@@ -39,6 +46,8 @@ export interface DocumentViewerDialogProps {
   codes: string[];
   /** Código -> nombre del documento, para etiquetar los botones. */
   codeNames: Record<string, string>;
+  /** Huecos libres del lote, en el mismo orden que los muestra el tablero. */
+  destinations: AssignmentDestination[];
   /**
    * Values with which the dialog opens. Used when the operator clicks an empty
    * slot instead of dragging: the dossier and document type are already
@@ -52,34 +61,29 @@ export interface DocumentViewerDialogProps {
 }
 
 /**
- * Ver el archivo y, si hace falta, decidir a qué expediente va.
+ * Ver el archivo y decidir dónde va.
  *
- * Tiene **dos formas** según si hay algo pendiente:
+ * El orden es el del trabajo: primero **mirar** el documento, después decir
+ * **dónde** va. La imagen va arriba y a todo el ancho, que es para eso; la
+ * decisión va abajo, sobre una lista de los huecos que están esperando. Elegir
+ * un hueco es un clic, contra escribir un número y ubicar un chip.
  *
- * - Con algo que decidir (el archivo no tiene expediente, o su tipo no existe
- *   en la actividad) abre el formulario completo.
- * - Con la asignación ya resuelta —viene de un clic en un hueco, o de un clic en
- *   un chip ya ocupado— abre como visor: la imagen grande y una barra con
- *   "90093246 · DNI Apoderado" y un botón *Cambiar* que despliega el
- *   formulario en el lugar. Antes era un formulario entero con la clave
- *   bloqueada y un mensaje que mandaba a quitar el archivo del lote para
- *   cambiarlo, cuando el tablero ya lo resuelve con arrastrarlo a otro hueco.
+ * La lista solo ofrece huecos libres, nunca ranuras ocupadas: cambiar el tipo
+ * de un archivo que ya está asignado se hace en el formulario de abajo, que
+ * viene con la clave y el tipo cargados, así que es cambiar un chip y guardar.
  *
- * La clave nunca se bloquea. Cambiarla es editar un campo, y el tablero
- * reagrupa solo; el que no debía offers un cambio accidental era el formulario
- * entero en pantalla, y eso se resuelve mostrando la barra primero.
- *
- * La imagen se monta **solo** mientras el diálogo está abierto: el contenido del
- * diálogo no existe en el DOM cuando `item` es `null`, así que con 200 archivos
- * en la bandeja no se baja ni una miniatura. Es a propósito — el operador
- * elige un archivo, lo mira, lo asigna y sigue; cargar las 141 fotos de una vez
- * lo que hace es vaciar la memoria del navegador y trabar la pantalla.
+ * La imagen se baja de Drive con el token del usuario. No por el proxy
+ * `/api/drive-image`: ese va contra `thumbnail`, que solo responde para
+ * archivos públicos, así que con un Drive privado daba 404 en todos los
+ * archivos y el operador no veía nada. Solo se pide con el diálogo abierto —no
+ * se precargan las 141 fotos— y la object URL se revoca al cerrar.
  */
 export function DocumentViewerDialog({
   item,
   knownKeys,
   codes,
   codeNames,
+  destinations,
   presetKey,
   presetCode,
   onApply,
@@ -88,13 +92,11 @@ export function DocumentViewerDialog({
 }: DocumentViewerDialogProps) {
   // Borrador de la asignación. La identidad del borrador incluye el prellenado
   // para que al abrir el mismo archivo con otro destino el formulario empiece
-  // de cero, sin necesidad de un efecto. `expanded` viaja en el mismo objeto
-  // por lo mismo: si no, cambiar de archivo dejaría el formulario abierto.
+  // de cero, sin necesidad de un efecto.
   const [draft, setDraft] = useState<{
     identity: string;
     key: string;
     code: string;
-    expanded: boolean;
   } | null>(null);
 
   const sourceId = item?.file.source_id ?? '';
@@ -108,26 +110,7 @@ export function DocumentViewerDialog({
   const current =
     draft && draft.identity === identity
       ? draft
-      : {
-          identity,
-          ...decided,
-          // Si el tipo no existe en la actividad hay algo roto que mirar, así
-          // que el formulario se abre solo en vez de mandar al operador a
-          // descubrir que tiene que apretar "Cambiar".
-          expanded:
-            !decided.key ||
-            (decided.code !== '' && !codes.includes(decided.code)),
-        };
-
-  // Estados de la imagen sin `useEffect`: se comparan contra la URL actual, así
-  // que cambian solos al abrir otro archivo.
-  const imageUrl = item
-    ? `/api/drive-image?id=${encodeURIComponent(item.file.source_id)}&sz=w1600`
-    : '';
-  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
-  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
-  const imageReady = loadedUrl === imageUrl;
-  const imageBroken = brokenUrl === imageUrl;
+      : { identity, ...decided };
 
   const problem = assignProblem(
     current.key,
@@ -140,241 +123,251 @@ export function DocumentViewerDialog({
     current.code,
     item?.file.file_name ?? ''
   );
+  const changed = composedName !== (item?.file.file_name ?? '');
 
-  // Si el nombre que se va a mandar es el mismo que ya tiene, no hay nada que
-  // confirmar: el diálogo es un visor y alcanza con cerrarlo.
-  const isPending = composedName !== (item?.file.file_name ?? '') || problem !== null;
+  const setKey = (key: string) =>
+    setDraft({ ...current, key: key.toUpperCase() });
+  const setCode = (code: string) => setDraft({ ...current, code });
 
-  // Estado "ya resuelto" al que volver: solo existe si el archivo ya venía bien
-  // asignado. Si lo que hay que corregir es justamente la asignación, no hay
-  // nada a qué cancelar.
-  const resolved = Boolean(
-    decided.key &&
-      decided.code &&
-      codes.includes(decided.code) &&
-      assignProblem(decided.key, decided.code, item?.file.file_name ?? '', codes) ===
-        null
-  );
+  /* Vista previa ------------------------------------------------------- */
 
-  const patch = (next: Partial<typeof current>) => setDraft({ ...current, ...next });
-  const setKey = (key: string) => patch({ key: key.toUpperCase() });
-  const setCode = (code: string) => patch({ code });
-  /** Vuelve a la asignación real del archivo, descartando lo editado. */
-  const collapse = () => setDraft({ identity, ...decided, expanded: false });
+  const [objectUrl, setObjectUrl] = useState<{
+    sourceId: string;
+    url: string;
+  } | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fileId = item?.file.source_id;
+    if (!fileId) return;
+
+    let cancelled = false;
+    let created: string | null = null;
+
+    void (async () => {
+      // Sin token no se intenta nada: pedirlo abriría una ventana de Google
+      // encima del documento (ver `peekDriveToken`).
+      const token = peekDriveToken();
+      if (!token) {
+        setFailedId(fileId);
+        return;
+      }
+      try {
+        const blob = await fetchDriveFileBlob(token, fileId);
+        if (cancelled) return;
+        created = URL.createObjectURL(blob);
+        setObjectUrl({ sourceId: fileId, url: created });
+      } catch {
+        if (!cancelled) setFailedId(fileId);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [item?.file.source_id]);
+
+  const imageSrc = objectUrl?.sourceId === sourceId ? objectUrl.url : null;
+  const imageFailed = failedId === sourceId;
+  const noDriveSession = !peekDriveToken();
+
+  /* Render -------------------------------------------------------------- */
 
   return (
     <Dialog open={item !== null} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-w-4xl gap-0 overflow-hidden p-0">
+      {/* `sm:max-w-*` y no `max-w-*`: el Popup base trae `sm:max-w-sm`, y una
+          variante le gana a la clase sin prefijo. Con `max-w-3xl` a secas el
+          diálogo se quedaba en 384px y la imagen no tenía dónde crecer. */}
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <DialogHeader className="border-b border-border p-4">
           <DialogTitle className="truncate font-data text-base">
             {item?.file.file_name}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {current.expanded
-              ? 'Revisá el documento y decidí a qué expediente pertenece.'
-              : 'Revisá que el documento sea de esta persona.'}
+            {decided.key
+              ? 'Revisá que el documento sea de esta persona.'
+              : 'Revisá el documento y decidí a qué expediente pertenece.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div
-          className={cn(
-            'grid max-h-[72vh] overflow-y-auto',
-            imageBroken ? 'grid-cols-1' : 'md:grid-cols-[1fr_290px]'
-          )}
-        >
-          {/* Archivo. El <img> existe únicamente con el diálogo abierto. Si la
-              vista previa no se puede obtener, el panel entero se va: media
-              pantalla de negro con una línea de error no es una pantalla de
-              trabajo. El guard por `imageUrl` además evita el `<img src="">`
-              que queda durante la animación de salida, cuando `item` ya es
-              `null` pero el popup sigue en el DOM. */}
-          {imageUrl && !imageBroken && (
-            <div className="relative flex min-h-56 items-center justify-center bg-slate-900 p-3">
-              {!imageReady && (
-                <span className="absolute flex items-center gap-2 font-data text-xs text-slate-300">
-                  <Loader2 className="size-4 animate-spin" />
-                  Cargando archivo…
+        {/* El documento, arriba y a todo el ancho. */}
+        {imageSrc ? (
+          /* eslint-disable-next-line @next/next/no-img-element -- blob local
+              armado con el token de Drive; `next/image` no puede consumir una
+              object URL ni ahorra nada porque el optimizador no la bajaría. */
+          <img
+            src={imageSrc}
+            alt={item?.file.file_name ?? ''}
+            className="max-h-[50vh] w-full bg-slate-900 object-contain"
+          />
+        ) : (
+          <div className="flex h-40 items-center justify-center bg-slate-900">
+            {imageFailed ? (
+              <span className="flex max-w-md flex-col items-center gap-1 px-4 text-center font-data text-xs text-slate-400">
+                <span className="flex items-center gap-2">
+                  <ImageOff className="size-4 shrink-0" />
+                  No se pudo ver este archivo.
                 </span>
-              )}
-              {/* eslint-disable-next-line @next/next/no-img-element -- proxy
-                  propio de Drive que ya devuelve la imagen al tamaño pedido;
-                  `next/image` solo agregaría una vuelta por el optimizador. */}
-              <img
-                src={imageUrl}
-                alt={item?.file.file_name ?? ''}
-                onLoad={() => setLoadedUrl(imageUrl)}
-                onError={() => setBrokenUrl(imageUrl)}
-                className={cn(
-                  'max-h-[68vh] w-auto max-w-full object-contain',
-                  imageReady ? 'opacity-100' : 'opacity-0'
+                {noDriveSession ? (
+                  <span>
+                    Tu sesión de Google Drive venció. Si volvés a agregar
+                    archivos desde Drive, las imágenes vuelven a verse.
+                  </span>
+                ) : (
+                  <span>
+                    Si reconocés el nombre, podés cargarlo igual.
+                  </span>
                 )}
-              />
-            </div>
-          )}
+              </span>
+            ) : (
+              <span className="flex items-center gap-2 font-data text-xs text-slate-300">
+                <Loader2 className="size-4 animate-spin" />
+                Bajando el documento de Drive…
+              </span>
+            )}
+          </div>
+        )}
 
-          {imageBroken && (
-            <p className="flex items-center gap-2 border-b border-border bg-warning-light px-4 py-2 text-[11px] text-warning-dark">
-              <ImageOff className="size-3.5 shrink-0" />
-              No se pudo ver este archivo. Si reconocés el nombre, podés
-              cargarlo igual.
+        <div className="max-h-[34vh] overflow-y-auto">
+          {/* Dónde está ahora, y que abajo está el reemplazo. */}
+          {decided.key && (
+            <p className="border-b border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+              Ahora está en{' '}
+              <span className="font-data font-semibold text-foreground">
+                {decided.key}
+              </span>{' '}
+              · {codeNames[decided.code] ?? decided.code}.{' '}
+              {destinations.length > 0 ? (
+                <>
+                  Para cambiarlo,{' '}
+                  <span className="text-foreground">ponelo en otro lugar</span>{' '}
+                  de los de abajo.
+                </>
+              ) : (
+                'Para moverlo de persona o cambiarle el tipo, usá el formulario de abajo.'
+              )}
             </p>
           )}
 
-          {/* Controles de asignación */}
-          <div
-            className={cn(
-              'flex flex-col gap-4 p-4',
-              !imageBroken && 'md:border-l md:border-border',
-              !current.expanded && 'gap-3'
-            )}
-          >
-            {!current.expanded ? (
-              /* Todo resuelto: la asignación a la vista y un solo camino para
-                 cambiar algo. Nada de un campo de solo lectura que no lleva a
-                 ninguna parte. */
-              <div className="flex flex-col gap-2">
-                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
-                  <p className="text-[11px] text-muted-foreground">
-                    Asignado a este expediente
-                  </p>
-                  <p className="font-data text-sm font-semibold text-foreground">
-                    {current.key || '—'}
-                    <span className="mx-1.5 font-sans font-normal text-muted-foreground">
-                      ·
-                    </span>
-                    <span className="font-sans font-medium">
-                      {codeNames[current.code] ?? current.code}
-                    </span>
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => patch({ expanded: true })}
-                  className="self-start"
-                >
-                  <Pencil className="size-3.5" />
-                  Cambiar
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="assign-key" className="text-xs">
-                    Expediente
-                  </Label>
-                  <Input
-                    id="assign-key"
-                    list={DATALIST_ID}
-                    inputMode="numeric"
-                    value={current.key}
-                    onChange={(e) => setKey(e.target.value)}
-                    placeholder="DNI del beneficiario"
-                    aria-describedby="assign-key-help"
-                  />
-                  <datalist id={DATALIST_ID}>
-                    {knownKeys.map((key) => (
-                      <option key={key} value={key} />
-                    ))}
-                  </datalist>
-                  <p id="assign-key-help" className="text-[11px] text-muted-foreground">
-                    Es el número que junta los documentos de una misma persona.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Tipo de documento</Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {codes.map((code) => (
+          <div className="flex flex-col gap-4 p-4">
+            {/* Destino principal: un clic en el hueco. */}
+            {destinations.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">
+                  {decided.key ? 'Reemplazarlo en' : 'Ponelo en'}
+                </Label>
+                <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto">
+                  {destinations.map((dest) => (
+                    <li key={`${dest.key}|${dest.code}`}>
                       <button
-                        key={code}
                         type="button"
-                        onClick={() => setCode(code)}
-                        aria-pressed={current.code === code}
-                        title={codeNames[code]}
-                        className={cn(
-                          'rounded-md border px-2 py-1 font-data text-xs font-semibold transition-colors',
-                          current.code === code
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border bg-card text-foreground hover:border-primary/50 hover:bg-accent'
-                        )}
+                        onClick={() => onApply(sourceId, dest.key, dest.code)}
+                        className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-left transition-colors hover:border-primary hover:bg-primary/5"
                       >
-                        {code}
+                        <span className="font-data text-xs font-semibold text-foreground">
+                          {dest.key}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                          {codeNames[dest.code] ?? dest.code}
+                        </span>
+                        <span className="shrink-0 font-data text-[11px] text-primary">
+                          poner acá
+                        </span>
                       </button>
-                    ))}
-                  </div>
-                  {current.code && codeNames[current.code] && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {codeNames[current.code]}
-                    </p>
-                  )}
-                </div>
-
-                {/* Vista previa del nombre resultante: el operador ve
-                    exactamente lo que se va a mandar al backend antes de
-                    confirmarlo. Con la asignación ya resuelta no se muestra
-                    para nada —sería un texto derivado que no puede cambiar. */}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs">Se va a guardar como</Label>
-                  <code className="rounded-md border border-border bg-muted/50 px-2 py-1.5 font-data text-xs break-all">
-                    {composedName}
-                  </code>
-                  {problem ? (
-                    <p className="flex items-start gap-1.5 text-[11px] text-destructive">
-                      <AlertTriangle className="mt-px size-3 shrink-0" />
-                      {problem}
-                    </p>
-                  ) : (
-                    <p className="flex items-start gap-1.5 text-[11px] text-success-dark">
-                      <CheckCircle2 className="mt-px size-3 shrink-0" />
-                      Listo para subir.
-                    </p>
-                  )}
-                </div>
-
-                {resolved && (
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={collapse}
-                      className="text-xs text-muted-foreground"
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                )}
-              </>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
-            {/* Acciones. "Quitar del lote" va separado y Chico: es
-                destructivo —se pierde la foto para todo el lote— y no puede
-                quedar del mismo tamaño al lado de "Guardar". */}
-            <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
-              {isPending ? (
-                <Button
-                  size="sm"
-                  disabled={problem !== null}
-                  onClick={() => onApply(sourceId, current.key, current.code)}
-                >
-                  <CheckCircle2 className="size-4" />
-                  Guardar
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={onClose}>
-                  Cerrar
-                </Button>
-              )}
+            {/* A otra persona: escribir la clave y elegir el tipo. También
+                sirve para cambiarle el tipo a un archivo ya asignado, porque
+                el formulario viene con lo que tiene. */}
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs">
+                {destinations.length > 0
+                  ? 'O a otra persona'
+                  : 'A qué expediente pertenece'}
+              </Label>
+              <Input
+                id="assign-key"
+                list={DATALIST_ID}
+                inputMode="numeric"
+                value={current.key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="Número del beneficiario"
+                aria-describedby="assign-key-help"
+              />
+              <datalist id={DATALIST_ID}>
+                {knownKeys.map((key) => (
+                  <option key={key} value={key} />
+                ))}
+              </datalist>
+              <div className="flex flex-wrap gap-1.5">
+                {codes.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setCode(code)}
+                    aria-pressed={current.code === code}
+                    title={codeNames[code]}
+                    className={cn(
+                      'rounded-md border px-2 py-1 font-data text-xs font-semibold transition-colors',
+                      current.code === code
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-card text-foreground hover:border-primary/50 hover:bg-accent'
+                    )}
+                  >
+                    {code}
+                  </button>
+                ))}
+              </div>
+              <p id="assign-key-help" className="text-[11px] text-muted-foreground">
+                Es el número que junta los documentos de una misma persona.
+              </p>
+            </div>
+
+            {/* Vista previa del nombre resultante, solo cuando lo compone a
+                mano el operador: si elige un hueco de la lista, el nombre ya
+                está dicho y esto sería ruido. */}
+            {changed || problem ? (
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">Se va a guardar como</Label>
+                <code className="rounded-md border border-border bg-muted/50 px-2 py-1.5 font-data text-xs break-all">
+                  {composedName}
+                </code>
+                {problem ? (
+                  <p className="flex items-start gap-1.5 text-[11px] text-destructive">
+                    <AlertTriangle className="mt-px size-3 shrink-0" />
+                    {problem}
+                  </p>
+                ) : (
+                  <p className="flex items-start gap-1.5 text-[11px] text-success-dark">
+                    <CheckCircle2 className="mt-px size-3 shrink-0" />
+                    Listo para subir.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-2 border-t border-border pt-3">
+              <Button
+                size="sm"
+                disabled={problem !== null || !changed}
+                onClick={() => onApply(sourceId, current.key, current.code)}
+              >
+                <CheckCircle2 className="size-4" />
+                Guardar con estos datos
+              </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 text-xs text-muted-foreground hover:bg-error-light hover:text-error"
+                className="ml-auto h-7 text-xs text-muted-foreground hover:bg-error-light hover:text-error"
                 onClick={() => onRemove(sourceId)}
               >
                 <Trash2 className="size-3.5" />
-                Quitar del lote
+                Sacar del lote
               </Button>
             </div>
           </div>

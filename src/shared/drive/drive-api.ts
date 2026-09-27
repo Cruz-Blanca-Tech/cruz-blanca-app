@@ -26,6 +26,35 @@ function authHeaders(token: string) {
 }
 
 /**
+ * Baja los bytes de un archivo de Drive con el token del usuario.
+ *
+ * Hace falta para los archivos privados. El proxy `/api/drive-image` va contra
+ * `drive.google.com/thumbnail`, que solo responde para archivos públicos
+ * ("cualquier persona con el enlace"), así que los escaneos de un Drive
+ * privado dan 404 y el operador ve "no se pudo obtener una vista previa" en
+ * todos los archivos. Con `alt=media` y el bearer del usuario se leen los
+ * privados, y además el token no sale del navegador: no hace falta mandarlo a
+ * nuestro servidor para que lo use de puente.
+ *
+ * `supportsAllDrives` porque los archivos pueden vivir en unidades
+ * compartidas, que sin ese parámetro dan 404.
+ */
+export async function fetchDriveFileBlob(
+  token: string,
+  fileId: string
+): Promise<Blob> {
+  const url = new URL(`${DRIVE_FILES_URL}/${fileId}`);
+  url.searchParams.append('alt', 'media');
+  url.searchParams.append('supportsAllDrives', 'true');
+
+  const res = await fetch(url.toString(), { headers: authHeaders(token) });
+  if (!res.ok) {
+    throw new Error('No se pudo descargar el archivo de Google Drive.');
+  }
+  return res.blob();
+}
+
+/**
  * Lista el contenido de una carpeta de Drive. Casos especiales:
  *  - `app_root` → los nodos raíz virtuales (`ROOT_NODES`).
  *  - `shared_drives_root` → las Unidades Compartidas del usuario.
