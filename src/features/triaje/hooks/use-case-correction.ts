@@ -215,12 +215,33 @@ export function useCaseCorrection({
   //   - sin match ni aprobación, se muestra como nota inline de una línea bajo el
   //     campo DNI (ver `dniInline`), no como banner.
   const isApprovedStatus = caseData?.status === 'APPROVED';
+
+  // ¿La clave con la que el intake agrupó los archivos es un DNI de 8 dígitos?
+  //
+  // No siempre. El backend agrupa por el token antes del primer `_` tal cual
+  // viene (`GroupKey`), porque ese token lo escribe el operador a mano y un
+  // dígito de más o de menos no vuelve el archivo ilegible. Un identificador
+  // que no es DNI no es un DNI que "no coincide" con otro: es una etiqueta de
+  // archivado. Compararlo contra el DNI de la ficha y ofrecer usarlo produce
+  // dos mentiras —el aviso de discrepancia y, peor, un botón que escribiría un
+  // identificador de 9 dígitos en el maestro de beneficiarios.
+  const groupKeyIsDni = useMemo(() => isValidDni(dniReference), [dniReference]);
+
+  // Aviso de agrupación (rediseño condicional+inline):
+  //   - se oculta si hay match MDM (la identidad la confirma el maestro, no hace
+  //     falta avisar por la agrupación) o si el caso ya está aprobado (antes el
+  //     banner persistía en cada visita al expediente aprobado);
+  //   - sin match ni aprobación, se muestra como nota inline de una línea bajo el
+  //     campo DNI (ver `dniInline`), no como banner.
+  // Solo tiene sentido si la clave ES un DNI: si no lo es, la línea es la nota
+  // neutra de abajo y no hay nada que comparar.
   const dniGroupMismatch = useMemo(() => {
+    if (!groupKeyIsDni) return false;
     if (mdmSnap || isApprovedStatus) return false;
     const current = (watchedDni || '').trim().toUpperCase();
     const group = (dniReference || '').trim().toUpperCase();
     return Boolean(current && group && current !== group);
-  }, [watchedDni, dniReference, mdmSnap, isApprovedStatus]);
+  }, [watchedDni, dniReference, groupKeyIsDni, mdmSnap, isApprovedStatus]);
 
   /**
    * Usa el DNI de agrupación del lote como DNI del beneficiario (1 clic).
@@ -234,6 +255,16 @@ export function useCaseCorrection({
   const useGroupDniAsBeneficiary = useCallback(() => {
     const group = (dniReference || '').trim().toUpperCase();
     if (!group) return;
+    // Cinturón y tirantes: esta acción escribe en el maestro de beneficiarios,
+    // así que solo admite un DNI real. Si la clave de agrupación no lo es, el
+    // aviso que la acompaña no debería ofrecerla — y si algún camino futuro
+    // llegara acá, no se escribe nada.
+    if (!isValidDni(group)) {
+      toast.error(
+        `El identificador de agrupación '${dniReference}' no es un DNI válido, así que no se puede usar como DNI del beneficiario.`
+      );
+      return;
+    }
     form.setValue('beneficiary.dni', group, { shouldValidate: true, shouldDirty: true });
     toast.success('DNI del beneficiario actualizado con el DNI de agrupación del lote');
   }, [dniReference, form]);
@@ -242,7 +273,11 @@ export function useCaseCorrection({
   //   - info (match MDM): "Registrado en MDM como X — identidad desde el maestro
   //     · Cambiar DNI para desvincular". Reactiva al valor del DNI: si el revisor
   //     lo cambia y deja de haber match, la línea desaparece (no es un banner).
-  //   - warning (agrupación): solo sin match y con caso editable.
+  //   - warning (agrupación): solo sin match, con caso editable y clave de
+  //     agrupación que sea un DNI de verdad.
+  //   - note (clave que no es DNI): el aviso neutro del que habla el backend. No
+  //     lleva acción porque no hay nada que aplicar: el DNI del beneficiario es
+  //     el de la ficha, y la clave solo sirvió para agrupar los archivos.
   const dniInline = useMemo(() => {
     // Mientras verificamos el maestro no pintamos línea ancla: el spinner
     // "Buscando en MDM…" dentro del campo es el único indicador durante el
@@ -253,6 +288,14 @@ export function useCaseCorrection({
       return {
         kind: 'info' as const,
         text: `Registrado en MDM como ${snapName || mdmSnap.dni || ''} — identidad desde el maestro · Cambiar DNI para desvincular`,
+      };
+    }
+    if (!groupKeyIsDni && (dniReference || '').trim()) {
+      // El `trim()` delega el caso degenerado (sin clave de agrupación) a la
+      // ausencia de línea: no hay ningún identificador que juzgar.
+      return {
+        kind: 'note' as const,
+        text: `El identificador de agrupación del lote (${dniReference}) no es un DNI válido: solo se usó para juntar los archivos de este expediente. El DNI del beneficiario es el que registra la ficha.`,
       };
     }
     if (dniGroupMismatch) {
@@ -268,6 +311,7 @@ export function useCaseCorrection({
     isMdmMatching,
     mdmSnap,
     dniGroupMismatch,
+    groupKeyIsDni,
     watchedDni,
     dniReference,
     useGroupDniAsBeneficiary,
