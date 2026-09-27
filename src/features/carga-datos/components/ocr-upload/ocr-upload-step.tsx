@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Info, Loader2, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,7 +26,10 @@ import type {
 } from '../../types';
 
 import { ExpectedDocuments } from './expected-documents';
-import { GoogleDrivePicker } from './google-drive-picker';
+import {
+  GoogleDrivePicker,
+  type GoogleDrivePickerHandle,
+} from './google-drive-picker';
 import { DossierBoard } from './dossier-board';
 import { FileNamingHelp } from './file-naming-help';
 import { OcrHelpNote } from './ocr-help-note';
@@ -56,6 +59,8 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
 
   // Subfase interna: 'config' (Programa y Actividad) | 'upload' (Subida de archivos y Lote)
   const [subStep, setSubStep] = useState<'config' | 'upload'>('config');
+  // La galería de huecos abre el selector de Drive desde adentro del tablero.
+  const drivePickerRef = useRef<GoogleDrivePickerHandle>(null);
 
   const [description, setDescription] = useState('');
   const createBatch = useCreateBatch();
@@ -372,6 +377,7 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
                     fileCount={files.length}
                     onPick={handlePick}
                     disabled={createBatch.isPending}
+                    ref={drivePickerRef}
                   />
                 </div>
 
@@ -428,6 +434,7 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
                       onUnassign={handleUnassign}
                       onRemoveFile={handleRemove}
                       canUnassign={handleCanUnassign}
+                      onRequestDrive={() => drivePickerRef.current?.openPicker()}
                       disabled={createBatch.isPending}
                     />
                   </>
