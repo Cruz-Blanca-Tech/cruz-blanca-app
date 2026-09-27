@@ -28,6 +28,7 @@ import {
   DocumentViewerDialog,
   type AssignmentDestination,
 } from './document-viewer-dialog';
+import { SlotGalleryDialog } from './slot-gallery-dialog';
 
 /**
  * MIME propio para el arrastre. Usar `text/plain` haría que el navegador
@@ -58,6 +59,12 @@ interface DossierBoardProps {
   onRemoveFile: (sourceId: string) => void;
   /** Si el archivo tiene un nombre al cual volver, distinto del actual. */
   canUnassign: (sourceId: string) => boolean;
+  /**
+   * Abre el selector de Google Drive. Lo llama la galería de huecos, que tiene
+   * su propio botón "Agregar desde Drive" para el caso de que el archivo que
+   * falta ni siquiera haya entrado al lote.
+   */
+  onRequestDrive?: () => void;
   disabled?: boolean;
 }
 
@@ -82,6 +89,7 @@ export function DossierBoard({
   onUnassign,
   onRemoveFile,
   canUnassign,
+  onRequestDrive,
   disabled = false,
 }: DossierBoardProps) {
   const [viewer, setViewer] = useState<{
@@ -93,10 +101,10 @@ export function DossierBoard({
   const [hoverSlot, setHoverSlot] = useState<string | null>(null);
   const [filter, setFilter] = useState<BoardFilter>('all');
   /**
-   * Hueco que se está completando a mano (sin arrastrar). Al elegirlo, la
-   * bandeja se convierte en el selector de archivo para ese destino.
+   * Hueco que se está completando a mano (sin arrastrar). Al elegirlo se abre
+   * la galería con los archivos sin expediente para elegir la foto.
    */
-  const [pendingSlot, setPendingSlot] = useState<Slot | null>(null);
+  const [gallerySlot, setGallerySlot] = useState<Slot | null>(null);
 
   const {
     dossierGroups,
@@ -206,6 +214,23 @@ export function DossierBoard({
    * se rechaza el movimiento y se dice por qué, en vez de duplicar en
    * silencio.
    */
+  /**
+   * El hueco siguiente en la lista, para dejar la galería abierta en él.
+   *
+   * El operador suele tener un montoncito de fotos para varios huecos de la
+   * misma actividad. Si la galería se cerrara en cada elección, llenar ocho
+   * huecos serían ocho ciclos de abrir, elegir, cerrar y volver a hacer clic en
+   * la fila. Con esto sigue abierta y el título pasa al hueco que sigue.
+   */
+  const nextHoleAfter = (placed: Slot) => {
+    const i = destinations.findIndex(
+      (d) => d.key === placed.key && d.code === placed.code
+    );
+    if (i < 0 || i + 1 >= destinations.length) return null;
+    const next = destinations[i + 1];
+    return { ...next, id: `${next.key}|${next.code}` };
+  };
+
   const place = (sourceId: string, slot: Slot) => {
     const occupant = occupantOf(slot);
 
@@ -224,7 +249,7 @@ export function DossierBoard({
       toast.error('No se pudo asignar ese archivo. Revisá el nombre.');
       return;
     }
-    setPendingSlot(null);
+    setGallerySlot(nextHoleAfter(slot));
   };
 
   return (
@@ -284,10 +309,10 @@ export function DossierBoard({
                   requiredCodes={requiredCodes}
                   optionalCodes={optionalCodes}
                   codeNames={codeNames}
-                  // Mientras se elige el archivo de un hueco, todos los huecos
-                  // se marcan como destino posible.
-                  dragging={draggingId !== null || pendingSlot !== null}
-                  hoverSlot={pendingSlot?.id ?? hoverSlot}
+                  // Mientras se arrastra, todos los huecos se marcan como
+                  // destino posible.
+                  dragging={draggingId !== null}
+                  hoverSlot={hoverSlot}
                   disabled={disabled}
                   onHoverSlot={(slot, over) =>
                     setHoverSlot(over ? slot.id : null)
@@ -296,7 +321,7 @@ export function DossierBoard({
                     if (draggingId) place(draggingId, slot);
                     endDrag();
                   }}
-                  onPickSlot={(slot) => setPendingSlot(slot)}
+                  onPickSlot={(slot) => setGallerySlot(slot)}
                   onViewFile={(item) => setViewer({ item })}
                   onRemoveFile={onRemoveFile}
                   canUnassign={canUnassign}
@@ -314,8 +339,8 @@ export function DossierBoard({
                 Faltan {missingSlotCount} documentos.
               </strong>{' '}
               Arrastrá un archivo de la bandeja al hueco marcado, o hacé clic en
-              el hueco para elegirlo. También podés quitar el expediente entero
-              con la ✕ y seguir sin él.
+              el hueco para ver las fotos y elegir una. También podés quitar el
+              expediente entero con la ✕ y seguir sin él.
             </p>
           </footer>
         )}
@@ -333,30 +358,11 @@ export function DossierBoard({
             </span>
           </div>
 
-          {pendingSlot ? (
-            <div className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 p-2 text-xs">
-              <Hand className="mt-px size-3.5 shrink-0 text-primary" />
-              <p className="flex-1 text-foreground">
-                Elegí un archivo para{' '}
-                <strong className="font-mono">
-                  {pendingSlot.key} · {pendingSlot.code}
-                </strong>
-              </p>
-              <button
-                type="button"
-                onClick={() => setPendingSlot(null)}
-                aria-label="Cancelar"
-                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-          ) : (
-            <p className="text-[11px] text-muted-foreground">
-              Estos archivos no se van a subir. Abrilos para ver de qué se
-              trata y decidir su expediente, o arrastralos a un hueco.
-            </p>
-          )}
+          <p className="text-[11px] text-muted-foreground">
+            Estos archivos no se van a subir. Abrilos para ver de qué se trata
+            y decidir su expediente, arrastralos a un hueco, o hacé clic en un
+            hueco ✗ para elegir la foto de una grilla.
+          </p>
         </header>
 
         <div className="max-h-[30rem] overflow-y-auto p-2">
@@ -410,19 +416,9 @@ export function DossierBoard({
                       dragging={draggingId === item.file.source_id}
                       onDragStart={startDrag}
                       onDragEnd={endDrag}
-                      onView={() =>
-                        setViewer(
-                          pendingSlot
-                            ? {
-                                item,
-                                presetKey: pendingSlot.key,
-                                presetCode: pendingSlot.code,
-                              }
-                            : { item }
-                        )
-                      }
+                      onView={() => setViewer({ item })}
                       onRemove={() => onRemoveFile(item.file.source_id)}
-                      highlight={pendingSlot !== null}
+                      highlight={gallerySlot !== null}
                       showReason={!reasonIsUniform(unassignedFiles)}
                       disabled={disabled}
                     />
@@ -472,6 +468,29 @@ export function DossierBoard({
           setViewer(null);
         }}
         onClose={() => setViewer(null)}
+      />
+
+      {/* La galería se cierra antes de abrir el selector de Drive: son dos
+          modales y apilados se pisan el foco y el `Esc` del de abajo no llega. */}
+      <SlotGalleryDialog
+        slot={gallerySlot}
+        candidates={unassignedFiles}
+        codeNames={codeNames}
+        onPick={(sourceId) => {
+          if (gallerySlot) {
+            place(sourceId, {
+              key: gallerySlot.key,
+              code: gallerySlot.code,
+              id: gallerySlot.id,
+            });
+          }
+        }}
+        onRemove={(sourceId) => onRemoveFile(sourceId)}
+        onAddFromDrive={() => {
+          setGallerySlot(null);
+          onRequestDrive?.();
+        }}
+        onClose={() => setGallerySlot(null)}
       />
     </div>
   );
@@ -601,7 +620,7 @@ function DossierRow({
                   e.preventDefault();
                   onDrop(slot);
                 }}
-                title={`Falta ${codeNames[code] ?? code}. Hacé clic para elegir el archivo o arrastralo acá.`}
+                title={`Falta ${codeNames[code] ?? code}. Hacé clic para ver las fotos de los archivos sueltos y elegir una, o arrastralo acá.`}
                 className={cn(
                   'rounded border border-dashed px-1.5 py-0.5 font-data text-[10px] font-medium transition-colors',
                   dragging
