@@ -133,7 +133,10 @@ export function CaseCorrectionScreen({
               es → {nombre} · DNI {dni}" con botón Vincular.
           El aviso de DNI ≠ DNI de agrupación ya no es banner: es una línea
           inline bajo el campo DNI (ver `dniInline`), y se oculta con match MDM
-          o caso aprobado. */}
+          o caso aprobado. Si la clave de agrupación no es un DNI de 8 dígitos
+          (el intake agrupa por el token antes del `_` tal cual viene), la línea
+          es una nota neutra que dice eso, no un aviso de discrepancia: no hay
+          dos DNIs que comparar. */}
       {vm.mdmMatch && (
         <div className="flex flex-col gap-1.5 rounded-lg border border-info/30 bg-info-light px-4 py-3 shadow-sm">
           <div className="flex items-start gap-3">

@@ -144,6 +144,15 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
     files,
     description,
   });
+  // El bloqueo por expedientes incompletos es deliberado y se queda: es el
+  // control de calidad de la carga. El operador ve qué documento falta (chip
+  // ✗) y tiene dos salidas limpias — subirlo, o quitar el expediente entero
+  // con la ✕ y seguir sin él. Subir un lote con expedientes a medias solo
+  // produce casos que hay que reparar después.
+  //
+  // El backend tampoco aborta el lote (nunca lo hizo bien: tumbaba a los
+  // expedientes completos junto con el incompleto), pero marca el incompleto
+  // INCOMPLETE, lo saltea del OCR y lo manda a triaje pidiendo el faltante.
   const canProceed =
     fileValidation.validCount > 0 &&
     !fileValidation.hasIncompleteDossiers &&
@@ -171,11 +180,12 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
       );
     }
 
-    if (fileValidation.hasIncompleteDossiers) {
-      toast.warning(
-        'Hay expedientes con documentos faltantes. Se procesarán y podrás anexar los faltantes en Triaje.'
-      );
-    }
+    // Nota: `canProceed` exige `!hasIncompleteDossiers`, así que un lote con
+    // expedientes incompletos nunca llega acá. Antes había un toast que lo
+    // decía ("se procesarán y podrás anexar los faltantes en Triaje") pero
+    // era inalcanzable y además mentía: el backend ya no deja pasar un
+    // expediente incompleto, lo deja en triaje pidiendo el documento que
+    // falta.
 
     // Enviamos únicamente los archivos válidos al backend para proteger la extracción
     const payload = {

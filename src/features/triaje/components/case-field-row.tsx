@@ -9,6 +9,7 @@ import {
 import {
   AlertCircle,
   CheckCircle2,
+  Info,
   Loader2,
   Lock,
   OctagonAlert,
@@ -83,16 +84,20 @@ const STATUS_META: Record<FieldStatus, StatusMeta> = {
 const fieldName = (name: string) => name as FieldPath<CorrectionFormValues>;
 
 /**
- * Línea ancla de nivel info/advertencia bajo el campo DNI (única, reactiva):
+ * Línea ancla de nivel info/advertencia/nota bajo el campo DNI (única, reactiva):
  *   - info: "Registrado en MDM como X — identidad desde el maestro..." cuando el
  *     DNI del formulario tiene match MDM;
  *   - warning: agrupación del lote con DNI distinto (sin match MDM y caso
- *     editable), en sustitución del antiguo banner.
+ *     editable), en sustitución del antiguo banner;
+ *   - note: la clave con la que el intake agrupó los archivos no es un DNI de 8
+ *     dígitos. Es un hecho neutro sobre cómo se archivó el lote, no un error del
+ *     revisor, y no lleva acción: el DNI del beneficiario es el de la ficha.
  *
  * `action` es el atajo de un clic que resuelve el aviso (ej. "Usar DNI del lote").
+ * Solo existe en `warning`, y por eso es el único tipo con botón.
  */
 export interface DniInlineLine {
-  kind: 'info' | 'warning';
+  kind: 'info' | 'warning' | 'note';
   text: string;
   action?: { label: string; run: () => void };
 }
@@ -381,25 +386,34 @@ export function CaseFieldRow({
         </div>
       ) : null}
 
-      {/* Línea ancla bajo el DNI: info con match MDM o warning de agrupación. */}
+      {/* Línea ancla bajo el DNI: info con match MDM, warning de agrupación o
+          nota neutra cuando la clave de agrupación no es un DNI. */}
       {dniInline && (
         <div
           className={cn(
             'mt-1 flex items-start gap-1 rounded-sm px-1.5 py-1',
             dniInline.kind === 'warning'
               ? 'border border-warning/20 bg-warning-light'
-              : 'border border-info/20 bg-info-light'
+              : dniInline.kind === 'note'
+                ? 'border border-border bg-muted/40'
+                : 'border border-info/20 bg-info-light'
           )}
         >
           {dniInline.kind === 'warning' ? (
             <TriangleAlert className="mt-0.5 size-2.5 shrink-0 text-warning-dark" />
+          ) : dniInline.kind === 'note' ? (
+            <Info className="mt-0.5 size-2.5 shrink-0 text-muted-foreground" />
           ) : (
             <CheckCircle2 className="mt-0.5 size-2.5 shrink-0 text-info-dark" />
           )}
           <span
             className={cn(
               'font-data text-[10.5px] leading-snug',
-              dniInline.kind === 'warning' ? 'text-warning-dark' : 'text-info-dark'
+              dniInline.kind === 'warning'
+                ? 'text-warning-dark'
+                : dniInline.kind === 'note'
+                  ? 'text-muted-foreground'
+                  : 'text-info-dark'
             )}
           >
             {dniInline.text}

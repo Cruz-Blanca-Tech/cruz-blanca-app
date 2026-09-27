@@ -3,12 +3,28 @@ import type { ExpectedDocument, PickedFile } from '../types';
 
 const SUPPORTED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.bmp']);
 
+/** DNI peruano: 8 dígitos. */
+const DNI_REGEX = /^\d{8}$/;
+
+/** La clave de agrupación es un token numérico, de cualquier largo. */
+const GROUP_KEY_REGEX = /^\d+$/;
+
 export interface ValidatedFileItem {
   file: PickedFile;
   isValid: boolean;
   dni: string | null;
   code: string | null;
   errorReason?: string;
+  /**
+   * Algo que NO impide subir el archivo pero que el operador debería mirar.
+   *
+   * Existe porque el backend agrupa por clave numérica y NO por DNI validado
+   * (`GroupKey`): un token de 7 u 9 dígitos es casi siempre un dígito tipeado
+   * de más o de menos, no un documento ajeno. Marcarlo inválido lo borraba
+   * del lote, que era como se perdían. Se sube, se agrupa tal cual y el
+   * aviso honesto aparece en triaje.
+   */
+  warning?: string;
 }
 
 export interface DossierGroup {
@@ -17,6 +33,8 @@ export interface DossierGroup {
   presentCodes: string[];
   missingCodes: string[];
   isComplete: boolean;
+  /** False si la clave de agrupación no es un DNI de 8 dígitos. */
+  isDni: boolean;
   totalRequired: number;
   totalPresent: number;
 }
@@ -32,6 +50,8 @@ export interface BatchValidationResult {
   dossierCount: number;
   completeDossierCount: number;
   incompleteDossierCount: number;
+  /** Expedientes cuya clave de agrupación no es un DNI de 8 dígitos. */
+  nonDniKeyCount: number;
   isAllComplete: boolean;
   hasIncompleteDossiers: boolean;
   hasInvalidFiles: boolean;
@@ -80,15 +100,24 @@ export function useBatchFileValidation(
       }
 
       const dniCandidate = parts[0].trim();
-      if (!/^\d{8}$/.test(dniCandidate)) {
+      if (!GROUP_KEY_REGEX.test(dniCandidate)) {
+        // Sin token numérico no hay forma de saber a qué expediente pertenece
+        // el archivo, así que acá sí se rechaza (y el mensaje dice qué hacer).
         return {
           file,
           isValid: false,
           dni: dniCandidate || null,
           code: null,
-          errorReason: `DNI no válido ('${dniCandidate}'). Debe contener exactamente 8 dígitos numéricos.`,
+          errorReason: `El identificador '${dniCandidate || '(vacío)'}' no es numérico, así que no se puede agrupar el archivo en un expediente. Usa la estructura {DNI}_{CODIGO}.ext con solo dígitos.`,
         };
       }
+
+      // A partir de acá el token numérico SÍ sirve para agrupar, mida lo que
+      // mida. Solo se deja constancia de que no parece un DNI, para que el
+      // operador lo note y triaje lo diga explícitamente.
+      const keyWarning = DNI_REGEX.test(dniCandidate)
+        ? undefined
+        : `El identificador '${dniCandidate}' no es un DNI válido (no tiene 8 dígitos). Se enviará igual y los archivos se agruparán bajo esa clave. Si fue un error de tipeo, conviene renombrarlos antes de continuar.`;
 
       const codeCandidate = parts[1].trim().toUpperCase();
       if (!codeCandidate || codeCandidate.length < 2) {
@@ -116,13 +145,16 @@ export function useBatchFileValidation(
         isValid: true,
         dni: dniCandidate,
         code: codeCandidate,
+        warning: keyWarning,
       };
     });
 
     const validFiles = validatedFiles.filter((f) => f.isValid);
     const invalidFiles = validatedFiles.filter((f) => !f.isValid);
 
-    // Agrupar los válidos por DNI
+    // Agrupar los válidos por clave de agrupación (el token antes del `_`).
+    // No por DNI validado: el backend tampoco lo hace, y filtrar acá los
+    // descartaba archivos que allá sí se podían recuperar.
     const dossierMap = new Map<string, ValidatedFileItem[]>();
     for (const valid of validFiles) {
       if (!valid.dni) continue;
@@ -146,6 +178,7 @@ export function useBatchFileValidation(
           presentCodes,
           missingCodes,
           isComplete,
+          isDni: DNI_REGEX.test(dni),
           totalRequired: requiredCodes.length,
           totalPresent: presentCodes.filter((c) => requiredCodes.includes(c)).length,
         };
@@ -155,6 +188,7 @@ export function useBatchFileValidation(
     const completeDossierCount = dossierGroups.filter((g) => g.isComplete).length;
     const incompleteDossierCount = dossierGroups.length - completeDossierCount;
     const hasIncompleteDossiers = incompleteDossierCount > 0;
+    const nonDniKeyCount = dossierGroups.filter((g) => !g.isDni).length;
     const hasInvalidFiles = invalidFiles.length > 0;
     const canSubmit = validFiles.length > 0;
     const isAllComplete =
@@ -171,6 +205,7 @@ export function useBatchFileValidation(
       dossierCount: dossierGroups.length,
       completeDossierCount,
       incompleteDossierCount,
+      nonDniKeyCount,
       isAllComplete,
       hasIncompleteDossiers,
       hasInvalidFiles,
