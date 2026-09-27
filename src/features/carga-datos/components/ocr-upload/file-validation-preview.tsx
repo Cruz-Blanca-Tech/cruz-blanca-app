@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   FileText,
   FileWarning,
+  Info,
   Trash2,
   Users,
   X,
@@ -33,7 +34,14 @@ export function FileValidationPreview({
     hasIncompleteDossiers,
     completeDossierCount,
     dossierCount,
+    nonDniKeyCount,
   } = validation;
+
+  // Claves de agrupación que no son un DNI de 8 dígitos. NO son un error:
+  // el backend agrupa por token numérico, así que el archivo sube y no se
+  // pierde. Se avisa porque en triaje el identificador aparecerá como tal y
+  // el revisor tiene que saber que no es un DNI real.
+  const warnedFiles = validation.validFiles.filter((f) => f.warning);
 
   if (validation.totalFiles === 0) return null;
 
@@ -96,14 +104,64 @@ export function FileValidationPreview({
         </div>
       )}
 
-      {/* 2. SECCIÓN DE EXPEDIENTES POR DNI */}
+      {/* 1.b. CLAVES DE AGRUPACIÓN QUE NO SON DNI — informativo, no bloquea */}
+      {warnedFiles.length > 0 && (
+        <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
+          <div className="flex items-center gap-2 pb-2 text-sm font-semibold text-warning-dark">
+            <Info className="size-4.5" />
+            <span>
+              {nonDniKeyCount} expediente{nonDniKeyCount > 1 ? 's' : ''} agrupado
+              {nonDniKeyCount > 1 ? 's' : ''} con un identificador que no es un DNI
+            </span>
+          </div>
+          <p className="pb-3 text-xs text-muted-foreground">
+            Los archivos se suben y se agrupan tal cual, así que no se pierde
+            ninguno. El identificador solo sirve para juntar los archivos de un
+            expediente: en Triaje se mostrará como «identificador de agrupación»,
+            no como DNI, y el DNI real es el que registre la ficha. Si fue un
+            error al renombrar, conviene corregirlo ahora (quitar y volver a
+            tomar el archivo con el nombre bien puesto).
+          </p>
+
+          <ul className="flex max-h-48 flex-col gap-1.5 overflow-y-auto">
+            {warnedFiles.map((item: ValidatedFileItem) => (
+              <li
+                key={item.file.source_id}
+                className="flex items-center justify-between gap-3 rounded-md border border-warning/20 bg-card px-3 py-2 text-xs"
+              >
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate font-mono font-medium text-foreground">
+                    {item.file.file_name}
+                  </span>
+                  <span className="font-data text-[11px] text-warning-dark">
+                    {item.warning}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveFile(item.file.source_id)}
+                  disabled={disabled}
+                  title="Quitar este archivo"
+                  className="size-7 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 2. SECCIÓN DE EXPEDIENTES */}
       {dossierGroups.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border mb-3">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Users className="size-4.5 text-primary" />
               <span>
-                Expedientes agrupados por DNI ({dossierCount})
+                Expedientes agrupados ({dossierCount})
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -133,7 +191,15 @@ export function FileValidationPreview({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
                     <FileText className="size-3.5 text-muted-foreground" />
-                    DNI: {group.dni}
+                    {group.isDni ? `DNI: ${group.dni}` : `Identificador: ${group.dni}`}
+                    {!group.isDni && (
+                      <span
+                        className="rounded border border-warning/50 bg-warning/10 px-1 py-0 font-sans text-[9.5px] font-semibold text-warning-dark"
+                        title="Este identificador no es un DNI válido: solo agrupa los archivos de este expediente."
+                      >
+                        no es DNI
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge
