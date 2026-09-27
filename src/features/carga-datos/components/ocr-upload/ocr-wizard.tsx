@@ -17,24 +17,26 @@ interface BatchOutcome {
 
 /**
  * Contenedor del flujo OCR. Maneja el paso actual (1: subir, 2: procesando) y
- * guarda el resultado del batch para mostrarlo en el Paso 2. Cada paso se
- * renderiza de forma exclusiva, por lo que volver al Paso 1 remonta el
- * formulario y limpia los archivos seleccionados.
+ * guarda el resultado del batch para mostrarlo en el Paso 2.
  */
 export function OcrWizard() {
   const resetStore = useCargaDatosStore((s) => s.reset);
+  const clearPickedFiles = useCargaDatosStore((s) => s.clearPickedFiles);
   const [outcome, setOutcome] = useState<BatchOutcome | null>(null);
 
   const handleBatchCreated = useCallback(
     (result: CreateBatchResponse, summary: BatchSummary) => {
+      // El lote ya existe: los archivos de Drive ya no se pueden volver a
+      // cargar como si fueran nuevos. Se limpian apenas se crea el batch y no
+      // al volver atrás, para que un refresh a mitad de carga no los pierda.
+      clearPickedFiles();
       setOutcome({ result, summary });
     },
-    []
+    [clearPickedFiles]
   );
 
   const handleUploadMore = useCallback(() => {
-    // Resetea programa/actividad y vuelve al Paso 1 (el remontaje limpia los
-    // archivos seleccionados, que viven en el estado local de OcrUploadStep).
+    // Vuelve al Paso 1 con programa y actividad limpios y sin archivos.
     resetStore();
     setOutcome(null);
   }, [resetStore]);
