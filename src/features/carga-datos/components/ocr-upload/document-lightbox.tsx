@@ -35,6 +35,22 @@ interface DocumentLightboxProps {
    * no antes, así que el pedido arranca con la apertura y no con el render.
    */
   onOpen?: () => void;
+  /**
+   * Estado controlado desde afuera.
+   *
+   * La pantalla donde vive la lupa ya tiene su propio botón para mirar —el
+   * ojito de la bandeja, no un iconito de lupa— y quiere abrirla y cerrarla
+   * ella. Con `open` + `onOpenChange` lo hace. Sin `open`, la lupa se gobierna
+   * sola con su `DialogTrigger` (el caso del panel de revisión, la galería y
+   * el selector de Drive).
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /**
+   * No renderiza el botón de lupa por defecto. Sin él, el diálogo solo se
+   * abre si `open` viene controlado desde afuera.
+   */
+  showTrigger?: boolean;
 }
 
 /**
@@ -59,30 +75,38 @@ export function DocumentLightbox({
   failure,
   failedNote = 'No se puede mostrar esta vista previa.',
   onOpen,
+  open: openProp,
+  onOpenChange,
+  showTrigger = true,
 }: DocumentLightboxProps) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setOpenState(next);
+    onOpenChange?.(next);
+    // Solo al abrir: al cerrar no hay nada que pedir.
+    if (next) onOpen?.();
+  };
 
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        // Solo al abrir: al cerrar no hay nada que pedir.
-        if (next) onOpen?.();
-      }}
+      onOpenChange={setOpen}
     >
-      <DialogTrigger
-        render={
-          <Button
-            variant="secondary"
-            size="icon-sm"
-            className="absolute top-2 right-2 z-10 shadow-md"
-          />
-        }
-      >
-        <ZoomIn className="size-4" />
-        <span className="sr-only">Ver {fileName} más grande</span>
-      </DialogTrigger>
+      {showTrigger && (
+        <DialogTrigger
+          render={
+            <Button
+              variant="secondary"
+              size="icon-sm"
+              className="absolute top-2 right-2 z-10 shadow-md"
+            />
+          }
+        >
+          <ZoomIn className="size-4" />
+          <span className="sr-only">Ver {fileName} más grande</span>
+        </DialogTrigger>
+      )}
 
       <DialogContent
         showCloseButton={false}

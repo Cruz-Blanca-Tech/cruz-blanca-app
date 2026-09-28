@@ -131,6 +131,28 @@ export function usePreviewImage(
 }
 
 /**
+ * Vista previa de 2.000px que arranca pidiéndose, no en el render.
+ *
+ * Es la lupa del selector de Drive y la de la bandeja: la fila o la tarjeta
+ * entra en pantalla junto con cientos de otras, y bajarle la imagen completa a
+ * todas sería justamente lo que el tope de 4 descargas del loader existe para
+ * evitar. Se pide una sola —la que el operador está por mirar— y queda
+ * cacheada para el resto del flujo (validación, revisión, huecos).
+ *
+ * `sourceId` vacío = no hay nada que pedir (un archivo que no es imagen). El
+ * `retry` y el resto del estado vienen de `usePreviewImage`.
+ */
+export function useOnDemandPreview(sourceId: string, fileName = '') {
+  const [pedido, setPedido] = useState(false);
+  const state = usePreviewImage(sourceId, pedido, fileName);
+  return {
+    ...state,
+    /** Empieza a pedir la imagen. Da igual cuántas veces se llame. */
+    pedir: () => setPedido(true),
+  };
+}
+
+/**
  * `true` cuando el elemento está a punto de entrar en pantalla.
  *
  * Es lo que evita pedir de golpe todas las miniaturas de una lista: la galería
