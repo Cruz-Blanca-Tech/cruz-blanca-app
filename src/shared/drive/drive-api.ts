@@ -26,6 +26,28 @@ function authHeaders(token: string) {
 }
 
 /**
+ * Falló la descarga, y el código dice por qué.
+ *
+ * Antes el mensaje era uno solo para cualquier `!res.ok`, y eso borra
+ * justamente el dato que decide qué hacer: un `401` significa que hay que
+ * renovar la sesión y un `429` que hay que esperar y reintentar. Con un solo
+ * texto los dos se veían igual y los dos quedaban sin salida.
+ *
+ * El `403` NO se mezcla con el `401` a propósito: `403` casi siempre es que
+ * ese archivo en particular no se puede leer, y tirar la sesión ahí
+ * expulsaría al operador de Drive por un archivo.
+ */
+export class DriveHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`Google Drive respondió ${status}.`);
+    this.name = 'DriveHttpError';
+    this.status = status;
+  }
+}
+
+/**
  * Baja los bytes de un archivo de Drive con el token del usuario.
  *
  * Hace falta para los archivos privados. El proxy `/api/drive-image` va contra
@@ -48,9 +70,7 @@ export async function fetchDriveFileBlob(
   url.searchParams.append('supportsAllDrives', 'true');
 
   const res = await fetch(url.toString(), { headers: authHeaders(token) });
-  if (!res.ok) {
-    throw new Error('No se pudo descargar el archivo de Google Drive.');
-  }
+  if (!res.ok) throw new DriveHttpError(res.status);
   return res.blob();
 }
 
