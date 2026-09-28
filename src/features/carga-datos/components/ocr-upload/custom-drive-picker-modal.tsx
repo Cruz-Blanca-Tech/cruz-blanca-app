@@ -66,7 +66,14 @@ function PickerThumb({ file, iconSize = 4, imgClassName }: PickerThumbProps) {
   const { ref, near } = useNearViewport<HTMLSpanElement>({
     enabled: isImage,
   });
-  const { url } = useThumbnail(isImage ? file.id : '', isImage && near);
+  // El nombre va por la extensión: `image/tiff` pasa el filtro de `isImage`
+  // pero no lo dibuja ningún navegador, y bajarlo entero es gastar ancho de
+  // banda en un descarte. Ver `UNRENDERABLE_EXTENSIONS`.
+  const { url } = useThumbnail(
+    isImage ? file.id : '',
+    isImage && near,
+    file.name
+  );
 
   return (
     <span ref={ref} className="flex size-full items-center justify-center">

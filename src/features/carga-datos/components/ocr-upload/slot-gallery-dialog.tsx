@@ -324,7 +324,9 @@ function GalleryCard({
 }: GalleryCardProps) {
   const sourceId = item.file.source_id;
   const { ref, near } = useNearViewport<HTMLLIElement>();
-  const { url, failed } = useThumbnail(sourceId, near);
+  // El nombre va por el extension: sin él, un PDF del lote se bajaba entero
+  // para que `createImageBitmap` lo rechazara. Ver `UNRENDERABLE_EXTENSIONS`.
+  const { url, failed } = useThumbnail(sourceId, near, item.file.file_name);
 
   return (
     <li ref={ref} className="group relative">

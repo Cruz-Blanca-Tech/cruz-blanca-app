@@ -65,8 +65,28 @@ async function ensureIdentityServices(): Promise<void> {
 }
 
 const SESSION_STORAGE_KEY = 'cruz_blanca_drive_token';
+/**
+ * Separador de que el permiso de Drive ya fue concedido en este navegador.
+ *
+ * Sin este registro no se puede renovar una sesión vencida sin riesgo: el
+ * `prompt: ''` de GSI es silencioso **solo si el permiso ya existe**, y si
+ * nunca existió cae al flujo interactivo y abre un popup. Guardar que en algún
+ * momento se consiguió un token es lo que permite renovar sin ese riesgo: si
+ * nunca hubo token, nunca se intenta renovar, y el popup no puede aparecer.
+ */
+const GRANTED_KEY = 'cruz_blanca_drive_granted';
 let memoryToken: { value: string; expiresAt: number } | null = null;
 const TOKEN_EXPIRY_MARGIN_MS = 60_000;
+
+/**
+ * Renovación en curso, compartida.
+ *
+ * Sin esto, abrir la galería dispara un `load` por tarjeta y las 20 primeras
+ * llegan a la vez: 20 pedidos de token a Google en paralelo. El primero que
+ * responde deja a los otros 19 con un token vencido en la mano, que es
+ * exactamente el fallo que se está intentando arreglar.
+ */
+let pendingRenewal: Promise<string | null> | null = null;
 
 function getCachedToken(): { value: string; expiresAt: number } | null {
   if (memoryToken) return memoryToken;
@@ -93,6 +113,12 @@ function setCachedToken(value: string, expiresAt: number) {
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(tokenObj));
   } catch {
     // Ignore storage errors (e.g. incognito mode restrictions)
+  }
+  try {
+    sessionStorage.setItem(GRANTED_KEY, '1');
+  } catch {
+    // Si no se puede guardar, la sesión en curso anda igual; lo que se pierde
+    // es poder renovar más adelante, no el acceso a Drive.
   }
 }
 
@@ -144,10 +170,88 @@ function getDriveToken(google: GoogleApi): Promise<string> {
  * con Drive privado— pero sin la intromisión. Para volver a tener imágenes el
  * operador tiene que pasar por "Agregar más de Drive", que es donde el permiso
  * se concede y es un momento en que un popup tiene sentido.
+ *
+ * Las miniaturas y las vistas previas **no** usan esta: usan `renewDriveToken`,
+ * que renueva en silencio cuando el permiso ya existe. Con esta, una sesión de
+ * una hora vencida dejaba la pantalla sin fotos hasta que el operador volviera
+ * a pasar por el selector.
  */
 export function peekDriveToken(): string | null {
   const cached = getCachedToken();
   return cached && cached.expiresAt > Date.now() ? cached.value : null;
+}
+
+function wasGranted(): boolean {
+  try {
+    return sessionStorage.getItem(GRANTED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Olvida la sesión, para que el próximo intento renueve.
+ *
+ * Se llama cuando Google responde `401`: el token era válido en el papel y
+ * dejó de serlo, y sin esto el código de error seguiría en caché y cada
+ * reintento fallaría igual para siempre.
+ */
+export function invalidateDriveToken(): void {
+  memoryToken = null;
+  try {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Token de Drive, renovado en silencio si hizo falta.
+ *
+ * Es lo que usan las imágenes, y la diferencia con `peekDriveToken` es toda la
+ * diferencia entre una pantalla con fotos y una sin ellas. El token de GSI vive
+ * una hora; un lote de 200 escaneos lleva rato. Cuando se vencía, el camino de
+ * imágenes recibía `null`, tiraba "Sin sesión de Google Drive" y quedaba
+ * muerto: el único modo de recuperar era volver a pasar por "Agregar más de
+ * Drive", con el lote entero ya cargado. El selector de archivos, en cambio,
+ * siempre renovaba, así que la navegación seguía andando y solo las fotos
+ * morían — el síntoma era "las fotos no se ven" sin ninguna pista de por qué.
+ *
+ * Solo renueva si el permiso ya fue concedido (`GRANTED_KEY`), porque con
+ * `prompt: ''` Google abre un popup cuando no hay permiso previo. Si Google
+ * revoca el permiso, la renovación falla, se cae el registro y no se vuelve a
+ * intentar: reintentar en bucle solo abriría popups.
+ *
+ * `null` significa que no hay acceso a Drive, y el que llama decide qué
+ * mostrándole eso a una persona.
+ */
+export function renewDriveToken(): Promise<string | null> {
+  const cached = peekDriveToken();
+  if (cached) return Promise.resolve(cached);
+  if (!wasGranted()) return Promise.resolve(null);
+  if (pendingRenewal) return pendingRenewal;
+
+  pendingRenewal = (async () => {
+    try {
+      await ensureIdentityServices();
+      const google = getGoogleApi();
+      if (!google?.accounts?.oauth2) return null;
+      return await requestDriveToken(google);
+    } catch {
+      // Se renunció, se revocó el permiso o Google no cargó: se olvida que se
+      // concedió para no pedir un popup en cada miniatura.
+      try {
+        sessionStorage.removeItem(GRANTED_KEY);
+      } catch {
+        // Ignore storage errors
+      }
+      return null;
+    } finally {
+      pendingRenewal = null;
+    }
+  })();
+
+  return pendingRenewal;
 }
 
 /**
