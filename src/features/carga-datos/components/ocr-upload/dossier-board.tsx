@@ -11,13 +11,15 @@ import {
   FileWarning,
   Hand,
   Info,
+  Search,
   Trash2,
   Users,
   X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { cn, searchText } from '@/lib/utils';
 
 import type {
   BatchValidationResult,
@@ -29,6 +31,7 @@ import {
   type AssignmentDestination,
 } from './document-viewer-dialog';
 import { SlotGalleryDialog } from './slot-gallery-dialog';
+import { SlotDocumentDialog } from './slot-document-dialog';
 
 /**
  * MIME propio para el arrastre. Usar `text/plain` haría que el navegador
@@ -97,9 +100,20 @@ export function DossierBoard({
     presetKey?: string;
     presetCode?: string;
   } | null>(null);
+  /**
+   * Documento ya asociado que se está revisando. Es un estado aparte del
+   * `viewer` porque son dos pantallas distintas: la del `viewer` es un
+   * formulario para *asignar* un archivo que todavía no tiene destino, y acá el
+   * destino ya está decidido y lo que se hace es mirar la foto.
+   */
+  const [review, setReview] = useState<{
+    item: ValidatedFileItem;
+    slot: Slot;
+  } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hoverSlot, setHoverSlot] = useState<string | null>(null);
   const [filter, setFilter] = useState<BoardFilter>('all');
+  const [search, setSearch] = useState('');
   /**
    * Hueco que se está completando a mano (sin arrastrar). Al elegirlo se abre
    * la galería con los archivos sin expediente para elegir la foto.
@@ -131,11 +145,36 @@ export function DossierBoard({
     [dossierGroups]
   );
 
+  const query = searchText(search);
+
+  /**
+   * Los expedientes que se ven, después de los chips y de la búsqueda.
+   *
+   * La búsqueda da por la clave y también por los nombres de archivo del grupo.
+   * Lo segundo no estaba pedido, pero es la otra mitad de la misma pregunta: con
+   * 25 expedientes y 134 fotos sueltas, "buscar el expediente" y "buscar en qué
+   * expediente está esta foto" son la misma búsqueda, y el operador tiene las
+   * dos respuestas en la cabeza al mismo tiempo.
+   *
+   * Se arma un solo texto por expediente con las tres formas de escribir la
+   * clave —pelada, como `DNI …` y como `Clave …`, que es como el tablero la
+   * muestra y lo que el operador copia— más los nombres de sus archivos, y se
+   * compara contra eso. Un solo `includes` sobre un solo texto es más difícil
+   * de equivocar que cuatro condiciones en paralelo.
+   */
   const visibleGroups = useMemo(() => {
-    if (filter === 'incomplete') return orderedGroups.filter((g) => !g.isComplete);
-    if (filter === 'nonDni') return orderedGroups.filter((g) => !g.isDni);
-    return orderedGroups;
-  }, [orderedGroups, filter]);
+    let groups = orderedGroups;
+    if (filter === 'incomplete') groups = groups.filter((g) => !g.isComplete);
+    if (filter === 'nonDni') groups = groups.filter((g) => !g.isDni);
+    if (!query) return groups;
+    return groups.filter((g) =>
+      searchText(
+        `${g.dni} dni ${g.dni} clave ${g.dni} ${g.files
+          .map((f) => f.file.file_name)
+          .join(' ')}`
+      ).includes(query)
+    );
+  }, [orderedGroups, filter, query]);
 
   const missingSlotCount = dossierGroups.reduce(
     (total, group) => total + group.missingCodes.length,
@@ -268,6 +307,31 @@ export function DossierBoard({
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-1">
+            {/* El buscador va antes de los chips y no en su propia fila: con 25
+                expedientes la cabecera ya tiene tres cosas y agregar una
+                línea entera le comería altura al panel, que es lo que más
+                escasea en esta pantalla. */}
+            <div className="relative mr-1 w-44">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar expediente…"
+                aria-label="Buscar expedientes por clave o por nombre de archivo"
+                className="h-7 pr-7 pl-8 text-xs"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  aria-label="Limpiar la búsqueda"
+                  className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+
             <FilterChip
               active={filter === 'all'}
               onClick={() => setFilter('all')}
@@ -298,7 +362,17 @@ export function DossierBoard({
         <div className="max-h-[30rem] overflow-y-auto p-2">
           {visibleGroups.length === 0 ? (
             <p className="px-2 py-8 text-center text-xs text-muted-foreground">
-              No hay expedientes que coincidan con este filtro.
+              {query ? (
+                <>
+                  Ningún expediente coincide con{' '}
+                  <span className="font-data font-medium text-foreground">
+                    {search.trim()}
+                  </span>
+                  .
+                </>
+              ) : (
+                'No hay expedientes que coincidan con este filtro.'
+              )}
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
@@ -322,7 +396,7 @@ export function DossierBoard({
                     endDrag();
                   }}
                   onPickSlot={(slot) => setGallerySlot(slot)}
-                  onViewFile={(item) => setViewer({ item })}
+                  onViewFile={(item, slot) => setReview({ item, slot })}
                   onRemoveFile={onRemoveFile}
                   canUnassign={canUnassign}
                 />
@@ -451,6 +525,9 @@ export function DossierBoard({
         </div>
       </aside>
 
+      {/* El visor queda para los archivos de la bandeja, que todavía no tienen
+          destino y sí necesitan formulario. Lo que ya está colocado se revisa
+          con `SlotDocumentDialog`, más abajo. */}
       <DocumentViewerDialog
         item={viewer?.item ?? null}
         presetKey={viewer?.presetKey}
@@ -468,6 +545,39 @@ export function DossierBoard({
           setViewer(null);
         }}
         onClose={() => setViewer(null)}
+      />
+
+      <SlotDocumentDialog
+        item={review?.item ?? null}
+        slotKey={review?.slot.key ?? ''}
+        slotCode={review?.slot.code ?? ''}
+        codeNames={codeNames}
+        destinations={destinations}
+        onReplace={() => {
+          const slot = review?.slot;
+          // Dos modales apilados se pisan el foco, así que la galería se abre
+          // después de cerrar esta. Además conviene: traer otro archivo para
+          // esta ranura es justamente lo que hace la galería.
+          setReview(null);
+          if (slot) setGallerySlot(slot);
+        }}
+        onMove={(key, code) => {
+          const sourceId = review?.item.file.source_id;
+          setReview(null);
+          if (!sourceId) return;
+          place(sourceId, { key, code, id: `${key}|${code}` });
+          // `place` deja la galería abierta en el hueco siguiente para seguir
+          // llenando, que es lo que se quiere al arrastrar. Moviendo un
+          // documento, en cambio, lo que quedó vacío es la ranura de la que se
+          // salió, y esa no es la siguiente de la lista.
+          setGallerySlot(null);
+        }}
+        onRemove={() => {
+          const sourceId = review?.item.file.source_id;
+          setReview(null);
+          if (sourceId) onRemoveFile(sourceId);
+        }}
+        onClose={() => setReview(null)}
       />
 
       {/* La galería se cierra antes de abrir el selector de Drive: son dos
@@ -511,7 +621,7 @@ interface DossierRowProps {
   onHoverSlot: (slot: Slot, over: boolean) => void;
   onDrop: (slot: Slot) => void;
   onPickSlot: (slot: Slot) => void;
-  onViewFile: (item: ValidatedFileItem) => void;
+  onViewFile: (item: ValidatedFileItem, slot: Slot) => void;
   onRemoveFile: (sourceId: string) => void;
   canUnassign: (sourceId: string) => boolean;
 }
@@ -639,7 +749,7 @@ function DossierRow({
               key={code}
               type="button"
               disabled={disabled}
-              onClick={() => onViewFile(file)}
+              onClick={() => onViewFile(file, slot)}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
