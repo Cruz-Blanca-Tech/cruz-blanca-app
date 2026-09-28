@@ -414,7 +414,7 @@ export function DossierBoard({
               <strong className="font-semibold">
                 Faltan {missingSlotCount} documentos.
               </strong>{' '}
-              Arrastrá un archivo de la bandeja al hueco marcado, o hacé clic en
+              Arrastrá un archivo de la bandeja al hueco marcado, o haz clic en
               el hueco para ver las fotos y elegir una. También podés quitar el
               expediente entero con la ✕ y seguir sin él.
             </p>
@@ -436,7 +436,7 @@ export function DossierBoard({
 
           <p className="text-[11px] text-muted-foreground">
             Estos archivos no se van a subir. Abrilos para ver de qué se trata
-            y decidir su expediente, arrastralos a un hueco, o hacé clic en un
+            y decidir su expediente, arrastralos a un hueco, o haz clic en un
             hueco ✗ para elegir la foto de una grilla.
           </p>
         </header>
@@ -731,7 +731,7 @@ function DossierRow({
                   e.preventDefault();
                   onDrop(slot);
                 }}
-                title={`Falta ${codeNames[code] ?? code}. Hacé clic para ver las fotos de los archivos sueltos y elegir una, o arrastralo acá.`}
+                title={`Falta ${codeNames[code] ?? code}. Haz clic para ver las fotos de los archivos sueltos y elegir una, o arrastralo acá.`}
                 className={cn(
                   'rounded border border-dashed px-1.5 py-0.5 font-data text-[10px] font-medium transition-colors',
                   dragging
