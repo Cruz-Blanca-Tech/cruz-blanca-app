@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { FileText, ImageOff, Loader2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,10 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
-  loadDrivePreview,
-  loadDriveThumbnail,
-  peekDrivePreview,
-  peekDriveThumbnail,
-} from '@/shared/drive/thumbnail';
+  useNearViewport,
+  usePreviewImage,
+  useThumbnail,
+} from '@/shared/drive/use-drive-image';
 
 import type { ValidatedFileItem } from '../../hooks/use-batch-file-validation';
 
@@ -103,21 +102,46 @@ export function SlotGalleryDialog({
   return (
     <Dialog open={slot !== null} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-6xl">
+        {/* El destino se parte en dos: el expediente a la izquierda, que es la
+            persona, y el tipo de documento a la derecha, que es lo que hay que
+            completar. Estaban en una sola frase, "Falta DNI Apoderado en el
+            expediente 900220720", y con el tipo primero la lectura empezaba por
+            lo que el operador ya sabe —el archivo que le falta— en vez de por
+            el dato que lo identifica.
+
+            El tipo además va arriba a la derecha a propósito: en el layout de
+            dos columnas cae justo sobre el panel de vista previa y el botón, o
+            sea sobre la decisión, y no hay que ir a buscarlo. */}
         <DialogHeader className="border-b border-border p-4">
-          <DialogTitle className="text-base">
-            {slot && (
-              <>
-                Falta{' '}
-                <span className="font-data font-semibold text-foreground">
-                  {codeNames[slot.code] ?? slot.code}
-                </span>{' '}
-                en el expediente{' '}
-                <span className="font-data font-semibold text-foreground">
-                  {slot.key}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <DialogTitle className="text-base">
+              {slot && (
+                <span className="flex items-baseline gap-2">
+                  <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                    Expediente
+                  </span>
+                  <span className="font-data text-lg font-semibold text-foreground">
+                    {slot.key}
+                  </span>
+                  {/* El `DialogTitle` es el nombre accesible del diálogo, y el
+                      tipo de documento quedó fuera de él, en el badge de al
+                      lado. Sin esto, un lector de pantalla anunciaría
+                      "Expediente 900220720" y perdería justo el dato que dice
+                      qué se está llenando. */}
+                  <span className="sr-only">
+                    , documento {codeNames[slot.code] ?? slot.code}
+                  </span>
                 </span>
-              </>
+              )}
+            </DialogTitle>
+
+            {slot && (
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
+                <FileText className="size-4 shrink-0" />
+                {codeNames[slot.code] ?? slot.code}
+              </span>
             )}
-          </DialogTitle>
+          </div>
           <DialogDescription className="text-xs">
             {candidates.length === 0
               ? 'No queda ningún archivo sin expediente. Traé más desde Drive.'
@@ -152,8 +176,6 @@ export function SlotGalleryDialog({
             <aside className="order-1 flex flex-col border-b border-border md:order-2 md:border-b-0 md:border-l">
               <PreviewPane
                 item={selected}
-                codeName={slot ? (codeNames[slot.code] ?? slot.code) : ''}
-                slotKey={slot?.key ?? ''}
                 onAssign={assign}
                 onRemove={selected ? () => onRemove(selected.file.source_id) : undefined}
               />
@@ -366,26 +388,13 @@ function GalleryCard({
 
 interface PreviewPaneProps {
   item: ValidatedFileItem | null;
-  codeName: string;
-  slotKey: string;
   onAssign: () => void;
   onRemove: (() => void) | undefined;
 }
 
-function PreviewPane({
-  item,
-  codeName,
-  slotKey,
-  onAssign,
-  onRemove,
-}: PreviewPaneProps) {
+function PreviewPane({ item, onAssign, onRemove }: PreviewPaneProps) {
   const sourceId = item?.file.source_id ?? '';
-  const { url, failed } = useDriveImage(
-    sourceId,
-    Boolean(sourceId),
-    loadDrivePreview,
-    peekDrivePreview
-  );
+  const { url, failed } = usePreviewImage(sourceId, Boolean(sourceId));
 
   return (
     <>
@@ -420,17 +429,14 @@ function PreviewPane({
           <p className="truncate font-data text-xs font-medium text-foreground">
             {item.file.file_name}
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Se va a asociar como{' '}
-            <span className="font-medium text-foreground">{codeName}</span> en
-            el expediente{' '}
-            <span className="font-data font-medium text-foreground">
-              {slotKey}
-            </span>
-          </p>
 
+          {/* El destino —expediente y tipo de documento— está en la cabecera,
+              arriba a la derecha, justo sobre este panel. Repetirlo acá
+              aligeraba el botón ("Asociar" y no "Asociar a 900220720") pero
+              dejaba la decisión con el destino a media pantalla de distancia,
+              que es justo cuando un clic de más carga el DNI de otra persona. */}
           <Button size="sm" className="mt-2.5 w-full" onClick={onAssign}>
-            Asociar a {slotKey}
+            Asociar
           </Button>
 
           <div className="mt-1.5 flex items-center gap-2">
@@ -452,90 +458,4 @@ function PreviewPane({
       )}
     </>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/* Carga de imágenes                                                   */
-/* ------------------------------------------------------------------ */
-
-type ImageLoader = (sourceId: string) => Promise<string>;
-type ImagePeeker = (sourceId: string) => string | undefined;
-
-/**
- * Imagen del archivo en el tamaño que pida el `loader`, una vez que `enabled`.
- *
- * El estado llega comparando contra el `sourceId`: si el archivo cambia, lo
- * que quedó cargado es de otro y no se muestra. El caché se lee durante el
- * render para no tener que setear estado sincrónico dentro del efecto.
- */
-function useDriveImage(
-  sourceId: string,
-  enabled: boolean,
-  load: ImageLoader,
-  peek: ImagePeeker
-) {
-  const [loaded, setLoaded] = useState<{ id: string; url: string } | null>(
-    null
-  );
-  const [failedId, setFailedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!enabled || !sourceId) return;
-    let cancelled = false;
-    void load(sourceId)
-      .then((dataUrl) => {
-        if (!cancelled) setLoaded({ id: sourceId, url: dataUrl });
-      })
-      .catch(() => {
-        if (!cancelled) setFailedId(sourceId);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceId, enabled, load]);
-
-  const cached = enabled ? peek(sourceId) : undefined;
-  return {
-    url: loaded?.id === sourceId ? loaded.url : cached,
-    failed: failedId === sourceId,
-  };
-}
-
-/** Miniatura de la tarjeta, solo si la tarjeta está cerca de la vista. */
-function useThumbnail(sourceId: string, enabled: boolean) {
-  return useDriveImage(
-    sourceId,
-    enabled,
-    loadDriveThumbnail,
-    peekDriveThumbnail
-  );
-}
-
-/**
- * `true` cuando el elemento está a punto de entrar en pantalla.
- *
- * Es lo que evita pedir las 141 miniaturas de golpe: con la galería abierta se
- * descargan las ~20 que se ven y las demás a medida que se scrollea.
- */
-function useNearViewport<T extends HTMLElement>(margin = '400px') {
-  const ref = useRef<T | null>(null);
-  const [near, setNear] = useState(false);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || near) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setNear(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: margin }
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [near, margin]);
-
-  return { ref, near };
 }
