@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePreviewImage, type ImageFailure } from '@/shared/drive/use-drive-image';
 
+import { DocumentLightbox } from './document-lightbox';
+
 interface DocumentPreviewProps {
   /** Id de Drive del archivo. Vacío = no hay nada que mirar. */
   sourceId: string;
@@ -79,7 +81,7 @@ export function DocumentPreview({
   return (
     <div
       className={cn(
-        'flex items-center justify-center overflow-hidden bg-muted',
+        'relative flex items-center justify-center overflow-hidden bg-muted',
         className
       )}
     >
@@ -110,6 +112,10 @@ export function DocumentPreview({
       ) : (
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       )}
+
+      {/* Solo cuando hay imagen: la lupa no sirve si lo que se abriría es el
+          mensaje de error, y el botón flotando sobre el texto estorba. */}
+      {url && <DocumentLightbox url={url} fileName={fileName} />}
     </div>
   );
 }
