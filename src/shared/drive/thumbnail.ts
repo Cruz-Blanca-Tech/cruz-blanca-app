@@ -276,7 +276,18 @@ function createImageLoader({
       // La promesa vive en el caché de "en curso" solo mientras corre: si la
       // sacamos al terminar, el siguiente que la pida recibe la imagen del
       // caché en lugar de una promesa rechazada que ya no tiene consumidor.
-      void task.finally(() => inflight.delete(sourceId));
+      //
+      // `then` con los dos handlers, y no `finally`: `finally` devuelve una
+      // promesa nueva que rechaza con lo mismo, y como nadie la consume queda
+      // como rechazo sin manejar. En desarrollo eso es el overlay de Next
+      // tapando la pantalla con un error que la aplicación ya sabe manejar —
+      // sin sesión de Drive es una condición esperada, no una falla. Con
+      // `then` los dos handlers resuelven y la cadena no rechaza; `task`
+      // sigue rechazando para el que la pidió, que sí la maneja.
+      task.then(
+        () => inflight.delete(sourceId),
+        () => inflight.delete(sourceId)
+      );
       return task;
     },
 
