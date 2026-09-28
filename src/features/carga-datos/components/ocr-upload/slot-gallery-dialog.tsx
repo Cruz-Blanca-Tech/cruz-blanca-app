@@ -14,11 +14,11 @@ import {
 import { cn } from '@/lib/utils';
 import {
   useNearViewport,
-  usePreviewImage,
   useThumbnail,
 } from '@/shared/drive/use-drive-image';
 
 import type { ValidatedFileItem } from '../../hooks/use-batch-file-validation';
+import { DocumentPreview } from './document-preview';
 
 /** Un hueco libre de un expediente: el destino de lo que se elige acá. */
 export interface GallerySlot {
@@ -393,36 +393,14 @@ interface PreviewPaneProps {
 }
 
 function PreviewPane({ item, onAssign, onRemove }: PreviewPaneProps) {
-  const sourceId = item?.file.source_id ?? '';
-  const { url, failed } = usePreviewImage(sourceId, Boolean(sourceId));
-
   return (
     <>
-      {/* `object-contain`, no `cover`: un DNI se reconoce por la foto y por el
-          sello de arriba; recortar para llenar la caja puede cortar justo lo
-          que hacía falta ver. */}
-      <div className="flex max-h-[28vh] min-h-32 items-center justify-center overflow-hidden bg-muted md:max-h-[56vh]">
-        {item === null ? null : url ? (
-          /* eslint-disable-next-line @next/next/no-img-element -- data URL
-              ya reducida en el cliente; `next/image` solo agregaría una vuelta
-              por el optimizador. */
-          <img
-            src={url}
-            alt={item.file.file_name}
-            className="size-full object-contain"
-          />
-        ) : failed ? (
-          <div className="flex flex-col items-center gap-1.5 px-4 text-center">
-            <ImageOff className="size-6 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">
-              No se puede mostrar esta vista previa. Si el archivo está bien,
-              igual podés asociarlo.
-            </p>
-          </div>
-        ) : (
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        )}
-      </div>
+      <DocumentPreview
+        sourceId={item?.file.source_id ?? ''}
+        fileName={item?.file.file_name ?? ''}
+        className="max-h-[28vh] min-h-32 md:max-h-[56vh]"
+        failedNote="No se puede mostrar esta vista previa. Si el archivo está bien, igual podés asociarlo."
+      />
 
       {item !== null && (
         <div className="border-t border-border p-3">
