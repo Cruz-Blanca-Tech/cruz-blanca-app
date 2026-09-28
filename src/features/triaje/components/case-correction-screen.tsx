@@ -3,7 +3,6 @@
 import { FormProvider } from 'react-hook-form';
 import {
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
   Lock,
   Loader2,
@@ -12,7 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useState } from 'react';
 
 import { useCaseCorrection } from '../hooks/use-case-correction';
@@ -26,7 +25,6 @@ import { CaseCorrectionHeader } from './case-correction-header';
 import { IncompleteCasePanel } from './incomplete-case-panel';
 import { CaseCorrectionActions } from './case-correction-actions';
 import { UploadMissingDocModal } from './upload-missing-doc-modal';
-import { useUploadMissingDoc } from '../hooks/use-upload-missing-doc';
 import { useReprocessDossier } from '../hooks/use-reprocess-dossier';
 import { RejectCaseDialog } from './reject-case-dialog';
 import { DossierDocumentChecklist } from './dossier-document-checklist';
@@ -318,17 +316,10 @@ export function CaseCorrectionScreen({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {vm.nextCase ? (
-              <Button size="sm" onClick={() => vm.nextCase && vm.goToCase(vm.nextCase)}>
-                Siguiente registro
-                <ArrowRight className="size-3.5" />
-              </Button>
-            ) : (
-              <Button size="sm" onClick={vm.goBackToBatch}>
-                <ArrowLeft className="size-3.5" />
-                Volver al lote para registrar
-              </Button>
-            )}
+            <Button size="sm" variant="ghost" onClick={vm.goBackToBatch}>
+              <ArrowLeft className="size-3.5 mr-1" />
+              Volver al lote
+            </Button>
           </div>
         </div>
       )}
@@ -346,17 +337,10 @@ export function CaseCorrectionScreen({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {vm.nextCase ? (
-              <Button size="sm" onClick={() => vm.nextCase && vm.goToCase(vm.nextCase)}>
-                Siguiente registro
-                <ArrowRight className="size-3.5" />
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={vm.goBackToBatch}>
-                <ArrowLeft className="size-3.5" />
-                Volver al lote
-              </Button>
-            )}
+            <Button size="sm" variant="ghost" onClick={vm.goBackToBatch}>
+              <ArrowLeft className="size-3.5 mr-1" />
+              Volver al lote
+            </Button>
           </div>
         </div>
       )}
@@ -439,23 +423,20 @@ export function CaseCorrectionScreen({
           </div>
 
           <CaseCorrectionActions
-            onBack={vm.goBackToBatch}
             onReject={() => vm.setRejectOpen(true)}
             onSubmit={handleValidationClick}
-            onNext={() => vm.nextCase && vm.goToCase(vm.nextCase)}
-            hasNext={Boolean(vm.nextCase)}
+            onReprocess={() => {
+                reprocessMutation.mutate(undefined, {
+                    onSuccess: () => {
+                      // El toast de éxito real se muestra ahora cuando el polling termina
+                      void vm.refetchCase();
+                    }
+                  });
+              }}
             isSubmitting={vm.isSubmitting}
             isIncomplete={isIncomplete}
             canReject={caseActions.canReject}
-              onReprocess={() => {
-                  reprocessMutation.mutate(undefined, {
-                      onSuccess: () => {
-                        // El toast de éxito real se muestra ahora cuando el polling termina
-                        void vm.refetchCase();
-                      }
-                    });
-                }}
-              isReprocessing={reprocessMutation.isPending}
+            isReprocessing={reprocessMutation.isPending}
             canEdit={caseActions.canEdit}
           />
         </div>

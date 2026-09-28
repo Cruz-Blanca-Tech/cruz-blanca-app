@@ -163,13 +163,19 @@ export function CaseValidationPanel({
               return (
                 <div
                   key={`d-${i}`}
-                  onClick={() => d.fieldId && onJumpField(d.fieldId)}
+                  onClick={() => {
+                    if (d.navigation_hint === 'contactos_apoderados') {
+                      onJumpGroup('Contactos y Apoderado');
+                    } else if (d.fieldId) {
+                      onJumpField(d.fieldId);
+                    }
+                  }}
                   className={cn(
                     'flex items-start gap-2 rounded-md border p-2',
                     isError && 'border-error/20 bg-error-light',
                     isInfo && 'border-emerald-200 bg-emerald-50',
                     !isError && !isInfo && 'border-warning/20 bg-warning-light',
-                    jumpable && 'cursor-pointer'
+                    (jumpable || d.navigation_hint) && 'cursor-pointer'
                   )}
                 >
                   {isError ? (
@@ -193,13 +199,30 @@ export function CaseValidationPanel({
                       - {d.rule_description}
                     </div>
                   </div>
-                  {jumpable && (
-                    <CornerDownRight
-                      className={cn(
-                        'mt-0.5 size-3.5 shrink-0',
-                        isError ? 'text-error' : isInfo ? 'text-emerald-600' : 'text-warning'
+                  {(jumpable || d.navigation_hint) && (
+                    <div className="flex items-center gap-1.5">
+                      {d.navigation_hint === 'contactos_apoderados' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onJumpGroup('Contactos y Apoderado');
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark underline"
+                          aria-label="Ir a Contactos y Apoderado"
+                        >
+                          Ir a Contactos y Apoderado
+                        </button>
                       )}
-                    />
+                      {d.fieldId && !d.navigation_hint && (
+                        <CornerDownRight
+                          className={cn(
+                            'mt-0.5 size-3.5 shrink-0',
+                            isError ? 'text-error' : isInfo ? 'text-emerald-600' : 'text-warning'
+                          )}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               );
