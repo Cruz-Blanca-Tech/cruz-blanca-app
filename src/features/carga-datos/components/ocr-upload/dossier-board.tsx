@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn, searchText } from '@/lib/utils';
+import { useOnDemandPreview } from '@/shared/drive/use-drive-image';
 
 import type {
   BatchValidationResult,
@@ -30,6 +31,7 @@ import {
   DocumentViewerDialog,
   type AssignmentDestination,
 } from './document-viewer-dialog';
+import { DocumentLightbox } from './document-lightbox';
 import { SlotGalleryDialog } from './slot-gallery-dialog';
 import { SlotDocumentDialog } from './slot-document-dialog';
 
@@ -470,7 +472,6 @@ export function DossierBoard({
                               })
                           : undefined
                       }
-                      onView={() => setViewer({ item, presetKey: item.dni ?? '' })}
                       onRemove={() => onRemoveFile(item.file.source_id)}
                     />
                   ))}
@@ -900,18 +901,32 @@ function TrayRow({
 function FixableRow({
   item,
   onFix,
-  onView,
   onRemove,
   disabled,
 }: {
   item: ValidatedFileItem;
   onFix: (() => void) | undefined;
-  onView: () => void;
   onRemove: () => void;
   disabled: boolean;
 }) {
   const missing = item.fix?.missingCodes ?? [];
   const missingCount = missing.length;
+  /**
+   * El expediente ya se sabe —el nombre lo lleva—, así que no hay formulario
+   * que abrir: quien mira decide viendo la foto, y para eso el ojito abre la
+   * misma lupa que el selector de Drive, una imagen en grande sin botones que
+   * la tapen. La imagen se pide recién al abrir, que es cuando sirve.
+   */
+  const [ver, setVer] = useState(false);
+  const { url, failed, failure, pedir } = useOnDemandPreview(
+    item.file.source_id,
+    item.file.file_name
+  );
+
+  const mirar = () => {
+    pedir();
+    setVer(true);
+  };
 
   return (
     <li className="flex flex-col gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5">
@@ -919,7 +934,7 @@ function FixableRow({
         <FileWarning className="size-3 shrink-0 text-destructive" />
         <button
           type="button"
-          onClick={onView}
+          onClick={mirar}
           disabled={disabled}
           className="min-w-0 flex-1 truncate text-left font-data text-[11px] text-foreground"
           title={item.errorReason}
@@ -928,10 +943,10 @@ function FixableRow({
         </button>
         <button
           type="button"
-          onClick={onView}
+          onClick={mirar}
           disabled={disabled}
-          title="Ver el archivo"
-          aria-label={`Ver ${item.file.file_name}`}
+          title="Ver el archivo en grande"
+          aria-label={`Ver ${item.file.file_name} en grande`}
           className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
         >
           <Eye className="size-3.5" />
@@ -970,18 +985,28 @@ function FixableRow({
           {missingCount === 0 ? (
             <span>
               El expediente {item.dni} ya está completo, así que este archivo
-              sobra o es de otra persona. Abrilo para ver de qué se trata.
+              sobra o es de otra persona. Miralo en grande con el ojito para
+              ver de qué se trata.
             </span>
           ) : (
             <span>
               A {item.dni} le falta{missingCount > 1 ? 'n' : ''}{' '}
               {missingCount > 1 ? 'varios documentos' : 'un documento'} (
-              {missing.join(', ')}) y no se puede deducir cuál es.{' '}
-              Abrilo para ver la foto y elegir el tipo.
+              {missing.join(', ')}) y no se puede deducir cuál es. Miralo en
+              grande con el ojito y arrastralo al hueco del documento que sea.
             </span>
           )}
         </p>
       )}
+
+      <DocumentLightbox
+        url={url}
+        fileName={item.file.file_name}
+        failure={failed ? failure : undefined}
+        open={ver}
+        onOpenChange={setVer}
+        showTrigger={false}
+      />
     </li>
   );
 }

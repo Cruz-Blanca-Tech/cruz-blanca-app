@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 import type { PickedFile, DriveFile, DriveBreadcrumb } from '@/shared/drive/types';
 import { ROOT_NODES, listDriveContent, listFolderFiles } from '@/shared/drive/drive-api';
 import { getDriveFileIcon } from '@/shared/drive/drive-file-icon';
-import { useNearViewport, usePreviewImage, useThumbnail } from '@/shared/drive/use-drive-image';
+import { useNearViewport, useOnDemandPreview, useThumbnail } from '@/shared/drive/use-drive-image';
 import { DocumentLightbox } from './document-lightbox';
 
 interface PickerThumbProps {
@@ -109,10 +109,8 @@ function PickerThumb({ file, iconSize = 4, imgClassName }: PickerThumbProps) {
  */
 function PickerLightbox({ file }: { file: DriveFile }) {
   const isImage = file.mimeType?.startsWith('image/') ?? false;
-  const [pedido, setPedido] = useState(false);
-  const { url, failed, failure } = usePreviewImage(
+  const { url, failed, failure, pedir } = useOnDemandPreview(
     isImage ? file.id : '',
-    pedido,
     file.name
   );
 
@@ -123,7 +121,7 @@ function PickerLightbox({ file }: { file: DriveFile }) {
       url={url}
       fileName={file.name}
       failure={failed ? failure : undefined}
-      onOpen={() => setPedido(true)}
+      onOpen={pedir}
     />
   );
 }
