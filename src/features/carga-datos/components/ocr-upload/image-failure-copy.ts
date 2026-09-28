@@ -18,7 +18,7 @@ export function failureCopy(
 ) {
   switch (failure) {
     case 'session':
-      return 'No pudimos acceder a Google Drive. Volvé a agregar archivos desde Drive para renovar el acceso.';
+      return 'No pudimos acceder a Google Drive. Conectá Drive una vez desde "Agregar más de Drive"; después las imágenes se ven sin volver a pedir permiso.';
     case 'transient':
       return 'Google Drive no respondió. Puede ser un momento de carga.';
     case 'unrenderable':
