@@ -34,6 +34,7 @@ import { DossierBoard } from './dossier-board';
 import { FileNamingHelp } from './file-naming-help';
 import { OcrHelpNote } from './ocr-help-note';
 import { ProgramActivityStep } from './program-activity-step';
+import { StartOverButton } from './start-over-button';
 import {
   composeFileName,
   useBatchFileValidation,
@@ -56,6 +57,8 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
   const addPickedFiles = useCargaDatosStore((s) => s.addPickedFiles);
   const renamePickedFile = useCargaDatosStore((s) => s.renamePickedFile);
   const removePickedFile = useCargaDatosStore((s) => s.removePickedFile);
+  const clearPickedFiles = useCargaDatosStore((s) => s.clearPickedFiles);
+  const resetStore = useCargaDatosStore((s) => s.reset);
 
   // Subfase interna: 'config' (Programa y Actividad) | 'upload' (Subida de archivos y Lote)
   const [subStep, setSubStep] = useState<'config' | 'upload'>('config');
@@ -176,6 +179,25 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
 
 
   const fileValidation = useBatchFileValidation(files, documents);
+
+  /**
+   * Las dos formas de abandonar el lote en curso.
+   *
+   * La descripción va en el mismo gesto porque es parte de la carga: dejarla
+   * escrita llevaría a mandar el lote nuevo con la explicación del anterior.
+   *
+   * El paso activo no hay que tocarlo a mano: `reset()` deja la actividad sin
+   * seleccionar, y el salto a 'config' que hay más arriba ya reacciona a eso.
+   */
+  const handleClearFiles = useCallback(() => {
+    clearPickedFiles();
+    setDescription('');
+  }, [clearPickedFiles]);
+
+  const handleResetAll = useCallback(() => {
+    resetStore();
+    setDescription('');
+  }, [resetStore]);
 
   // Validación centralizada del Paso 1: programa/actividad (store), archivos
   // (picker) y descripción (local) se validan con un único schema Zod.
@@ -301,10 +323,25 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
                 )}
 
                 <footer className="flex items-center justify-between gap-3 border-t border-border pt-4">
-                  <Button variant="ghost" size="sm" disabled>
-                    <ArrowLeft className="size-4 mr-1" />
-                    Anterior
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" disabled>
+                      <ArrowLeft className="size-4 mr-1" />
+                      Anterior
+                    </Button>
+                    {/* También en el paso 1, y no solo en la barra del paso 2:
+                        un refresh siempre vuelve acá —el paso activo no se
+                        persiste— y deja los archivos del lote anterior
+                        esperando en el store, invisibles hasta que el operador
+                        toca "Continuar". Sin esta salida, la única forma de
+                        vaciar 181 filas era con la ✕ de a una. */}
+                    <StartOverButton
+                      fileCount={files.length}
+                      programLabel={programLabel ?? null}
+                      activityName={activity?.name ?? null}
+                      onClearFiles={handleClearFiles}
+                      onResetAll={handleResetAll}
+                    />
+                  </div>
 
                   <div className="flex items-center gap-3">
                     {!hasActivity && (
@@ -355,6 +392,18 @@ export function OcrUploadStep({ onBatchCreated }: OcrUploadStepProps) {
                       <ArrowLeft className="size-3.5 mr-1" />
                       Cambiar actividad
                     </Button>
+                    {/* Va en la barra sticky y no solo al pie de la página
+                        porque con 25 expedientes la barra es lo único que se
+                        ve sin scrollear: es donde el operador se da cuenta de
+                        que está armando el lote equivocado. */}
+                    <StartOverButton
+                      fileCount={files.length}
+                      programLabel={programLabel ?? null}
+                      activityName={activity?.name ?? null}
+                      onClearFiles={handleClearFiles}
+                      onResetAll={handleResetAll}
+                      disabled={createBatch.isPending}
+                    />
                   </div>
                 )}
 
