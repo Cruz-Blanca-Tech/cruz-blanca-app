@@ -231,7 +231,7 @@ export function DocumentLightbox({
 
       <DialogContent
         showCloseButton={false}
-        className="relative flex h-[90vh] w-[96vw] max-w-[96vw] flex-col gap-2 overflow-hidden bg-slate-950/95 p-3 sm:max-w-[96vw]"
+        className="flex h-[90vh] w-[96vw] max-w-[96vw] flex-col gap-2 overflow-hidden bg-slate-950/95 p-3 sm:max-w-[96vw]"
       >
         <div className="flex shrink-0 items-center justify-between gap-3">
           <DialogTitle className="truncate text-sm font-medium text-slate-200">
