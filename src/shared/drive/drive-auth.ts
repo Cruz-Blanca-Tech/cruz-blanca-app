@@ -4,8 +4,8 @@
  * en `triaje/.../single-drive-file-picker.tsx` (el propio código lo admitía en un
  * comentario). Se centraliza aquí.
  *
- * Es un módulo cliente (usa `window`/`sessionStorage`): solo se invoca desde
- * componentes `'use client'`.
+ * Es un módulo cliente (usa `window`, `sessionStorage` y `localStorage`): solo
+ * se invoca desde componentes `'use client'`.
  */
 import { clientEnv } from '@/lib/env';
 import type { GoogleApi, GoogleTokenResponse } from '@/types/google-picker';
@@ -73,6 +73,14 @@ const SESSION_STORAGE_KEY = 'cruz_blanca_drive_token';
  * nunca existió cae al flujo interactivo y abre un popup. Guardar que en algún
  * momento se consiguió un token es lo que permite renovar sin ese riesgo: si
  * nunca hubo token, nunca se intenta renovar, y el popup no puede aparecer.
+ *
+ * Vive en `localStorage`, y no en `sessionStorage`, porque describe a la
+ * cuenta de Google del navegador, no a la pestaña. Con `sessionStorage` cada
+ * pestaña nueva arrancaba sin registro, la renovación silenciosa se negaba y
+ * las imágenes morían hasta volver a pasar por "Agregar más de Drive" —aunque
+ * el permiso de Google siguiera vigente. Compartido entre pestañas, basta con
+ * haber conectado Drive una vez para que todas las sesiones siguientes de esa
+ * cuenta reutilicen la autorización de su inicio de sesión en Google.
  */
 const GRANTED_KEY = 'cruz_blanca_drive_granted';
 let memoryToken: { value: string; expiresAt: number } | null = null;
@@ -114,12 +122,9 @@ function setCachedToken(value: string, expiresAt: number) {
   } catch {
     // Ignore storage errors (e.g. incognito mode restrictions)
   }
-  try {
-    sessionStorage.setItem(GRANTED_KEY, '1');
-  } catch {
-    // Si no se puede guardar, la sesión en curso anda igual; lo que se pierde
-    // es poder renovar más adelante, no el acceso a Drive.
-  }
+  // El permiso queda marcado en `localStorage` (ver `GRANTED_KEY`): compartido
+  // entre pestañas, alcanza con concederlo una vez por navegador y cuenta.
+  markGranted();
 }
 
 /** Pide un access token de Drive (silencioso si ya se concedió el permiso). */
@@ -160,32 +165,59 @@ function getDriveToken(google: GoogleApi): Promise<string> {
 }
 
 /**
- * Token de Drive **solo si ya está en caché**. No pide uno nuevo.
+ * Token de Drive **solo si ya está en caché**. No pide uno nuevo ni renueva.
  *
- * Para el visor de documentos: abrir un archivo no puede abrir una ventana de
- * consentimiento de Google en medio de la pantalla de trabajo. `prompt: ''` de
- * GSI es silencioso únicamente si el permiso ya se concedió alguna vez; si
- * nunca se concedió, GSI igual cae al flujo interactivo y salta el popup. Si
- * no hay token no se muestra la imagen —que es lo que pasaba antes, siempre,
- * con Drive privado— pero sin la intromisión. Para volver a tener imágenes el
- * operador tiene que pasar por "Agregar más de Drive", que es donde el permiso
- * se concede y es un momento en que un popup tiene sentido.
- *
- * Las miniaturas y las vistas previas **no** usan esta: usan `renewDriveToken`,
- * que renueva en silencio cuando el permiso ya existe. Con esta, una sesión de
- * una hora vencida dejaba la pantalla sin fotos hasta que el operador volviera
- * a pasar por el selector.
+ * La renovación (`renewDriveToken`) se apoya en esta para no pedirle nada a
+ * Google si lo que hay en caché todavía alcanza. Es también el acceso que
+ * necesitan los llamadores que bajo ningún concepto pueden disparar un flujo
+ * de Google: con esta jamás se abre una ventana —a lo sumo devuelve `null`—.
  */
 export function peekDriveToken(): string | null {
   const cached = getCachedToken();
   return cached && cached.expiresAt > Date.now() ? cached.value : null;
 }
 
+/**
+ * ¿Alguna vez se concedió el permiso de Drive en este navegador?
+ *
+ * Lee el flag persistente y también migra el valor viejo de `sessionStorage`:
+ * una pestaña con una sesión previa a este cambio lo guardó ahí, y se lo
+ * adopta para que el permiso quede compartido entre pestañas de ahora en más.
+ */
 function wasGranted(): boolean {
   try {
-    return sessionStorage.getItem(GRANTED_KEY) === '1';
+    if (localStorage.getItem(GRANTED_KEY) === '1') return true;
   } catch {
-    return false;
+    // Sin storage configurado no hay permiso recordado.
+  }
+  try {
+    if (sessionStorage.getItem(GRANTED_KEY) === '1') {
+      localStorage.setItem(GRANTED_KEY, '1');
+      sessionStorage.removeItem(GRANTED_KEY);
+      return true;
+    }
+  } catch {
+    // Misma conclusión: sin storage no se puede recordar ni migrar.
+  }
+  return false;
+}
+
+/** Marca el permiso como concedido para todas las pestañas y sesiones. */
+function markGranted(): void {
+  try {
+    localStorage.setItem(GRANTED_KEY, '1');
+  } catch {
+    // Si no se puede guardar, la sesión en curso anda igual; lo que se pierde
+    // es poder renovar más adelante, no el acceso a Drive.
+  }
+}
+
+/** Olvida el permiso; lo llama la renovación cuando Google lo revoca. */
+function forgetGranted(): void {
+  try {
+    localStorage.removeItem(GRANTED_KEY);
+  } catch {
+    // Ignore storage errors
   }
 }
 
@@ -218,9 +250,12 @@ export function invalidateDriveToken(): void {
  * morían — el síntoma era "las fotos no se ven" sin ninguna pista de por qué.
  *
  * Solo renueva si el permiso ya fue concedido (`GRANTED_KEY`), porque con
- * `prompt: ''` Google abre un popup cuando no hay permiso previo. Si Google
- * revoca el permiso, la renovación falla, se cae el registro y no se vuelve a
- * intentar: reintentar en bucle solo abriría popups.
+ * `prompt: ''` Google abre un popup cuando no hay permiso previo. El registro
+ * vive en `localStorage`, así que alcanza con haber conectado Drive una vez:
+ * de ahí en más, en cualquier pestaña y cualquier sesión, la renovación es
+ * silenciosa y se apoya en la sesión que esa cuenta ya tiene en Google. Si
+ * Google revoca el permiso, la renovación falla, se cae el registro y no se
+ * vuelve a intentar: reintentar en bucle solo abriría popups.
  *
  * `null` significa que no hay acceso a Drive, y el que llama decide qué
  * mostrándole eso a una persona.
@@ -239,12 +274,9 @@ export function renewDriveToken(): Promise<string | null> {
       return await requestDriveToken(google);
     } catch {
       // Se renunció, se revocó el permiso o Google no cargó: se olvida que se
-      // concedió para no pedir un popup en cada miniatura.
-      try {
-        sessionStorage.removeItem(GRANTED_KEY);
-      } catch {
-        // Ignore storage errors
-      }
+      // concedió para no pedir un popup en cada miniatura (en `localStorage`,
+      // igual que el registro del permiso — ver `GRANTED_KEY`).
+      forgetGranted();
       return null;
     } finally {
       pendingRenewal = null;

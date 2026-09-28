@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { peekDriveToken } from '@/shared/drive/drive-auth';
+import { renewDriveToken } from '@/shared/drive/drive-auth';
 import { fetchDriveFileBlob } from '@/shared/drive/drive-api';
 
 import {
@@ -136,6 +136,8 @@ export function DocumentViewerDialog({
     url: string;
   } | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
+  /** El documento no se pudo bajar porque no hay (ni hubo) acceso a Drive. */
+  const [noDriveSession, setNoDriveSession] = useState(false);
 
   useEffect(() => {
     const fileId = item?.file.source_id;
@@ -145,11 +147,16 @@ export function DocumentViewerDialog({
     let created: string | null = null;
 
     void (async () => {
-      // Sin token no se intenta nada: pedirlo abriría una ventana de Google
-      // encima del documento (ver `peekDriveToken`).
-      const token = peekDriveToken();
+      // Renueva en silencio: si el permiso ya se concedió alguna vez en este
+      // navegador (lo normal), `renewDriveToken` consigue el token sin abrir
+      // ninguna ventana de Google encima del documento. Si nunca se concedió,
+      // devuelve `null` sin intentar nada.
+      setNoDriveSession(false);
+      const token = await renewDriveToken();
+      if (cancelled) return;
       if (!token) {
         setFailedId(fileId);
+        setNoDriveSession(true);
         return;
       }
       try {
@@ -170,7 +177,6 @@ export function DocumentViewerDialog({
 
   const imageSrc = objectUrl?.sourceId === sourceId ? objectUrl.url : null;
   const imageFailed = failedId === sourceId;
-  const noDriveSession = !peekDriveToken();
 
   /* Render -------------------------------------------------------------- */
 
@@ -211,8 +217,9 @@ export function DocumentViewerDialog({
                 </span>
                 {noDriveSession ? (
                   <span>
-                    Tu sesión de Google Drive venció. Si volvés a agregar
-                    archivos desde Drive, las imágenes vuelven a verse.
+                    Drive no está conectado. Conectalo una vez desde{' '}
+                    {'"Agregar más de Drive"'}; después las imágenes se ven sin
+                    volver a pedir permiso.
                   </span>
                 ) : (
                   <span>
