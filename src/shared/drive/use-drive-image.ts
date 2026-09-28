@@ -1,13 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  failureOf,
   loadDrivePreview,
   loadDriveThumbnail,
   peekDrivePreview,
   peekDriveThumbnail,
+  type ImageFailure,
 } from './thumbnail';
+
+export type { ImageFailure };
 
 /**
  * Hooks para pintar imágenes de Drive privados.
@@ -20,8 +24,17 @@ import {
  * el selector los descargaría otra vez.
  */
 
-type ImageLoader = (sourceId: string) => Promise<string>;
+type ImageLoader = (sourceId: string, fileName?: string) => Promise<string>;
 type ImagePeeker = (sourceId: string) => string | undefined;
+
+interface DriveImageState {
+  url: string | undefined;
+  failed: boolean;
+  /** Por qué no se pudo mostrar. `undefined` mientras carga o si salió bien. */
+  failure: ImageFailure | undefined;
+  /** Vuelve a pedirla. Para lo que falló por el momento, no por el archivo. */
+  retry: () => void;
+}
 
 /**
  * Imagen del archivo en el tamaño que pida el `loader`, una vez que `enabled`.
@@ -29,53 +42,92 @@ type ImagePeeker = (sourceId: string) => string | undefined;
  * El estado llega comparando contra el `sourceId`: si el archivo cambia, lo
  * que quedó cargado es de otro y no se muestra. El caché se lee durante el
  * render para no tener que setear estado sincrónico dentro del efecto.
+ *
+ * `fileName` no es para el caché —que se indexa por `sourceId`— sino para
+ * descartar antes de descargar lo que el navegador no puede decodificar. Ver
+ * `UNRENDERABLE_EXTENSIONS`.
  */
 export function useDriveImage(
   sourceId: string,
   enabled: boolean,
   load: ImageLoader,
-  peek: ImagePeeker
-) {
+  peek: ImagePeeker,
+  fileName = ''
+): DriveImageState {
   const [loaded, setLoaded] = useState<{ id: string; url: string } | null>(
     null
   );
-  const [failedId, setFailedId] = useState<string | null>(null);
+  /**
+   * El error lleva el número del intento del que salió.
+   *
+   * Es lo que hace desaparecer el mensaje viejo al apretar "Reintentar" sin
+   * setear estado sincrónico dentro del efecto —que React marca como error, y
+   * con razón. Un error de un intento viejo deja de ser el de ahora en cuanto
+   * el número cambia, así que no hace falta limpiarlo.
+   */
+  const [error, setError] = useState<{
+    id: string;
+    attempt: number;
+    failure: ImageFailure;
+  } | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!enabled || !sourceId) return;
     let cancelled = false;
-    void load(sourceId)
+    void load(sourceId, fileName)
       .then((dataUrl) => {
         if (!cancelled) setLoaded({ id: sourceId, url: dataUrl });
       })
-      .catch(() => {
-        if (!cancelled) setFailedId(sourceId);
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError({ id: sourceId, attempt, failure: failureOf(err) });
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [sourceId, enabled, load]);
+  }, [sourceId, fileName, enabled, load, attempt]);
 
   const cached = enabled ? peek(sourceId) : undefined;
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const isCurrentError = error?.id === sourceId && error.attempt === attempt;
   return {
     url: loaded?.id === sourceId ? loaded.url : cached,
-    failed: failedId === sourceId,
+    failed: Boolean(isCurrentError),
+    failure: isCurrentError ? error.failure : undefined,
+    retry,
   };
 }
 
 /** Miniatura de 360px: la que entra en una tarjeta de contacto. */
-export function useThumbnail(sourceId: string, enabled: boolean) {
+export function useThumbnail(
+  sourceId: string,
+  enabled: boolean,
+  fileName = ''
+): DriveImageState {
   return useDriveImage(
     sourceId,
     enabled,
     loadDriveThumbnail,
-    peekDriveThumbnail
+    peekDriveThumbnail,
+    fileName
   );
 }
 
 /** Vista previa de 2.000px: la que entra en un panel de revisión. */
-export function usePreviewImage(sourceId: string, enabled: boolean) {
-  return useDriveImage(sourceId, enabled, loadDrivePreview, peekDrivePreview);
+export function usePreviewImage(
+  sourceId: string,
+  enabled: boolean,
+  fileName = ''
+): DriveImageState {
+  return useDriveImage(
+    sourceId,
+    enabled,
+    loadDrivePreview,
+    peekDrivePreview,
+    fileName
+  );
 }
 
 /**
