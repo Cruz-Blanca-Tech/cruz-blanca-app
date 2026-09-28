@@ -34,6 +34,53 @@ import { cn } from '@/lib/utils';
 import type { PickedFile, DriveFile, DriveBreadcrumb } from '@/shared/drive/types';
 import { ROOT_NODES, listDriveContent, listFolderFiles } from '@/shared/drive/drive-api';
 import { getDriveFileIcon } from '@/shared/drive/drive-file-icon';
+import { useNearViewport, useThumbnail } from '@/shared/drive/use-drive-image';
+
+interface PickerThumbProps {
+  file: DriveFile;
+  /** Tamaño del ícono de respaldo, igual que en `getDriveFileIcon`. */
+  iconSize?: number;
+  imgClassName: string;
+}
+
+/**
+ * Miniatura del archivo, con el ícono de Drive de respaldo.
+ *
+ * Sirve para las dos vistas porque el operador elige archivos escaneados, y
+ * elegir un escaneo mirando un ícono de Word es adivinar: `Imagen (2).jpg` y
+ * `Imagen (3).jpg` son idénticos hasta que se los mira. Es el mismo motivo por
+ * el que la galería de huecos es una grilla de fotos y no una lista de nombres.
+ *
+ * Solo se pide para mimes de imagen. Un PDF o una carpeta no se van a
+ * convertir nunca en miniatura, y con el selector listando hasta 1.000 archivos
+ * por carpeta, intentar descargarlos para que `createImageBitmap` falle sería
+ * gastar el ancho de banda de Google en descartes.
+ *
+ * La descarga es la de `shared/drive/thumbnail`: 4 peticiones simultáneas como
+ * tope, caché por id y reducción en el cliente a 360px. Y solo se pide para las
+ * filas que están por verse, así que recorrer la carpeta no dispara 1.000
+ * descargas de golpe.
+ */
+function PickerThumb({ file, iconSize = 4, imgClassName }: PickerThumbProps) {
+  const isImage = file.mimeType?.startsWith('image/') ?? false;
+  const { ref, near } = useNearViewport<HTMLSpanElement>({
+    enabled: isImage,
+  });
+  const { url } = useThumbnail(isImage ? file.id : '', isImage && near);
+
+  return (
+    <span ref={ref} className="flex size-full items-center justify-center">
+      {url ? (
+        /* eslint-disable-next-line @next/next/no-img-element -- data URL de
+            ~18KB ya reducida en el cliente; `next/image` solo agregaría una
+            vuelta por el optimizador. */
+        <img src={url} alt="" className={imgClassName} />
+      ) : (
+        getDriveFileIcon(file.mimeType, file.isSharedDrive, iconSize)
+      )}
+    </span>
+  );
+}
 
 interface CustomDrivePickerModalProps {
   isOpen: boolean;
@@ -333,8 +380,12 @@ export function CustomDrivePickerModal({
                             )}
                           </TableCell>
                           <TableCell className="p-2">
-                            <div className="flex items-center justify-center size-8 rounded-md bg-white border border-slate-200 shadow-sm group-hover:border-slate-300 transition-colors">
-                              {getDriveFileIcon(file.mimeType, file.isSharedDrive)}
+                            <div className="flex items-center justify-center size-8 overflow-hidden rounded-md bg-white border border-slate-200 shadow-sm group-hover:border-slate-300 transition-colors">
+                              <PickerThumb
+                                file={file}
+                                iconSize={4}
+                                imgClassName="size-full object-cover"
+                              />
                             </div>
                           </TableCell>
                           <TableCell className={cn(
@@ -392,8 +443,18 @@ export function CustomDrivePickerModal({
                           </div>
                         )}
                         
-                        <div className="flex-1 flex items-center justify-center p-4 w-full aspect-square bg-slate-50/50 rounded-lg border border-slate-100 mb-1">
-                          {getDriveFileIcon(file.mimeType, file.isSharedDrive, 12)}
+                        {/* Sin padding cuando hay miniatura: la foto tiene que
+                            llenar la caja, y `object-top` deja ver la parte de
+                            arriba del documento, que es donde está el tipo y
+                            de dónde se distingue uno de otro. `cover` con
+                            centrado mostraría el medio de la hoja, que en
+                            varias es un espacio en blanco. */}
+                        <div className="flex-1 flex items-center justify-center w-full aspect-square bg-slate-50/50 rounded-lg border border-slate-100 mb-1 overflow-hidden">
+                          <PickerThumb
+                            file={file}
+                            iconSize={12}
+                            imgClassName="size-full object-cover object-top"
+                          />
                         </div>
                         
                         <div className="w-full text-center px-1">

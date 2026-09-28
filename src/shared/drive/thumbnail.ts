@@ -51,8 +51,17 @@ function acquire(): Promise<void> {
 }
 
 function release(): void {
-  active -= 1;
-  waiting.shift()?.();
+  // El permiso se *transfiere* al que estaba esperando, no se devuelve y se
+  // entrega otro. Bajar el contador y despertar a un espera al mismo tiempo
+  // hacía que `active` fuera cada vez menor que la realidad, y como la
+  // comprobación es `active < MAX_CONCURRENT`, el contador inflado hacía que
+  // todo lo que llegara después entrara sin esperar: el primer lote respeta
+  // el tope de 4 y el segundo se va entero en paralelo. Con 141 escaneos
+  // eso es la descarga completa del lote de una, que es justo el 429 que
+  // el tope existe para evitar.
+  const next = waiting.shift();
+  if (next) next();
+  else active -= 1;
 }
 
 async function renderToDataUrl(
