@@ -34,7 +34,8 @@ import { cn } from '@/lib/utils';
 import type { PickedFile, DriveFile, DriveBreadcrumb } from '@/shared/drive/types';
 import { ROOT_NODES, listDriveContent, listFolderFiles } from '@/shared/drive/drive-api';
 import { getDriveFileIcon } from '@/shared/drive/drive-file-icon';
-import { useNearViewport, useThumbnail } from '@/shared/drive/use-drive-image';
+import { useNearViewport, usePreviewImage, useThumbnail } from '@/shared/drive/use-drive-image';
+import { DocumentLightbox } from './document-lightbox';
 
 interface PickerThumbProps {
   file: DriveFile;
@@ -86,6 +87,44 @@ function PickerThumb({ file, iconSize = 4, imgClassName }: PickerThumbProps) {
         getDriveFileIcon(file.mimeType, file.isSharedDrive, iconSize)
       )}
     </span>
+  );
+}
+
+/**
+ * La lupa de una tarjeta del selector.
+ *
+ * Existe por el mismo motivo que la miniatura: `Imagen (2).jpg` y
+ * `Imagen (3).jpg` son idénticos hasta que se los mira, y al elegir hay que
+ * poder distinguir *cuál* de los dos escaneos es, no solo que hay una foto ahí.
+ *
+ * La diferencia con el panel de revisión es que **pide** la versión grande en
+ * vez de tenerla: acá la miniatura es de 360px porque la tarjeta es de 150px, y
+ * bajarle 2.000px a cada una de las tarjetas que van apareciendo sería
+ * justamente el problema que el tope de 4 descargas y el recorte de 360px
+ * existen para evitar. Se pide una, la que el operador está por mirar, y queda
+ * cacheada para cuando ese archivo llegue al lote.
+ *
+ * Solo para imágenes, y con el mismo filtro de mimes que `PickerThumb`: la lupa
+ * de una carpeta o de un PDF no tiene nada que mostrar.
+ */
+function PickerLightbox({ file }: { file: DriveFile }) {
+  const isImage = file.mimeType?.startsWith('image/') ?? false;
+  const [pedido, setPedido] = useState(false);
+  const { url, failed, failure } = usePreviewImage(
+    isImage ? file.id : '',
+    pedido,
+    file.name
+  );
+
+  if (!isImage) return null;
+
+  return (
+    <DocumentLightbox
+      url={url}
+      fileName={file.name}
+      failure={failed ? failure : undefined}
+      onOpen={() => setPedido(true)}
+    />
   );
 }
 
@@ -387,12 +426,22 @@ export function CustomDrivePickerModal({
                             )}
                           </TableCell>
                           <TableCell className="p-2">
-                            <div className="flex items-center justify-center size-8 overflow-hidden rounded-md bg-white border border-slate-200 shadow-sm group-hover:border-slate-300 transition-colors">
-                              <PickerThumb
-                                file={file}
-                                iconSize={4}
-                                imgClassName="size-full object-cover"
-                              />
+                            {/* El mismo criterio que en la grilla: la lupa es
+                                para mirar, y el clic en la fila es para
+                                elegir. */}
+                            <div className="flex items-center gap-1">
+                              <div className="flex items-center justify-center size-8 overflow-hidden rounded-md bg-white border border-slate-200 shadow-sm group-hover:border-slate-300 transition-colors">
+                                <PickerThumb
+                                  file={file}
+                                  iconSize={4}
+                                  imgClassName="size-full object-cover"
+                                />
+                              </div>
+                              {isSelectable && (
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <PickerLightbox file={file} />
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className={cn(
@@ -447,6 +496,19 @@ export function CustomDrivePickerModal({
                                 isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                               )}
                             />
+                          </div>
+                        )}
+
+                        {/* A la derecha del checkbox, y con `stopPropagation`
+                            como el: mirar un archivo no es elegirlo. Sin esto,
+                            la lupa se usaría para revisar un escaneo y el clic
+                            lo sacaría o lo pondría en el lote. */}
+                        {isSelectable && (
+                          <div
+                            className="absolute top-2 right-2 z-10"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <PickerLightbox file={file} />
                           </div>
                         )}
                         
