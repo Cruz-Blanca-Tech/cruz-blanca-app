@@ -553,7 +553,6 @@ export function DossierBoard({
         slotKey={review?.slot.key ?? ''}
         slotCode={review?.slot.code ?? ''}
         codeNames={codeNames}
-        destinations={destinations}
         onReplace={() => {
           const slot = review?.slot;
           // Dos modales apilados se pisan el foco, así que la galería se abre
@@ -561,17 +560,6 @@ export function DossierBoard({
           // esta ranura es justamente lo que hace la galería.
           setReview(null);
           if (slot) setGallerySlot(slot);
-        }}
-        onMove={(key, code) => {
-          const sourceId = review?.item.file.source_id;
-          setReview(null);
-          if (!sourceId) return;
-          place(sourceId, { key, code, id: `${key}|${code}` });
-          // `place` deja la galería abierta en el hueco siguiente para seguir
-          // llenando, que es lo que se quiere al arrastrar. Moviendo un
-          // documento, en cambio, lo que quedó vacío es la ranura de la que se
-          // salió, y esa no es la siguiente de la lista.
-          setGallerySlot(null);
         }}
         onRemove={() => {
           const sourceId = review?.item.file.source_id;
@@ -1031,7 +1019,7 @@ function FilterChip({
         'rounded-md border px-2 py-0.5 font-data text-[11px] transition-colors',
         active && tone === 'default' && 'border-primary bg-primary text-primary-foreground',
         active && tone === 'destructive' && 'border-destructive bg-destructive text-white',
-        active && tone === 'warning' && 'border-warning bg-warning text-warning-dark',
+        active && tone === 'warning' && 'border-warning bg-warning text-white',
         !active && 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground'
       )}
     >
