@@ -29,15 +29,79 @@
  * imagen (un PDF, un `.heic`): rechaza, y la tarjeta cae al ícono de archivo en
  * vez de quedar en blanco.
  *
- * No pide token: usa `peekDriveToken`, que solo devuelve uno ya concedidos.
- * Una galería que abre una ventana de consentimiento de Google encima de las
- * fotos sería peor que una galería sin fotos.
+ * No pide token: usa `renewDriveToken`, que renueva en silencio el token
+ * vencido si el permiso de Drive ya existe. Una galería que abra una ventana de
+ * consentimiento de Google encima de las fotos sería peor que una galería sin
+ * fotos, y por eso solo se renueva cuando el permiso ya está concedido.
  */
-import { fetchDriveFileBlob } from './drive-api';
-import { peekDriveToken } from './drive-auth';
+import { fetchDriveFileBlob, DriveHttpError } from './drive-api';
+import { invalidateDriveToken, renewDriveToken } from './drive-auth';
 
 /** Peticiones simultáneas a Drive. Compartidas por los dos tamaños. */
 const MAX_CONCURRENT = 4;
+
+/**
+ * Por qué no se pudo mostrar la imagen.
+ *
+ * Antes toda falla terminaba en el mismo texto, y ese texto mentía: decía que
+ * el archivo no se podía ver cuando muchas veces lo que no se podía era
+ * acceder a él. Con la razón atada al error, cada pantalla puede decir la
+ * verdad y ofrecer lo que corresponde —renovar, reintentar o nada— en vez de
+ * rendirse siempre con lo mismo.
+ */
+export type ImageFailure =
+  /** No hay acceso a Drive: permiso nunca concedido, o revocado. */
+  | 'session'
+  /** Google no respondió bien: límite de pedidos o un 5xx. Vale reintentar. */
+  | 'transient'
+  /** El archivo no es una imagen que el navegador pueda dibujar. */
+  | 'unrenderable'
+  /** Cualquier otra cosa, incluido un 403 de ese archivo en particular. */
+  | 'other';
+
+export class DriveImageError extends Error {
+  readonly failure: ImageFailure;
+
+  constructor(failure: ImageFailure, detail?: string) {
+    super(detail ?? failure);
+    this.name = 'DriveImageError';
+    this.failure = failure;
+  }
+}
+
+/** Traduce cualquier excepción a la razón que la pantalla necesita. */
+export function failureOf(err: unknown): ImageFailure {
+  if (err instanceof DriveImageError) return err.failure;
+  if (err instanceof DriveHttpError) {
+    // 429 es límite de pedidos y 5xx es el servidor: los dos son de los que se
+    // resuelven solos si se espera un momento.
+    if (err.status === 429 || err.status >= 500) return 'transient';
+    return 'other';
+  }
+  // Un `TypeError` es que el `fetch` no llegó a tener respuesta: se cortó la
+  // conexión o el navegador quedó sin red. También transitorio, y el caso más
+  // común cuando la sesión del navegador expiró.
+  if (err instanceof TypeError) return 'transient';
+  return 'other';
+}
+
+/**
+ * Extensiones que el navegador no sabe decodificar.
+ *
+ * `.pdf` está en `SUPPORTED_EXTENSIONS` del lote y un escaner puede entregar
+ * `.tiff`, así que los dos llegan acá. `createImageBitmap` los rechaza siempre,
+ * así que bajarlos es gastar megabytes de Google en un descarte: un PDF de una
+ * hoja son 5 a 20MB, y con la galería pidiendo 4 a la vez, un lote con PDF
+ * satura el ancho de banda, Google responde 429 y ahí fallan también los JPEG,
+ * que sí se podían mostrar. Por eso se descartan **antes** de descargar.
+ */
+const UNRENDERABLE_EXTENSIONS = new Set(['pdf', 'tif', 'tiff', 'heic', 'heif']);
+
+function isUnrenderable(fileName: string): boolean {
+  const dot = fileName.lastIndexOf('.');
+  if (dot < 0) return false;
+  return UNRENDERABLE_EXTENSIONS.has(fileName.slice(dot + 1).toLowerCase());
+}
 
 let active = 0;
 const waiting: Array<() => void> = [];
@@ -69,7 +133,17 @@ async function renderToDataUrl(
   maxEdge: number,
   quality: number
 ): Promise<string> {
-  const bitmap = await createImageBitmap(blob);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(blob);
+  } catch {
+    // El archivo llegó entero pero no es una imagen que el navegador sepa
+    // dibujar. No es un problema de red y reintentar no lo arregla.
+    throw new DriveImageError(
+      'unrenderable',
+      'El navegador no puede decodificar este archivo.'
+    );
+  }
   try {
     // `Math.min(1, ...)`: un archivo chico se guarda tal cual, sin estirar.
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
@@ -92,7 +166,7 @@ async function renderToDataUrl(
 }
 
 interface ImageLoader {
-  load: (sourceId: string) => Promise<string>;
+  load: (sourceId: string, fileName?: string) => Promise<string>;
   peek: (sourceId: string) => string | undefined;
 }
 
@@ -126,28 +200,77 @@ function createImageLoader({
     cache.set(sourceId, dataUrl);
   }
 
+  /** Un intento: acceso a Drive, descarga y reducción. */
+  async function attempt(sourceId: string): Promise<string> {
+    const token = await renewDriveToken();
+    if (!token) {
+      throw new DriveImageError('session', 'Sin acceso a Google Drive.');
+    }
+
+    await acquire();
+    try {
+      const blob = await fetchDriveFileBlob(token, sourceId);
+      return await renderToDataUrl(blob, maxEdge, quality);
+    } catch (err) {
+      // Un `401` con un token que en el papel estaba vigente significa que
+      // Google lo cerró. Va acá y no en el reintento porque un 401 no se
+      // reintenta —tampoco es transitorio—: si la conversión viviera más
+      // abajo, el `401` saldría como "otro error", la pantalla acusaría al
+      // archivo de estar roto y no ofrecería reintentar, que es justo el
+      // error que se estaba corrigiendo.
+      if (err instanceof DriveHttpError && err.status === 401) {
+        invalidateDriveToken();
+        throw new DriveImageError('session', 'La sesión de Google venció.');
+      }
+      throw err;
+    } finally {
+      release();
+    }
+  }
+
+  /**
+   * El intento, con **un** reintento si la falla fue del momento.
+   *
+   * Un `429` de Drive no es un fallo del archivo: es que se le pidió rápido.
+   * Con 133 miniaturas y 4 en paralelo, un pico de pedidos lo dispara seguido,
+   * y sin reintento cada foto que lo pasó quedaba con el mensaje de error para
+   * el resto de la sesión. Un reintento con una espera corta lo resuelve; más
+   * de uno solo multiplicaría la carga que provocó el 429, así que queda en
+   * uno.
+   */
+  async function fetchAndRender(
+    sourceId: string,
+    fileName: string
+  ): Promise<string> {
+    if (isUnrenderable(fileName)) {
+      throw new DriveImageError(
+        'unrenderable',
+        `El navegador no puede mostrar un ${fileName.split('.').pop()}.`
+      );
+    }
+
+    try {
+      return await attempt(sourceId);
+    } catch (err) {
+      if (failureOf(err) !== 'transient') throw err;
+
+      await new Promise((r) => setTimeout(r, 700));
+      return attempt(sourceId);
+    }
+  }
+
   return {
-    load(sourceId: string): Promise<string> {
+    load(sourceId: string, fileName = ''): Promise<string> {
       const cached = cache.get(sourceId);
       if (cached) return Promise.resolve(cached);
 
       const running = inflight.get(sourceId);
       if (running) return running;
 
-      const task = (async () => {
-        const token = peekDriveToken();
-        if (!token) throw new Error('Sin sesión de Google Drive.');
-
-        await acquire();
-        try {
-          const blob = await fetchDriveFileBlob(token, sourceId);
-          const dataUrl = await renderToDataUrl(blob, maxEdge, quality);
-          remember(sourceId, dataUrl);
-          return dataUrl;
-        } finally {
-          release();
-        }
-      })();
+      const task = fetchAndRender(sourceId, fileName).then((dataUrl) => {
+        remember(sourceId, dataUrl);
+        return dataUrl;
+      });
 
       inflight.set(sourceId, task);
       // La promesa vive en el caché de "en curso" solo mientras corre: si la
@@ -192,8 +315,11 @@ const previews = createImageLoader({
 });
 
 /** Miniatura en JPEG como data URL. Reutiliza caché y deduplica. */
-export function loadDriveThumbnail(sourceId: string): Promise<string> {
-  return thumbnails.load(sourceId);
+export function loadDriveThumbnail(
+  sourceId: string,
+  fileName?: string
+): Promise<string> {
+  return thumbnails.load(sourceId, fileName);
 }
 
 /** La miniatura si ya se calculó. Permite pintar sin esperar a la red. */
@@ -201,9 +327,20 @@ export function peekDriveThumbnail(sourceId: string): string | undefined {
   return thumbnails.peek(sourceId);
 }
 
-/** El archivo a tamaño de revisión, para el panel de vista previa. */
-export function loadDrivePreview(sourceId: string): Promise<string> {
-  return previews.load(sourceId);
+/**
+ * El archivo a tamaño de revisión, para el panel de vista previa.
+ *
+ * `fileName` no se reenvía a la ligera: sin él, `isUnrenderable` ve una cadena
+ * vacía, no descarta nada, y un PDF del lote baja entero para que
+ * `createImageBitmap` lo rechace. Es opcional justamente por eso —el parámetro
+ * es un segundo argumento, no un objeto, y por eso es fácil pasarlo por alto al
+ * escribir el wrapper—: si se pierde, el descarte se desactiva en silencio.
+ */
+export function loadDrivePreview(
+  sourceId: string,
+  fileName?: string
+): Promise<string> {
+  return previews.load(sourceId, fileName);
 }
 
 /** La vista previa si ya se calculó. */
