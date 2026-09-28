@@ -9,6 +9,7 @@ import {
   OctagonAlert,
   TriangleAlert,
   Sparkles,
+  CircleCheck,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ const SEVERITY_LABEL: Record<string, string> = {
   ERROR: 'Error',
   WARNING: 'Advertencia',
   AI_INSIGHT: 'Sugerencia IA',
+  INFO: 'Corrección automática',
 };
 
 export function CaseValidationPanel({
@@ -156,6 +158,7 @@ export function CaseValidationPanel({
               })
               .map((d, i) => {
               const isError = d.severity === 'ERROR';
+              const isInfo = d.severity === 'INFO';
               const jumpable = Boolean(d.fieldId);
               return (
                 <div
@@ -163,15 +166,27 @@ export function CaseValidationPanel({
                   onClick={() => d.fieldId && onJumpField(d.fieldId)}
                   className={cn(
                     'flex items-start gap-2 rounded-md border p-2',
-                    isError ? 'border-error/20 bg-error-light' : 'border-warning/20 bg-warning-light',
+                    isError && 'border-error/20 bg-error-light',
+                    isInfo && 'border-emerald-200 bg-emerald-50',
+                    !isError && !isInfo && 'border-warning/20 bg-warning-light',
                     jumpable && 'cursor-pointer'
                   )}
                 >
-                  {isError ? (<OctagonAlert className="mt-0.5 size-3.5 shrink-0 text-error" />) : (<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />)}
+                  {isError ? (
+                    <OctagonAlert className="mt-0.5 size-3.5 shrink-0 text-error" />
+                  ) : isInfo ? (
+                    <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                  ) : (
+                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="font-data text-[11.5px] leading-snug text-ink-primary">
                       <strong
-                        className={isError ? 'text-error-dark' : 'text-warning-dark'}
+                        className={cn(
+                          isError && 'text-error-dark',
+                          isInfo && 'text-emerald-700',
+                          !isError && !isInfo && 'text-warning-dark'
+                        )}
                       >
                         {SEVERITY_LABEL[d.severity] ?? d.severity}
                       </strong>{' '}
@@ -182,7 +197,7 @@ export function CaseValidationPanel({
                     <CornerDownRight
                       className={cn(
                         'mt-0.5 size-3.5 shrink-0',
-                        isError ? 'text-error' : 'text-warning'
+                        isError ? 'text-error' : isInfo ? 'text-emerald-600' : 'text-warning'
                       )}
                     />
                   )}
