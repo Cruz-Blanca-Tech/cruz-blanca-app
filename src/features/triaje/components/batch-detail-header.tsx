@@ -17,8 +17,6 @@ interface BatchDetailHeaderProps {
   /** Error al cargar la metadata (incluye 404 / lote no encontrado). */
   isError: boolean;
   onOpenReject: () => void;
-  /** Deshabilita "Cancelar lote" (p. ej. lote ya finalizado/rechazado). */
-  canReject: boolean;
 }
 
 /**
@@ -33,10 +31,13 @@ export function BatchDetailHeader({
   isLoading,
   isError,
   onOpenReject,
-  canReject,
 }: BatchDetailHeaderProps) {
   const router = useRouter();
   const date = batch ? formatBatchDate(batch.created_at) : null;
+
+  // Compute canReject locally from batch prop to avoid hydration mismatch
+  // (parent computes it before data loads, causing SSR/client mismatch)
+  const canReject = batch?.status === 'COMPLETED';
 
   return (
     <header className="flex flex-col gap-3.5">
