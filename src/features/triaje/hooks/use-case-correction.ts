@@ -140,7 +140,14 @@ export function useCaseCorrection({
     batchStatus: batchQuery.data?.status,
   });
   const documents = useMemo(() => docsQuery.data?.documents ?? [], [docsQuery.data]);
-  const discrepancies = useMemo(() => caseData?.discrepancies ?? [], [caseData]);
+  // Acuerdo de producto: NO se muestran las correcciones internas. Las
+  // discrepancias de severidad INFO documentan correcciones automáticas ya
+  // APLICADAS al dossier (apellidos unificados, reconciliaciones LLM u de
+  // apoderado); se filtran para que el revisor solo vea lo que requiere acción.
+  const discrepancies = useMemo(
+    () => (caseData?.discrepancies ?? []).filter((d) => d.severity !== 'INFO'),
+    [caseData]
+  );
 
   const form = useForm<CorrectionFormValues>({
     defaultValues: emptyCorrectionValues(),
