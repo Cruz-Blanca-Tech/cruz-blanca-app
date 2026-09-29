@@ -41,6 +41,8 @@ function CountCell({ count, icon: Icon, activeClassName }: CountCellProps) {
 export function CaseRow({ caseItem, index }: CaseRowProps) {
   const hasErrors = caseItem.error_count > 0;
   const hasWarnings = caseItem.warning_count > 0;
+  // Las correcciones internas (INFO) no se muestran: ya van aplicadas.
+  const visibleDiscrepancies = caseItem.discrepancies.filter((d) => d.severity !== 'INFO');
   const isSyncFailed = caseItem.sync_status === 'FAILED';
   // Un expediente ya resuelto se sigue pudiendo abrir (consultar el detalle es
   // legítimo), pero se anuncia como lectura: sus campos no admiten corrección.
@@ -85,7 +87,7 @@ export function CaseRow({ caseItem, index }: CaseRowProps) {
 
       {/* 3. Incidencias Detectadas (4/12) */}
       <div className="sm:col-span-4 flex flex-wrap items-center gap-2 min-w-0">
-        {hasErrors || hasWarnings || caseItem.discrepancies.length > 0 ? (
+        {hasErrors || hasWarnings || visibleDiscrepancies.length > 0 ? (
           <>
             {hasErrors && (
               <CountCell
