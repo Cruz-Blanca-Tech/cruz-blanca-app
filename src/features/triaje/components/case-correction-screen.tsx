@@ -61,7 +61,7 @@ export function CaseCorrectionScreen({
   const aiInsightDiscrepancy = vm.enrichedDiscrepancies.find(d => d.severity === 'AI_INSIGHT' && d.fieldId === 'beneficiary.dni');
   const isReprocessing = reprocessMutation.isPending;
   const canEditForm = caseActions.canEdit && !isReprocessing;
-  const displayLockReason = isReprocessing ? 'Reprocesando expediente con Inteligencia Artificial. Por favor, espere unos segundos...' : caseActions.lockReason;
+  const displayLockReason = caseActions.lockReason;
 
   const handleValidationClick = async () => {
     // 1. Validar reglas de la interfaz primero (campos vacíos, formatos incorrectos)
@@ -99,19 +99,16 @@ export function CaseCorrectionScreen({
 
   return (
     <div className="relative flex flex-1 flex-col gap-3 p-6">
-      {/* Overlay de Carga (IA Reprocesando) local al área de trabajo */}
+      {/* Indicador no bloqueante de reprocesamiento en la barra superior */}
       {(isReprocessing || vm.pendingDocuments.length > 0) && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4 rounded-xl bg-white p-8 shadow-2xl">
-            <Loader2 className="size-12 animate-spin text-primary" />
-            <div className="text-center">
-              <h3 className="font-heading text-lg font-bold text-ink-primary">
-                El expediente se está procesando por la IA
-              </h3>
-              <p className="mt-1 text-sm text-ink-secondary">
-                {vm.pendingDocuments.length > 0 ? `Analizando ${vm.pendingDocuments.length} documento(s) en progreso...` : 'Enviando solicitud a la IA. Por favor espere...'}
-              </p>
-            </div>
+        <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center px-4 py-2 bg-primary/95 text-white shadow-lg border-b border-primary/50">
+          <div className="flex items-center gap-3">
+            <Loader2 className="size-5 animate-spin" />
+            <span className="font-heading text-sm font-medium">
+              {isReprocessing
+                ? 'Reprocesando expediente con IA…'
+                : `Analizando ${vm.pendingDocuments.length} documento(s)…`}
+            </span>
           </div>
         </div>
       )}
@@ -480,6 +477,10 @@ export function CaseCorrectionScreen({
             onReject={() => vm.setRejectOpen(true)}
             onSubmit={handleValidationClick}
             onReprocess={() => {
+                toast.info('Reprocesando expediente en segundo plano…', {
+                  id: `reprocess-${caseId}`,
+                  duration: 3000,
+                });
                 reprocessMutation.mutate(undefined, {
                     onSuccess: () => {
                       // El toast de éxito real se muestra ahora cuando el polling termina
