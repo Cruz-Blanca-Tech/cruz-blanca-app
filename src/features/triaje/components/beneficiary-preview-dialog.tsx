@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { FileSearch, Loader2, UserRound, Users } from 'lucide-react';
+import { FileSearch, Loader2, UserRound, Users, UserCheck } from 'lucide-react';
 
 import {
   Dialog,
@@ -69,20 +69,29 @@ export function BeneficiaryPreviewDialog({
   });
 
   const persona = consulta.data?.exists ? consulta.data.beneficiary : null;
-  const titulo = role === 'adulto' ? 'Adulto ya registrado' : 'Beneficiario ya registrado';
+  const enMaestro = consulta.data?.exists === true;
+  const titulo = enMaestro
+    ? (role === 'adulto' ? 'Adulto ya registrado en el maestro' : 'Beneficiario ya registrado en el maestro')
+    : (role === 'adulto' ? 'Adulto sugerido (no está en el maestro)' : 'Beneficiario sugerido (no está en el maestro)');
+  const icono = enMaestro ? <UserCheck className="size-4 text-info-dark" /> : <FileSearch className="size-4 text-purple-600" />;
+  const colorIcono = enMaestro ? 'text-info-dark' : 'text-purple-600';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSearch className="size-4 text-purple-600" />
+            {icono}
             {titulo}
           </DialogTitle>
           <DialogDescription>
-            {reason
-              ? `${reason}. Estos son los datos que ya tiene registrados el maestro.`
-              : 'Estos son los datos que ya tiene registrados el maestro.'}
+            {enMaestro
+              ? (reason
+                  ? `${reason}. Estos son los datos que ya tiene registrados el maestro.`
+                  : 'Estos son los datos que ya tiene registrados el maestro.')
+              : (reason
+                  ? `${reason}. Este DNI no está en el maestro: la sugerencia viene de otra ficha del mismo lote.`
+                  : 'Este DNI no está en el maestro: la sugerencia viene de otra ficha del mismo lote.')}
           </DialogDescription>
         </DialogHeader>
 
