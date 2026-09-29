@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { AdultsListControl } from '@/features/triaje/components/adults-list-control';
 import { SchoolSelect } from '@/features/mdm/components/school-select';
 import { Input } from '@/components/ui/input';
-import { DateField } from '@/components/ui/date-field';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -272,7 +272,7 @@ export function BeneficiarioForm({ initialData: rawInitialData, isEdit }: Benefi
                     name="birth_date"
                     control={control}
                     render={({ field }) => (
-                      <DateField
+                      <DatePicker
                         id="birth_date"
                         value={field.value ?? ''}
                         onChange={field.onChange}
