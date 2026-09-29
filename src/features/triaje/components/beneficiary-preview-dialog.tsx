@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { isoToDdMmYyyy } from '@/components/ui/date-field';
+import { isoToDdMmYyyy } from '@/components/ui/date-picker';
 import { getGenderLabel, getRelationshipLabel } from '@/lib/domain/enum-labels';
 import { isValidDni } from '@/lib/domain/beneficiary-rules';
 import { cn } from '@/lib/utils';

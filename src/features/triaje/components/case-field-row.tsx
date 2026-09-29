@@ -20,7 +20,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { DateField } from '@/components/ui/date-field';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select,
   SelectContent,
@@ -307,7 +307,7 @@ export function CaseFieldRow({
           control={control}
           name={fieldName(field.name!)}
           render={({ field: rhf }) => (
-            <DateField
+            <DatePicker
               value={(rhf.value as string) ?? ''}
               onChange={rhf.onChange}
               onBlur={rhf.onBlur}

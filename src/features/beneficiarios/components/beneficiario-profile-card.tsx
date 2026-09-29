@@ -16,7 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DateField, isoToDdMmYyyy } from '@/components/ui/date-field';
+import { DatePicker, isoToDdMmYyyy } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -457,7 +457,7 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
                     name="birth_date"
                     control={control}
                     render={({ field }) => (
-                      <DateField
+                      <DatePicker
                         value={field.value ?? ''}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
