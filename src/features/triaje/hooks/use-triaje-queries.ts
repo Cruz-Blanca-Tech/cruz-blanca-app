@@ -49,7 +49,31 @@ export const triajeKeys = {
   // (contexto intake), no por caseId → namespace propio (`case-documents`).
   caseDocuments: (batchId: string, dniRef: string) =>
     [...triajeKeys.all, 'case-documents', batchId, dniRef] as const,
+  // Estado de reprocesamiento por caso (persiste en caché aunque naveguemos).
+  // Clave: caseId. Valor: boolean (true = reprocesando).
+  reprocessing: (caseId: string) => [...triajeKeys.all, 'reprocessing', caseId] as const,
 };
+
+/**
+ * Marca un caso como "reprocesando" en la caché global (persiste entre navegaciones).
+ */
+export function setCaseReprocessing(
+  queryClient: ReturnType<typeof useQueryClient>,
+  caseId: string,
+  value: boolean
+) {
+  queryClient.setQueryData(triajeKeys.reprocessing(caseId), value);
+}
+
+/**
+ * Lee si un caso está reprocesando desde la caché global.
+ */
+export function getCaseReprocessing(
+  queryClient: ReturnType<typeof useQueryClient>,
+  caseId: string
+): boolean {
+  return queryClient.getQueryData<boolean>(triajeKeys.reprocessing(caseId)) ?? false;
+}
 
 const FIVE_MINUTES = 1000 * 60 * 5;
 const THIRTY_SECONDS = 1000 * 30;

@@ -30,6 +30,8 @@ import { useReprocessDossier } from '../hooks/use-reprocess-dossier';
 import { RejectCaseDialog } from './reject-case-dialog';
 import { DossierDocumentChecklist } from './dossier-document-checklist';
 import { BeneficiaryPreviewDialog } from './beneficiary-preview-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { getCaseReprocessing } from '../hooks/use-triaje-queries';
 
 interface CaseCorrectionScreenProps {
   batchId: string;
@@ -45,11 +47,16 @@ export function CaseCorrectionScreen({
 }: CaseCorrectionScreenProps) {
   const vm = useCaseCorrection({ batchId, caseId, dniReference });
   const retryCaseSync = useRetryCaseSync(caseId, batchId);
+  const queryClient = useQueryClient();
   const reprocessMutation = useReprocessDossier(batchId, dniReference, caseId);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [previewDni, setPreviewDni] = useState<string | null>(null);
   const [previewRole, setPreviewRole] = useState<'beneficiario' | 'adulto'>('beneficiario');
   const [previewReason, setPreviewReason] = useState<string | undefined>();
+
+  // Estado global de reprocesamiento (persiste aunque naveguemos a otro caso y volvamos)
+  const isReprocessingGlobal = getCaseReprocessing(queryClient, caseId);
+  const isReprocessing = reprocessMutation.isPending || isReprocessingGlobal;
 
   if (vm.isLoading) return <CaseCorrectionSkeleton />;
   if (vm.isError || !vm.caseData) return <CaseNotFound onBack={vm.goBackToBatch} />;
@@ -59,7 +66,6 @@ export function CaseCorrectionScreen({
   const isRejected = vm.caseData?.status === 'REJECTED';
   const isSyncFailed = vm.caseData?.sync_status === 'FAILED';
   const aiInsightDiscrepancy = vm.enrichedDiscrepancies.find(d => d.severity === 'AI_INSIGHT' && d.fieldId === 'beneficiary.dni');
-  const isReprocessing = reprocessMutation.isPending;
   const canEditForm = caseActions.canEdit && !isReprocessing;
   const displayLockReason = caseActions.lockReason;
 
