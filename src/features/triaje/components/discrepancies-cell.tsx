@@ -57,12 +57,15 @@ function DiscrepancyItem({ discrepancy }: { discrepancy: TriageDiscrepancy }) {
  * por severidad. Replica el patrón de tooltips del mockup con shadcn/Base UI.
  */
 export function DiscrepanciesCell({ discrepancies }: DiscrepanciesCellProps) {
-  if (discrepancies.length === 0) {
+  // Acuerdo de producto: las correcciones internas (severity INFO) no se
+  // muestran — ya están aplicadas al expediente y solo son notas internas.
+  const visible = discrepancies.filter((d) => d.severity !== 'INFO');
+  if (visible.length === 0) {
     return <span className="font-data text-xs text-ink-muted">—</span>;
   }
 
-  const errors = discrepancies.filter(isError);
-  const warnings = discrepancies.filter((d) => !isError(d));
+  const errors = visible.filter(isError);
+  const warnings = visible.filter((d) => !isError(d));
 
   return (
     <Tooltip>
@@ -75,7 +78,7 @@ export function DiscrepanciesCell({ discrepancies }: DiscrepanciesCellProps) {
         }
       >
         <ListChecks className="size-3" />
-        {discrepancies.length}
+        {visible.length}
       </TooltipTrigger>
       <TooltipContent side="left" className="max-w-72 px-3 py-2.5">
         <div className="flex flex-col gap-2 text-left">
