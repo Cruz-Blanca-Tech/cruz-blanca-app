@@ -4,6 +4,7 @@ import { FormProvider } from 'react-hook-form';
 import {
   ArrowLeft,
   CheckCircle2,
+  FileSearch,
   Lock,
   Loader2,
   OctagonAlert,
@@ -28,6 +29,7 @@ import { UploadMissingDocModal } from './upload-missing-doc-modal';
 import { useReprocessDossier } from '../hooks/use-reprocess-dossier';
 import { RejectCaseDialog } from './reject-case-dialog';
 import { DossierDocumentChecklist } from './dossier-document-checklist';
+import { BeneficiaryPreviewDialog } from './beneficiary-preview-dialog';
 
 interface CaseCorrectionScreenProps {
   batchId: string;
@@ -45,6 +47,9 @@ export function CaseCorrectionScreen({
   const retryCaseSync = useRetryCaseSync(caseId, batchId);
   const reprocessMutation = useReprocessDossier(batchId, dniReference, caseId);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [previewDni, setPreviewDni] = useState<string | null>(null);
+  const [previewRole, setPreviewRole] = useState<'beneficiario' | 'adulto'>('beneficiario');
+  const [previewReason, setPreviewReason] = useState<string | undefined>();
 
   if (vm.isLoading) return <CaseCorrectionSkeleton />;
   if (vm.isError || !vm.caseData) return <CaseNotFound onBack={vm.goBackToBatch} />;
@@ -185,22 +190,39 @@ export function CaseCorrectionScreen({
               </div>
             </div>
             {caseActions.canEdit && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
-                onClick={() => {
-                  vm.form.setValue('beneficiary.dni', aiInsightDiscrepancy.expected_pattern || '', { shouldValidate: true, shouldDirty: true });
-                  toast.success(aiInsightDiscrepancy.document_code === 'CORROBORATED'
-                    ? 'DNI aplicado desde los documentos'
-                    : 'DNI actualizado con sugerencia de IA');
-                }}
-              >
-                <LinkIcon className="mr-2 size-4" />
-                {aiInsightDiscrepancy.document_code === 'CORROBORATED'
-                  ? `Usar DNI: ${aiInsightDiscrepancy.expected_pattern}`
-                  : `Vincular (DNI: ${aiInsightDiscrepancy.expected_pattern})`}
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                  onClick={() => {
+                    setPreviewDni(aiInsightDiscrepancy.expected_pattern || '');
+                    setPreviewRole('beneficiario');
+                    setPreviewReason(aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                      ? 'DNI corroborado entre documentos'
+                      : 'Sugerencia de IA: posible duplicado');
+                  }}
+                  aria-label="Ver vista previa del beneficiario"
+                >
+                  <FileSearch className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                  onClick={() => {
+                    vm.form.setValue('beneficiary.dni', aiInsightDiscrepancy.expected_pattern || '', { shouldValidate: true, shouldDirty: true });
+                    toast.success(aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                      ? 'DNI aplicado desde los documentos'
+                      : 'DNI actualizado con sugerencia de IA');
+                  }}
+                >
+                  <LinkIcon className="mr-2 size-4" />
+                  {aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                    ? `Usar DNI: ${aiInsightDiscrepancy.expected_pattern}`
+                    : `Vincular (DNI: ${aiInsightDiscrepancy.expected_pattern})`}
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -240,15 +262,30 @@ export function CaseCorrectionScreen({
                 {caseActions.canEdit && (
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {s.dni && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
-                        onClick={() => vm.linkAdult(s.adultIndex, s.dni, s.name || undefined)}
-                      >
-                        <LinkIcon className="mr-2 size-4" />
-                        Vincular (DNI: {s.dni})
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                          onClick={() => {
+                            setPreviewDni(s.dni);
+                            setPreviewRole('adulto');
+                            setPreviewReason('Sugerencia de IA: posible adulto ya registrado');
+                          }}
+                          aria-label="Ver vista previa del adulto"
+                        >
+                          <FileSearch className="size-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                          onClick={() => vm.linkAdult(s.adultIndex, s.dni, s.name || undefined)}
+                        >
+                          <LinkIcon className="mr-2 size-4" />
+                          Vincular (DNI: {s.dni})
+                        </Button>
+                      </>
                     )}
                     {s.phone && (
                       <Button
@@ -527,6 +564,16 @@ export function CaseCorrectionScreen({
           </div>
         </DialogContent>
       </Dialog>
+
+      {previewDni && (
+        <BeneficiaryPreviewDialog
+          dni={previewDni}
+          open={!!previewDni}
+          onOpenChange={(open) => !open && setPreviewDni(null)}
+          role={previewRole}
+          reason={previewReason}
+        />
+      )}
     </div>
   );
 }
