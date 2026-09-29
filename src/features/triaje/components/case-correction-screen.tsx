@@ -163,12 +163,25 @@ export function CaseCorrectionScreen({
             <div className="flex items-start gap-3">
               <Sparkles className="mt-0.5 size-5 shrink-0 text-purple-600" />
               <div>
-                <h4 className="font-heading text-sm font-bold text-purple-900">
-                  Sugerencia de Inteligencia Artificial (Posible Duplicado)
-                </h4>
-                <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
-                  {aiInsightDiscrepancy.rule_description}
-                </p>
+                {aiInsightDiscrepancy.document_code === 'CORROBORATED' ? (
+                  <>
+                    <h4 className="font-heading text-sm font-bold text-purple-900">
+                      DNI corroborado entre documentos
+                    </h4>
+                    <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
+                      {aiInsightDiscrepancy.rule_description}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-heading text-sm font-bold text-purple-900">
+                      Sugerencia de Inteligencia Artificial (Posible Duplicado)
+                    </h4>
+                    <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
+                      {aiInsightDiscrepancy.rule_description}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             {caseActions.canEdit && (
@@ -178,11 +191,15 @@ export function CaseCorrectionScreen({
                 className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
                 onClick={() => {
                   vm.form.setValue('beneficiary.dni', aiInsightDiscrepancy.expected_pattern || '', { shouldValidate: true, shouldDirty: true });
-                  toast.success('DNI actualizado con sugerencia de IA');
+                  toast.success(aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                    ? 'DNI aplicado desde los documentos'
+                    : 'DNI actualizado con sugerencia de IA');
                 }}
               >
                 <LinkIcon className="mr-2 size-4" />
-                Vincular (DNI: {aiInsightDiscrepancy.expected_pattern})
+                {aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                  ? `Usar DNI: ${aiInsightDiscrepancy.expected_pattern}`
+                  : `Vincular (DNI: ${aiInsightDiscrepancy.expected_pattern})`}
               </Button>
             )}
           </div>
