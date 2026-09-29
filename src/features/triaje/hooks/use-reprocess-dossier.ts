@@ -18,7 +18,7 @@ export function useReprocessDossier(batchId: string, caseDni: string, caseId: st
       toast.error(err instanceof Error ? err.message : 'Error al reprocesar el expediente');
     },
     onSuccess: (res) => {
-      // The toast is fired in the UI now, we'll return the response so the UI can use it
+      toast.success(res?.message || 'Expediente reprocesado correctamente');
       return Promise.all([
         invalidateBatchState(queryClient, batchId),
         queryClient.invalidateQueries({ queryKey: triajeKeys.caseDocuments(batchId, caseDni) }),
