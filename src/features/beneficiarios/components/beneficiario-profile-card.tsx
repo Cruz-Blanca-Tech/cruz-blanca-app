@@ -572,8 +572,18 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
                   <DataRow label="Medicamentos">{b?.medical?.medications?.length > 0 ? b.medical.medications.join(', ') : 'Ninguno'}</DataRow>
                   <DataRow label="Vacunas">{b?.medical?.vaccines?.length > 0 ? b.medical.vaccines.join(', ') : 'Ninguna'}</DataRow>
                   <DataRow label="Seguro">{b?.medical?.insurance?.length > 0 ? b.medical.insurance.join(', ') : 'Ninguno'}</DataRow>
-                  <DataRow label="Hospitalizado"><BoolBadge value={b?.medical?.has_been_hospitalized} /></DataRow>
-                  <DataRow label="Operado"><BoolBadge value={b?.medical?.has_been_operated} /></DataRow>
+                  <DataRow label="Hospitalizado">
+                    <BoolBadge value={b?.medical?.has_been_hospitalized || Boolean(b?.medical?.hospitalization_reason)} />
+                  </DataRow>
+                  {b?.medical?.hospitalization_reason && (
+                    <DataRow label="Motivo de hospitalización">{b.medical.hospitalization_reason}</DataRow>
+                  )}
+                  <DataRow label="Operado">
+                    <BoolBadge value={b?.medical?.has_been_operated || Boolean(b?.medical?.operation_reason)} />
+                  </DataRow>
+                  {b?.medical?.operation_reason && (
+                    <DataRow label="Motivo de operación">{b.medical.operation_reason}</DataRow>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -596,23 +606,68 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
                       />
                     </div>
                   ))}
-                  <div className="flex gap-4 pt-1">
-                    {([
-                      { name: 'medical.has_been_hospitalized', label: 'Hospitalizado', id: 'hosp' },
-                      { name: 'medical.has_been_operated', label: 'Operado', id: 'oper' },
-                    ] as const).map(({ name, label, id }) => (
-                      <div key={name} className="flex items-center gap-2">
+                  <div className="space-y-3 pt-1">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
                         <Controller
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          name={name as any}
+                          name="medical.has_been_hospitalized"
                           control={control}
                           render={({ field: f }) => (
-                            <Checkbox id={id} checked={!!f.value} onCheckedChange={f.onChange} />
+                            <Checkbox id="hosp" checked={!!f.value} onCheckedChange={f.onChange} />
                           )}
                         />
-                        <Label htmlFor={id} className="text-xs cursor-pointer">{label}</Label>
+                        <Label htmlFor="hosp" className="text-xs cursor-pointer">Hospitalizado</Label>
                       </div>
-                    ))}
+                      <Controller
+                        name="medical.has_been_hospitalized"
+                        control={control}
+                        render={({ field: hospField }) =>
+                          hospField.value ? (
+                            <div className="pl-6 space-y-1">
+                              <Label className="text-[10.5px] font-semibold text-muted-foreground">
+                                Motivo de hospitalización (opcional)
+                              </Label>
+                              <Input
+                                {...register('medical.hospitalization_reason')}
+                                placeholder="Indicar motivo…"
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          ) : <></>
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Controller
+                          name="medical.has_been_operated"
+                          control={control}
+                          render={({ field: f }) => (
+                            <Checkbox id="oper" checked={!!f.value} onCheckedChange={f.onChange} />
+                          )}
+                        />
+                        <Label htmlFor="oper" className="text-xs cursor-pointer">Operado</Label>
+                      </div>
+                      <Controller
+                        name="medical.has_been_operated"
+                        control={control}
+                        render={({ field: operField }) =>
+                          operField.value ? (
+                            <div className="pl-6 space-y-1">
+                              <Label className="text-[10.5px] font-semibold text-muted-foreground">
+                                Motivo de operación (opcional)
+                              </Label>
+                              <Input
+                                {...register('medical.operation_reason')}
+                                placeholder="Indicar motivo…"
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          ) : <></>
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               )}
