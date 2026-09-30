@@ -145,7 +145,7 @@ export function CustomDrivePickerModal({
   const [error, setError] = useState<string | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedFilesMap, setSelectedFilesMap] = useState<Map<string, DriveFile>>(new Map());
   const [isConfirming, setIsConfirming] = useState(false);
   
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -191,7 +191,7 @@ export function CustomDrivePickerModal({
     setLastOpenKey(openKey);
     if (openKey !== 'closed') {
       setHistory([{ id: 'app_root', name: 'Google Drive' }]);
-      setSelectedIds(new Set());
+      setSelectedFilesMap(new Map());
       setSearchQuery('');
       setFiles(ROOT_NODES);
     }
@@ -215,37 +215,46 @@ export function CustomDrivePickerModal({
     setHistory(newHistory);
   };
 
-  const toggleSelection = (fileId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
+  const toggleSelection = (file: DriveFile) => {
+    setSelectedFilesMap((prev) => {
+      const next = new Map(prev);
+      if (next.has(file.id)) {
+        next.delete(file.id);
       } else {
-        next.add(fileId);
+        next.set(file.id, file);
       }
       return next;
     });
   };
 
+  const selectableFiles = files.filter(f => f.id !== 'root' && f.id !== 'shared_drives_root');
+  const allVisibleSelected = selectableFiles.length > 0 && selectableFiles.every(f => selectedFilesMap.has(f.id));
+
   const toggleSelectAll = () => {
-    const selectableFiles = files.filter(f => f.id !== 'root' && f.id !== 'shared_drives_root');
     if (selectableFiles.length === 0) return;
     
-    const allSelected = selectableFiles.every(f => selectedIds.has(f.id));
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(selectableFiles.map(f => f.id)));
-    }
+    setSelectedFilesMap((prev) => {
+      const next = new Map(prev);
+      if (allVisibleSelected) {
+        for (const f of selectableFiles) {
+          next.delete(f.id);
+        }
+      } else {
+        for (const f of selectableFiles) {
+          next.set(f.id, f);
+        }
+      }
+      return next;
+    });
   };
 
   const handleConfirm = async () => {
-    if (selectedIds.size === 0 || !token) return;
+    if (selectedFilesMap.size === 0 || !token) return;
     setIsConfirming(true);
     setError(null);
     try {
       let finalFiles: PickedFile[] = [];
-      const selectedFiles = files.filter(f => selectedIds.has(f.id));
+      const selectedFiles = Array.from(selectedFilesMap.values());
 
       for (const file of selectedFiles) {
         if (file.mimeType === 'application/vnd.google-apps.folder') {
@@ -380,7 +389,7 @@ export function CustomDrivePickerModal({
                       <TableHead className="w-12 pl-4">
                         {currentFolder.id !== 'app_root' && (
                           <Checkbox 
-                            checked={files.length > 0 && selectedIds.size === files.length}
+                            checked={allVisibleSelected}
                             onCheckedChange={toggleSelectAll}
                             aria-label="Seleccionar todo"
                           />
@@ -394,7 +403,7 @@ export function CustomDrivePickerModal({
                   <TableBody>
                     {files.map((file) => {
                       const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
-                      const isSelected = selectedIds.has(file.id);
+                      const isSelected = selectedFilesMap.has(file.id);
                       const isSelectable = file.id !== 'root' && file.id !== 'shared_drives_root';
 
                       return (
@@ -409,7 +418,7 @@ export function CustomDrivePickerModal({
                             if (isFolder) {
                               handleFolderClick(file);
                             } else if (isSelectable) {
-                              toggleSelection(file.id);
+                              toggleSelection(file);
                             }
                           }}
                         >
@@ -418,7 +427,7 @@ export function CustomDrivePickerModal({
                               <div onClick={(e) => e.stopPropagation()}>
                                 <Checkbox 
                                   checked={isSelected}
-                                  onCheckedChange={() => toggleSelection(file.id)}
+                                  onCheckedChange={() => toggleSelection(file)}
                                 />
                               </div>
                             )}
@@ -461,7 +470,7 @@ export function CustomDrivePickerModal({
                 <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {files.map((file) => {
                     const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
-                    const isSelected = selectedIds.has(file.id);
+                    const isSelected = selectedFilesMap.has(file.id);
                     const isSelectable = file.id !== 'root' && file.id !== 'shared_drives_root';
 
                     return (
@@ -471,7 +480,7 @@ export function CustomDrivePickerModal({
                           if (isFolder) {
                             handleFolderClick(file);
                           } else if (isSelectable) {
-                            toggleSelection(file.id);
+                            toggleSelection(file);
                           }
                         }}
                         className={cn(
@@ -488,7 +497,7 @@ export function CustomDrivePickerModal({
                           >
                             <Checkbox 
                               checked={isSelected}
-                              onCheckedChange={() => toggleSelection(file.id)}
+                              onCheckedChange={() => toggleSelection(file)}
                               className={cn(
                                 "transition-opacity",
                                 isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -548,7 +557,7 @@ export function CustomDrivePickerModal({
           {isConfirming && (
             <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-50">
               <Loader2 className="size-10 animate-spin text-primary mb-4" />
-              <p className="text-sm font-medium text-slate-700">Procesando {selectedIds.size} elemento{selectedIds.size > 1 ? 's' : ''}...</p>
+              <p className="text-sm font-medium text-slate-700">Procesando {selectedFilesMap.size} elemento{selectedFilesMap.size > 1 ? 's' : ''}...</p>
               <p className="text-xs text-slate-500 mt-1">Esto puede tardar unos segundos si seleccionaste carpetas enteras.</p>
             </div>
           )}
@@ -559,11 +568,11 @@ export function CustomDrivePickerModal({
           <div className="flex w-full items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="text-base font-medium text-slate-700 flex items-center h-full pt-1">
-                {selectedIds.size} {selectedIds.size === 1 ? 'elemento' : 'elementos'} seleccionado{selectedIds.size === 1 ? '' : 's'}
+                {selectedFilesMap.size} {selectedFilesMap.size === 1 ? 'elemento' : 'elementos'} seleccionado{selectedFilesMap.size === 1 ? '' : 's'}
               </div>
               {viewMode === 'grid' && files.length > 0 && currentFolder.id !== 'app_root' && (
                  <Button variant="outline" size="sm" onClick={toggleSelectAll} className="h-9">
-                   {selectedIds.size === files.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                   {allVisibleSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
                  </Button>
               )}
             </div>
@@ -571,7 +580,7 @@ export function CustomDrivePickerModal({
               <Button type="button" variant="ghost" size="lg" onClick={onClose} disabled={isConfirming} className="font-medium">
                 Cancelar
               </Button>
-              <Button type="button" size="lg" onClick={handleConfirm} disabled={selectedIds.size === 0 || isConfirming} className="font-medium px-6 shadow-sm">
+              <Button type="button" size="lg" onClick={handleConfirm} disabled={selectedFilesMap.size === 0 || isConfirming} className="font-medium px-6 shadow-sm">
                 Extraer y Continuar
               </Button>
             </div>
