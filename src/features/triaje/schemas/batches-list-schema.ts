@@ -31,7 +31,12 @@ export const batchListItemSchema = z.object({
   created_at: z.string().nullable(),
   documents_failed_count: count,
   documents_approved_count: count,
-  documents_total_count: count.optional().default(0),
+  // SIN `.default(0)`: a propósito. El backend no envía `documents_total_count`
+  // (el nombre real es `total_documents_count`), y un default de 0 haría que
+  // este campo nunca fuera `undefined`: el `??` de `batch-row.tsx` se cortaría
+  // en el primer operando y "archivos subidos" mostraría siempre 0, ignorando
+  // tanto el campo real como el fallback de aprobados+fallidos.
+  documents_total_count: count.optional(),
   total_documents_count: count.optional(),
   description: z.string().nullable(),
   activity_name: z.string().nullable(),
