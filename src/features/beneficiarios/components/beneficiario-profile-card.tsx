@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker, isoToDdMmYyyy } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -450,9 +451,20 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
               {/* Fecha Nacimiento — el MDM es su dueño: aquí se corrige si está mal.
                   El triaje no la toca (ver `useMdmBeneficiaryMatch`). */}
               <FieldSlot label="Fecha de Nacimiento" required={isEditing('personal')} editing={isEditing('personal')}
-                view={<p className="text-sm font-medium">{b?.birth_date || '—'}</p>}>
+                view={<p className="text-sm font-medium">{isoToDdMmYyyy(b?.birth_date) || '—'}</p>}>
                 <>
-                  <Input type="date" {...register('birth_date')} />
+                  <Controller
+                    name="birth_date"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        invalid={Boolean(errors.birth_date)}
+                      />
+                    )}
+                  />
                   {errors.birth_date && <p className="text-xs text-destructive mt-1">{errors.birth_date.message}</p>}
                   {ageWarning && (
                     <div className="flex items-start gap-1.5 rounded-md bg-destructive/10 px-2 py-1.5 mt-1.5">

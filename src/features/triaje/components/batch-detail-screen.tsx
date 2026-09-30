@@ -19,7 +19,6 @@ interface BatchDetailScreenProps {
   batchId: string;
 }
 
-/** Expedientes por página (el detalle pagina con `skip`/`limit`). */
 const PAGE_SIZE = 25;
 
 /** Orquestador del detalle de un lote (ruta /triaje/[batchId]). */
@@ -41,10 +40,6 @@ export function BatchDetailScreen({ batchId }: BatchDetailScreenProps) {
   const total = casesQuery.data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  // Solo se puede cancelar un lote en revisión (COMPLETED); mientras carga o si
-  // falla la metadata, el botón queda deshabilitado.
-  const canReject = batch?.status === 'COMPLETED';
-
   // Tras aprobar o rechazar, el lote deja la cola "por revisar": vuelve a la
   // bandeja (las mutaciones ya invalidaron el listado y el resumen).
   const goBackToInbox = () => router.push('/triaje');
@@ -56,7 +51,6 @@ export function BatchDetailScreen({ batchId }: BatchDetailScreenProps) {
         isLoading={batchQuery.isLoading}
         isError={batchQuery.isError}
         onOpenReject={() => setRejectOpen(true)}
-        canReject={canReject}
       />
 
       <CasesTable
@@ -99,12 +93,10 @@ export function BatchDetailScreen({ batchId }: BatchDetailScreenProps) {
       </div>
 
       <BatchDetailFooter
-        batchId={batchId}
         batch={batch}
         summary={summaryQuery.data}
         isLoading={summaryQuery.isLoading}
         isError={summaryQuery.isError}
-        onApproved={goBackToInbox}
       />
 
       <RejectBatchDialog

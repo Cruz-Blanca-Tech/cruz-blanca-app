@@ -133,14 +133,23 @@ export function useCaseCorrection({
     caseData?.status === 'INCOMPLETE' ||
     pendingDocuments.length > 0 ||
     (caseData?.discrepancies ?? []).some((d) => d.field_name?.startsWith('documents.'));
-  // Un expediente ya resuelto no admite correcciones, y sólo admite rechazo
-  // mientras su lote no se haya cargado al registro de beneficiarios.
+  // Un expediente no admite correcciones una vez cargado al registro de
+  // beneficiarios. Mientras no haya llegado (o si la carga falló) sigue abierto:
+  // ver `getCaseActionsState`.
   const caseActions = getCaseActionsState({
     caseStatus: caseData?.status ?? '',
+    syncStatus: caseData?.sync_status,
     batchStatus: batchQuery.data?.status,
   });
   const documents = useMemo(() => docsQuery.data?.documents ?? [], [docsQuery.data]);
-  const discrepancies = useMemo(() => caseData?.discrepancies ?? [], [caseData]);
+  // Acuerdo de producto: NO se muestran las correcciones internas. Las
+  // discrepancias de severidad INFO documentan correcciones automáticas ya
+  // APLICADAS al dossier (apellidos unificados, reconciliaciones LLM u de
+  // apoderado); se filtran para que el revisor solo vea lo que requiere acción.
+  const discrepancies = useMemo(
+    () => (caseData?.discrepancies ?? []).filter((d) => d.severity !== 'INFO'),
+    [caseData]
+  );
 
   const form = useForm<CorrectionFormValues>({
     defaultValues: emptyCorrectionValues(),
