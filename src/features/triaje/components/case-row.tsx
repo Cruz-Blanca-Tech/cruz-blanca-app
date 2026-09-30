@@ -39,10 +39,15 @@ function CountCell({ count, icon: Icon, activeClassName }: CountCellProps) {
 
 /** Fila de un expediente del lote. Se tiñe el fondo según la severidad máxima. */
 export function CaseRow({ caseItem, index }: CaseRowProps) {
-  const hasErrors = caseItem.error_count > 0;
-  const hasWarnings = caseItem.warning_count > 0;
+  const isApproved = caseItem.status === 'APPROVED';
+  const hasErrors = !isApproved && caseItem.error_count > 0;
+  const hasWarnings = !isApproved && caseItem.warning_count > 0;
   // Las correcciones internas (INFO) no se muestran: ya van aplicadas.
-  const visibleDiscrepancies = caseItem.discrepancies.filter((d) => d.severity !== 'INFO');
+  // En expedientes ya aprobados, las observaciones/advertencias fueron aceptadas
+  // durante la validación y no deben teñir la fila ni mostrar alertas en la bandeja.
+  const visibleDiscrepancies = isApproved
+    ? []
+    : caseItem.discrepancies.filter((d) => d.severity !== 'INFO');
   const isSyncFailed = caseItem.sync_status === 'FAILED';
   // Un expediente ya resuelto se sigue pudiendo abrir (consultar el detalle es
   // legítimo), pero se anuncia como lectura: sus campos no admiten corrección.

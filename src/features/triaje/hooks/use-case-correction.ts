@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -559,7 +559,14 @@ export function useCaseCorrection({
     ) as Record<CorrectionGroup, number>;
     for (const field of descriptors) {
       const status = validations.get(field.id)?.status;
-      if (status === 'warning' || status === 'error') base[field.group] += 1;
+      if (status === 'warning' || status === 'error') {
+        const visibleGroup: CorrectionGroup = (
+          CORRECTION_GROUPS as readonly string[]
+        ).includes(field.group)
+          ? field.group
+          : 'Contactos y Apoderado';
+        base[visibleGroup] += 1;
+      }
     }
     for (const issue of sectionIssues) base[issue.group] += 1;
     return base;
@@ -579,17 +586,35 @@ export function useCaseCorrection({
   const effectiveDocId = activeDocId ?? documents[0]?.id ?? null;
 
   const focusField = (id: string) => {
-    setActiveFieldId(id);
     const field = descriptors.find((f) => f.id === id);
-    if (!field) return;
+    if (!field) {
+      setActiveFieldId(id);
+      return;
+    }
+    const isVisibleTab = (CORRECTION_GROUPS as readonly string[]).includes(
+      field.group
+    );
+    if (!isVisibleTab) {
+      // Subgrupos contextuales ('Apoderado', 'Padre', 'Madre', 'Otro') no tienen
+      // pestaña propia: redirigen siempre a la pestaña visible 'Contactos y Apoderado'.
+      setActiveGroup('Contactos y Apoderado');
+      setActiveFieldId('beneficiary.adultos');
+      return;
+    }
+    setActiveFieldId(id);
     setActiveGroup(field.group);
     // Auto-cambio de documento deshabilitado por solicitud del usuario
   };
 
   const jumpToField = (id: string) => {
+    const field = descriptors.find((f) => f.id === id);
+    const isVisibleTab = field
+      ? (CORRECTION_GROUPS as readonly string[]).includes(field.group)
+      : true;
+    const targetFieldId = isVisibleTab ? id : 'beneficiary.adultos';
     focusField(id);
     setTimeout(() => {
-      const el = fieldRefs.current[id];
+      const el = fieldRefs.current[targetFieldId];
       el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       el?.querySelector<HTMLElement>('input, textarea, button')?.focus();
     }, 60);

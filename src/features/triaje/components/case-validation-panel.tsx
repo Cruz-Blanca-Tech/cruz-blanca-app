@@ -159,12 +159,16 @@ export function CaseValidationPanel({
               .map((d, i) => {
               const isError = d.severity === 'ERROR';
               const isInfo = d.severity === 'INFO';
-              const jumpable = Boolean(d.fieldId);
+              const isContactosNav =
+                d.navigation_hint === 'contactos_apoderados' ||
+                d.field_name?.startsWith('related_adults.') ||
+                d.fieldId?.startsWith('apoderado.');
+              const jumpable = Boolean(d.fieldId) || isContactosNav;
               return (
                 <div
                   key={`d-${i}`}
                   onClick={() => {
-                    if (d.navigation_hint === 'contactos_apoderados') {
+                    if (isContactosNav) {
                       onJumpGroup('Contactos y Apoderado');
                     } else if (d.fieldId) {
                       onJumpField(d.fieldId);
@@ -175,7 +179,7 @@ export function CaseValidationPanel({
                     isError && 'border-error/20 bg-error-light',
                     isInfo && 'border-emerald-200 bg-emerald-50',
                     !isError && !isInfo && 'border-warning/20 bg-warning-light',
-                    (jumpable || d.navigation_hint) && 'cursor-pointer'
+                    jumpable && 'cursor-pointer'
                   )}
                 >
                   {isError ? (
@@ -199,9 +203,9 @@ export function CaseValidationPanel({
                       - {d.rule_description}
                     </div>
                   </div>
-                  {(jumpable || d.navigation_hint) && (
+                  {jumpable && (
                     <div className="flex items-center gap-1.5">
-                      {d.navigation_hint === 'contactos_apoderados' && (
+                      {isContactosNav ? (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -213,8 +217,7 @@ export function CaseValidationPanel({
                         >
                           Ir a Contactos y Apoderado
                         </button>
-                      )}
-                      {d.fieldId && !d.navigation_hint && (
+                      ) : (
                         <CornerDownRight
                           className={cn(
                             'mt-0.5 size-3.5 shrink-0',
