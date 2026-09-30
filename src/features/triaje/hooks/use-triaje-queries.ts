@@ -223,19 +223,6 @@ export function invalidateBatchState(
 }
 
 /**
- * POST /batch/{batchId}/verify-completion — aprueba el lote (lo marca como
- * completado si todos sus expedientes están resueltos). Al tener éxito, refresca
- * la bandeja (resumen + listado) y los casos del lote.
- */
-export function useVerifyBatchCompletion(batchId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => batchDetailService.verifyBatchCompletion(batchId),
-    onSuccess: () => invalidateBatchState(queryClient, batchId),
-  });
-}
-
-/**
  * POST /batch/{batchId}/reject — rechaza en masa los expedientes pendientes del
  * lote. La mutación recibe el `reason` (obligatorio en el backend). Al tener
  * éxito, refresca la bandeja (resumen + listado) y los casos del lote.
@@ -309,20 +296,10 @@ export function useRetryBatch(batchId: string) {
 }
 
 /**
- * POST /batch/{batchId}/retry-sync — reintenta la sincronización con Beneficiarios
- * de todos los expedientes fallidos de un lote.
- */
-export function useRetryBatchSync(batchId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => batchDetailService.retryBatchSync(batchId),
-    onSuccess: () => invalidateBatchState(queryClient, batchId),
-  });
-}
-
-/**
  * POST /educa/{caseId}/retry-sync — reintenta la sincronización con Beneficiarios
- * de un expediente individual.
+ * de un expediente individual. Es el único reintento que queda: el del lote se
+ * fue con el botón "Validar y cargar lote", así que el reintento se hace desde la
+ * ficha del expediente que falló, que además es donde está el error concreto.
  */
 export function useRetryCaseSync(caseId: string, batchId: string) {
   const queryClient = useQueryClient();

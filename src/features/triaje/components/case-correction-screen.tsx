@@ -366,9 +366,9 @@ export function CaseCorrectionScreen({
                 Expediente Aprobado
               </p>
               <p className="font-data text-xs text-success-dark/80">
-                {caseActions.canEdit
-                  ? 'Este expediente se encuentra aprobado. Puede realizar correcciones adicionales antes de completar el lote.'
-                  : 'Este expediente ya fue validado y su lote fue procesado. No requiere más correcciones.'}
+                {vm.caseData.sync_status === 'SYNCED'
+                  ? 'Este expediente ya está cargado en el registro de beneficiarios. Si algún dato está mal, corríalo en la ficha del beneficiario.'
+                  : 'Este expediente se encuentra aprobado. Puede realizar correcciones adicionales antes de completar el lote.'}
               </p>
             </div>
           </div>
@@ -499,6 +499,7 @@ export function CaseCorrectionScreen({
             canReject={caseActions.canReject}
             isReprocessing={reprocessMutation.isPending}
             canEdit={caseActions.canEdit}
+            canReprocess={caseActions.canReprocess}
           />
         </div>
       </div>

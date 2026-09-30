@@ -93,12 +93,10 @@ export function BatchDetailScreen({ batchId }: BatchDetailScreenProps) {
       </div>
 
       <BatchDetailFooter
-        batchId={batchId}
         batch={batch}
         summary={summaryQuery.data}
         isLoading={summaryQuery.isLoading}
         isError={summaryQuery.isError}
-        onApproved={goBackToInbox}
       />
 
       <RejectBatchDialog
