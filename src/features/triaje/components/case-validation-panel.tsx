@@ -175,7 +175,7 @@ export function CaseValidationPanel({
                     isError && 'border-error/20 bg-error-light',
                     isInfo && 'border-emerald-200 bg-emerald-50',
                     !isError && !isInfo && 'border-warning/20 bg-warning-light',
-(jumpable || d.navigation_hint) && 'cursor-pointer'
+                    (jumpable || d.navigation_hint) && 'cursor-pointer'
                   )}
                 >
                   {isError ? (
@@ -199,7 +199,7 @@ export function CaseValidationPanel({
                       - {d.rule_description}
                     </div>
                   </div>
-{(jumpable || d.navigation_hint) && (
+                  {(jumpable || d.navigation_hint) && (
                     <div className="flex items-center gap-1.5">
                       {d.navigation_hint === 'contactos_apoderados' && (
                         <button
