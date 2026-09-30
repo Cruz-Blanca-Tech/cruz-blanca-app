@@ -26,8 +26,8 @@ export function SchoolSelect({ value, onChange, disabled, className }: SchoolSel
 
   return (
     <Select
-      value={value || undefined}
-      onValueChange={(val) => val && onChange(val)}
+      value={value || ""}
+      onValueChange={(val) => onChange(val || "")}
       disabled={disabled || isLoading}
     >
       <SelectTrigger

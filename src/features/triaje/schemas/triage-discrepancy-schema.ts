@@ -20,5 +20,6 @@ export const triageDiscrepancySchema = z.object({
   rule_description: z.string(),
   severity: z.string(),
   document_code: z.string().nullable(),
+  navigation_hint: z.string().nullable(),
 });
 export type TriageDiscrepancy = z.infer<typeof triageDiscrepancySchema>;

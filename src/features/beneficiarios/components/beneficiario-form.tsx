@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { AdultsListControl } from '@/features/triaje/components/adults-list-control';
 import { SchoolSelect } from '@/features/mdm/components/school-select';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -267,7 +268,19 @@ export function BeneficiarioForm({ initialData: rawInitialData, isEdit }: Benefi
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="birth_date">Fecha de nac. *</Label>
-                  <Input id="birth_date" type="date" {...register('birth_date')} />
+                  <Controller
+                    name="birth_date"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        id="birth_date"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        invalid={Boolean(errors.birth_date)}
+                      />
+                    )}
+                  />
                   {errors.birth_date && (
                     <p className="text-xs font-medium text-destructive">{errors.birth_date.message}</p>
                   )}

@@ -3,8 +3,8 @@
 import { FormProvider } from 'react-hook-form';
 import {
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
+  FileSearch,
   Lock,
   Loader2,
   OctagonAlert,
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useState } from 'react';
 
 import { useCaseCorrection } from '../hooks/use-case-correction';
@@ -26,10 +26,12 @@ import { CaseCorrectionHeader } from './case-correction-header';
 import { IncompleteCasePanel } from './incomplete-case-panel';
 import { CaseCorrectionActions } from './case-correction-actions';
 import { UploadMissingDocModal } from './upload-missing-doc-modal';
-import { useUploadMissingDoc } from '../hooks/use-upload-missing-doc';
 import { useReprocessDossier } from '../hooks/use-reprocess-dossier';
 import { RejectCaseDialog } from './reject-case-dialog';
 import { DossierDocumentChecklist } from './dossier-document-checklist';
+import { BeneficiaryPreviewDialog } from './beneficiary-preview-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { getCaseReprocessing } from '../hooks/use-triaje-queries';
 
 interface CaseCorrectionScreenProps {
   batchId: string;
@@ -45,8 +47,16 @@ export function CaseCorrectionScreen({
 }: CaseCorrectionScreenProps) {
   const vm = useCaseCorrection({ batchId, caseId, dniReference });
   const retryCaseSync = useRetryCaseSync(caseId, batchId);
+  const queryClient = useQueryClient();
   const reprocessMutation = useReprocessDossier(batchId, dniReference, caseId);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [previewDni, setPreviewDni] = useState<string | null>(null);
+  const [previewRole, setPreviewRole] = useState<'beneficiario' | 'adulto'>('beneficiario');
+  const [previewReason, setPreviewReason] = useState<string | undefined>();
+
+  // Estado global de reprocesamiento (persiste aunque naveguemos a otro caso y volvamos)
+  const isReprocessingGlobal = getCaseReprocessing(queryClient, caseId);
+  const isReprocessing = reprocessMutation.isPending || isReprocessingGlobal;
 
   if (vm.isLoading) return <CaseCorrectionSkeleton />;
   if (vm.isError || !vm.caseData) return <CaseNotFound onBack={vm.goBackToBatch} />;
@@ -56,9 +66,8 @@ export function CaseCorrectionScreen({
   const isRejected = vm.caseData?.status === 'REJECTED';
   const isSyncFailed = vm.caseData?.sync_status === 'FAILED';
   const aiInsightDiscrepancy = vm.enrichedDiscrepancies.find(d => d.severity === 'AI_INSIGHT' && d.fieldId === 'beneficiary.dni');
-  const isReprocessing = reprocessMutation.isPending;
   const canEditForm = caseActions.canEdit && !isReprocessing;
-  const displayLockReason = isReprocessing ? 'Reprocesando expediente con Inteligencia Artificial. Por favor, espere unos segundos...' : caseActions.lockReason;
+  const displayLockReason = caseActions.lockReason;
 
   const handleValidationClick = async () => {
     // 1. Validar reglas de la interfaz primero (campos vacíos, formatos incorrectos)
@@ -96,19 +105,16 @@ export function CaseCorrectionScreen({
 
   return (
     <div className="relative flex flex-1 flex-col gap-3 p-6">
-      {/* Overlay de Carga (IA Reprocesando) local al área de trabajo */}
+      {/* Indicador no bloqueante de reprocesamiento en la barra superior */}
       {(isReprocessing || vm.pendingDocuments.length > 0) && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4 rounded-xl bg-white p-8 shadow-2xl">
-            <Loader2 className="size-12 animate-spin text-primary" />
-            <div className="text-center">
-              <h3 className="font-heading text-lg font-bold text-ink-primary">
-                El expediente se está procesando por la IA
-              </h3>
-              <p className="mt-1 text-sm text-ink-secondary">
-                {vm.pendingDocuments.length > 0 ? `Analizando ${vm.pendingDocuments.length} documento(s) en progreso...` : 'Enviando solicitud a la IA. Por favor espere...'}
-              </p>
-            </div>
+        <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center px-4 py-2 bg-primary/95 text-white shadow-lg border-b border-primary/50">
+          <div className="flex items-center gap-3">
+            <Loader2 className="size-5 animate-spin" />
+            <span className="font-heading text-sm font-medium">
+              {isReprocessing
+                ? 'Reprocesando expediente con IA…'
+                : `Analizando ${vm.pendingDocuments.length} documento(s)…`}
+            </span>
           </div>
         </div>
       )}
@@ -165,27 +171,61 @@ export function CaseCorrectionScreen({
             <div className="flex items-start gap-3">
               <Sparkles className="mt-0.5 size-5 shrink-0 text-purple-600" />
               <div>
-                <h4 className="font-heading text-sm font-bold text-purple-900">
-                  Sugerencia de Inteligencia Artificial (Posible Duplicado)
-                </h4>
-                <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
-                  {aiInsightDiscrepancy.rule_description}
-                </p>
+                {aiInsightDiscrepancy.document_code === 'CORROBORATED' ? (
+                  <>
+                    <h4 className="font-heading text-sm font-bold text-purple-900">
+                      DNI corroborado entre documentos
+                    </h4>
+                    <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
+                      {aiInsightDiscrepancy.rule_description}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-heading text-sm font-bold text-purple-900">
+                      Sugerencia de Inteligencia Artificial (Posible Duplicado)
+                    </h4>
+                    <p className="mt-0.5 font-data text-xs leading-relaxed text-purple-800">
+                      {aiInsightDiscrepancy.rule_description}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             {caseActions.canEdit && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
-                onClick={() => {
-                  vm.form.setValue('beneficiary.dni', aiInsightDiscrepancy.expected_pattern || '', { shouldValidate: true, shouldDirty: true });
-                  toast.success('DNI actualizado con sugerencia de IA');
-                }}
-              >
-                <LinkIcon className="mr-2 size-4" />
-                Vincular (DNI: {aiInsightDiscrepancy.expected_pattern})
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                  onClick={() => {
+                    setPreviewDni(aiInsightDiscrepancy.expected_pattern || '');
+                    setPreviewRole('beneficiario');
+                    setPreviewReason(aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                      ? 'DNI corroborado entre documentos'
+                      : 'Sugerencia de IA: posible duplicado');
+                  }}
+                  aria-label="Ver vista previa del beneficiario"
+                >
+                  <FileSearch className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                  onClick={() => {
+                    vm.form.setValue('beneficiary.dni', aiInsightDiscrepancy.expected_pattern || '', { shouldValidate: true, shouldDirty: true });
+                    toast.success(aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                      ? 'DNI aplicado desde los documentos'
+                      : 'DNI actualizado con sugerencia de IA');
+                  }}
+                >
+                  <LinkIcon className="mr-2 size-4" />
+                  {aiInsightDiscrepancy.document_code === 'CORROBORATED'
+                    ? `Usar DNI: ${aiInsightDiscrepancy.expected_pattern}`
+                    : `Vincular (DNI: ${aiInsightDiscrepancy.expected_pattern})`}
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -225,15 +265,30 @@ export function CaseCorrectionScreen({
                 {caseActions.canEdit && (
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {s.dni && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
-                        onClick={() => vm.linkAdult(s.adultIndex, s.dni, s.name || undefined)}
-                      >
-                        <LinkIcon className="mr-2 size-4" />
-                        Vincular (DNI: {s.dni})
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                          onClick={() => {
+                            setPreviewDni(s.dni);
+                            setPreviewRole('adulto');
+                            setPreviewReason('Sugerencia de IA: posible adulto ya registrado');
+                          }}
+                          aria-label="Ver vista previa del adulto"
+                        >
+                          <FileSearch className="size-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-purple-300 bg-white text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+                          onClick={() => vm.linkAdult(s.adultIndex, s.dni, s.name || undefined)}
+                        >
+                          <LinkIcon className="mr-2 size-4" />
+                          Vincular (DNI: {s.dni})
+                        </Button>
+                      </>
                     )}
                     {s.phone && (
                       <Button
@@ -311,24 +366,17 @@ export function CaseCorrectionScreen({
                 Expediente Aprobado
               </p>
               <p className="font-data text-xs text-success-dark/80">
-                {caseActions.canEdit
-                  ? 'Este expediente se encuentra aprobado. Puede realizar correcciones adicionales antes de completar el lote.'
-                  : 'Este expediente ya fue validado y su lote fue procesado. No requiere más correcciones.'}
+                {vm.caseData.sync_status === 'SYNCED'
+                  ? 'Este expediente ya está cargado en el registro de beneficiarios. Si algún dato está mal, corríalo en la ficha del beneficiario.'
+                  : 'Este expediente se encuentra aprobado. Puede realizar correcciones adicionales antes de completar el lote.'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {vm.nextCase ? (
-              <Button size="sm" onClick={() => vm.nextCase && vm.goToCase(vm.nextCase)}>
-                Siguiente registro
-                <ArrowRight className="size-3.5" />
-              </Button>
-            ) : (
-              <Button size="sm" onClick={vm.goBackToBatch}>
-                <ArrowLeft className="size-3.5" />
-                Volver al lote para registrar
-              </Button>
-            )}
+            <Button size="sm" variant="ghost" onClick={vm.goBackToBatch}>
+              <ArrowLeft className="size-3.5 mr-1" />
+              Volver al lote
+            </Button>
           </div>
         </div>
       )}
@@ -346,17 +394,10 @@ export function CaseCorrectionScreen({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {vm.nextCase ? (
-              <Button size="sm" onClick={() => vm.nextCase && vm.goToCase(vm.nextCase)}>
-                Siguiente registro
-                <ArrowRight className="size-3.5" />
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={vm.goBackToBatch}>
-                <ArrowLeft className="size-3.5" />
-                Volver al lote
-              </Button>
-            )}
+            <Button size="sm" variant="ghost" onClick={vm.goBackToBatch}>
+              <ArrowLeft className="size-3.5 mr-1" />
+              Volver al lote
+            </Button>
           </div>
         </div>
       )}
@@ -439,24 +480,26 @@ export function CaseCorrectionScreen({
           </div>
 
           <CaseCorrectionActions
-            onBack={vm.goBackToBatch}
             onReject={() => vm.setRejectOpen(true)}
             onSubmit={handleValidationClick}
-            onNext={() => vm.nextCase && vm.goToCase(vm.nextCase)}
-            hasNext={Boolean(vm.nextCase)}
+            onReprocess={() => {
+                toast.info('Reprocesando expediente en segundo plano…', {
+                  id: `reprocess-${caseId}`,
+                  duration: 3000,
+                });
+                reprocessMutation.mutate(undefined, {
+                    onSuccess: () => {
+                      // El toast de éxito real se muestra ahora cuando el polling termina
+                      void vm.refetchCase();
+                    }
+                  });
+              }}
             isSubmitting={vm.isSubmitting}
             isIncomplete={isIncomplete}
             canReject={caseActions.canReject}
-              onReprocess={() => {
-                  reprocessMutation.mutate(undefined, {
-                      onSuccess: () => {
-                        // El toast de éxito real se muestra ahora cuando el polling termina
-                        void vm.refetchCase();
-                      }
-                    });
-                }}
-              isReprocessing={reprocessMutation.isPending}
+            isReprocessing={reprocessMutation.isPending}
             canEdit={caseActions.canEdit}
+            canReprocess={caseActions.canReprocess}
           />
         </div>
       </div>
@@ -529,6 +572,16 @@ export function CaseCorrectionScreen({
           </div>
         </DialogContent>
       </Dialog>
+
+      {previewDni && (
+        <BeneficiaryPreviewDialog
+          dni={previewDni}
+          open={!!previewDni}
+          onOpenChange={(open) => !open && setPreviewDni(null)}
+          role={previewRole}
+          reason={previewReason}
+        />
+      )}
     </div>
   );
 }

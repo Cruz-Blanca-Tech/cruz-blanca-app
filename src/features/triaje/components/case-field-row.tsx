@@ -20,6 +20,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select,
   SelectContent,
@@ -299,6 +300,23 @@ export function CaseFieldRow({
         />
       ) : field.control === 'adults_list' ? (
         <AdultsListControl parentsLocked={parentsLocked} />
+      ) : field.control === 'date' ? (
+        // Selector día/mes/año en español: el `<input type="date">` nativo
+        // mostraba el formato del idioma del navegador (mm/dd/yyyy en inglés).
+        <Controller
+          control={control}
+          name={fieldName(field.name!)}
+          render={({ field: rhf }) => (
+            <DatePicker
+              value={(rhf.value as string) ?? ''}
+              onChange={rhf.onChange}
+              onBlur={rhf.onBlur}
+              disabled={effectiveDisabled}
+              invalid={flagged}
+              triggerClassName={flagged ? meta.border : undefined}
+            />
+          )}
+        />
       ) : field.control === 'school_select' ? (
         <Controller
           control={control}
