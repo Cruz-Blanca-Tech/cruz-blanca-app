@@ -3,8 +3,6 @@ import { parseApiResponse } from '@/lib/parse-api-response';
 import { API_PATHS } from '@/lib/api-paths';
 import { triageCasesSchema, type TriageCases } from '../schemas/triage-cases-schema';
 import {
-  batchVerifyCompletionSchema,
-  type BatchVerifyCompletion,
   batchRejectSchema,
   type BatchReject,
 } from '../schemas/batch-actions-schema';
@@ -60,20 +58,6 @@ export const batchDetailService = {
   },
 
   /**
-   * POST /batch/{batchId}/verify-completion — verifica si todos los expedientes
-   * del lote están resueltos y, de estarlo, lo marca como completado (aprueba el
-   * lote). Sin body: solo el `batchId`.
-   */
-  async verifyBatchCompletion(batchId: string): Promise<BatchVerifyCompletion> {
-    const data = await apiClient.post(`${API_PATHS.batch}/${batchId}/verify-completion`);
-    return parseApiResponse(
-      batchVerifyCompletionSchema,
-      data,
-      'la verificación del lote'
-    );
-  },
-
-  /**
    * POST /batch/{batchId}/reject — rechaza en masa los expedientes pendientes
    * del lote. El backend exige `reason` (obligatorio) en el body.
    */
@@ -84,16 +68,4 @@ export const batchDetailService = {
     return parseApiResponse(batchRejectSchema, data, 'el rechazo del lote');
   },
 
-  /**
-   * POST /batch/{batchId}/retry-sync — reintenta la sincronización con Beneficiarios
-   * de los expedientes del lote que fallaron anteriormente.
-   */
-  async retryBatchSync(batchId: string): Promise<BatchVerifyCompletion> {
-    const data = await apiClient.post(`${API_PATHS.batch}/${batchId}/retry-sync`);
-    return parseApiResponse(
-      batchVerifyCompletionSchema,
-      data,
-      'el reintento de sincronización del lote'
-    );
-  },
 };

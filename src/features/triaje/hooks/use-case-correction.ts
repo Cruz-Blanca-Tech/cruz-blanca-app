@@ -133,10 +133,12 @@ export function useCaseCorrection({
     caseData?.status === 'INCOMPLETE' ||
     pendingDocuments.length > 0 ||
     (caseData?.discrepancies ?? []).some((d) => d.field_name?.startsWith('documents.'));
-  // Un expediente ya resuelto no admite correcciones, y sólo admite rechazo
-  // mientras su lote no se haya cargado al registro de beneficiarios.
+  // Un expediente no admite correcciones una vez cargado al registro de
+  // beneficiarios. Mientras no haya llegado (o si la carga falló) sigue abierto:
+  // ver `getCaseActionsState`.
   const caseActions = getCaseActionsState({
     caseStatus: caseData?.status ?? '',
+    syncStatus: caseData?.sync_status,
     batchStatus: batchQuery.data?.status,
   });
   const documents = useMemo(() => docsQuery.data?.documents ?? [], [docsQuery.data]);

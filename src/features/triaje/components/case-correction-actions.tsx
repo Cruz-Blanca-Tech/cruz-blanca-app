@@ -9,6 +9,8 @@ interface CaseCorrectionActionsProps {
   isIncomplete: boolean;
   canReject: boolean;
   canEdit: boolean;
+  /** Reprocesar con IA reevalúa el expediente: si ya está decidido, no. */
+  canReprocess: boolean;
   isReprocessing?: boolean;
 }
 
@@ -21,6 +23,7 @@ export function CaseCorrectionActions({
   isIncomplete,
   canReject,
   canEdit,
+  canReprocess,
   isReprocessing,
 }: CaseCorrectionActionsProps) {
   return (
@@ -30,7 +33,12 @@ export function CaseCorrectionActions({
         size="sm"
         className="h-8 border-primary/20 text-primary hover:bg-brand-50"
         onClick={onReprocess}
-        disabled={isSubmitting || isReprocessing}
+        disabled={isSubmitting || isReprocessing || !canReprocess}
+        title={
+          canReprocess
+            ? undefined
+            : 'El expediente ya tiene una decisión tomada, no se puede volver a evaluar.'
+        }
       >
         {isReprocessing ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 size-3.5" />}
         Reprocesar Expediente (IA)
