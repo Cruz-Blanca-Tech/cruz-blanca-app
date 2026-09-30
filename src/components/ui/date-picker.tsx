@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Calendar, ChevronLeft, ChevronRight, ChevronDown, Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,7 @@ interface DatePickerProps {
  *
  * - Muestra `dd/mm/aaaa` en el input.
  * - El calendario muestra nombres de meses/días en español.
+ * - Permite buscar y seleccionar rápidamente por mes y por año.
  * - Valor del formulario y API: ISO `YYYY-MM-DD`.
  * - Navegación por teclado (flechas, Home, End).
  * - Botón para borrar la fecha.
@@ -121,9 +122,13 @@ export function DatePicker({
   maxYear = new Date().getFullYear(),
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
+  const [pickerView, setPickerView] = useState<"days" | "month" | "year">("days");
+  const [monthQuery, setMonthQuery] = useState("");
+  const [yearQuery, setYearQuery] = useState("");
   const [viewDate, setViewDate] = useState(() => isoToDate(value) || new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(isoToDate(value));
   const inputRef = useRef<HTMLInputElement>(null);
+  const yearListRef = useRef<HTMLDivElement>(null);
   const prevValueRef = useRef(value);
 
   // Sincronizar con value externo (controlled component pattern)
@@ -141,6 +146,54 @@ export function DatePicker({
     }
   }, [value]);
 
+  // Al abrir el selector de años, desplazar hacia el año activo
+  useEffect(() => {
+    if (open && pickerView === "year" && yearListRef.current) {
+      const activeBtn = yearListRef.current.querySelector<HTMLButtonElement>(
+        '[data-active="true"]'
+      );
+      if (activeBtn) {
+        activeBtn.scrollIntoView({ block: "center" });
+      }
+    }
+  }, [open, pickerView]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setPickerView("days");
+      setMonthQuery("");
+      setYearQuery("");
+    }
+  };
+
+  const applyMonthYearChange = (nextYear: number, nextMonth: number) => {
+    setViewDate(new Date(nextYear, nextMonth, 1));
+    if (selectedDate) {
+      const maxDayInTarget = new Date(nextYear, nextMonth + 1, 0).getDate();
+      const clampedDay = Math.min(selectedDate.getDate(), maxDayInTarget);
+      const updated = new Date(nextYear, nextMonth, clampedDay);
+      const min = new Date(minYear, 0, 1);
+      const max = new Date(maxYear, 11, 31);
+      if (updated >= min && updated <= max) {
+        setSelectedDate(updated);
+        onChange(dateToIso(updated));
+      }
+    }
+  };
+
+  const handleMonthSelect = (monthIndex: number) => {
+    applyMonthYearChange(viewDate.getFullYear(), monthIndex);
+    setPickerView("days");
+    setMonthQuery("");
+  };
+
+  const handleYearSelect = (year: number) => {
+    applyMonthYearChange(year, viewDate.getMonth());
+    setPickerView("days");
+    setYearQuery("");
+  };
+
   const handleDayClick = (day: Date) => {
     // Solo días del mes actual
     if (day.getMonth() !== viewDate.getMonth()) return;
@@ -150,7 +203,7 @@ export function DatePicker({
 
     setSelectedDate(day);
     onChange(dateToIso(day));
-    setOpen(false);
+    handleOpenChange(false);
     inputRef.current?.focus();
   };
 
@@ -209,8 +262,26 @@ export function DatePicker({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const years: number[] = [];
+  for (let y = maxYear; y >= minYear; y--) {
+    years.push(y);
+  }
+
+  const normalizedMonthQuery = monthQuery.trim().toLowerCase();
+  const filteredMonths = MESES.map((name, index) => ({ name, index })).filter(
+    ({ name, index }) =>
+      !normalizedMonthQuery ||
+      name.includes(normalizedMonthQuery) ||
+      String(index + 1).includes(normalizedMonthQuery)
+  );
+
+  const normalizedYearQuery = yearQuery.trim();
+  const filteredYears = years.filter(
+    (y) => !normalizedYearQuery || String(y).includes(normalizedYearQuery)
+  );
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <div className={cn("relative", className)}>
           <input
@@ -223,7 +294,7 @@ export function DatePicker({
             aria-label="Fecha de nacimiento"
             placeholder="dd/mm/aaaa"
             value={selectedDate ? formatDisplay(selectedDate) : ""}
-            onClick={(e) => { e.stopPropagation(); if (!disabled) setOpen(true); }}
+            onClick={(e) => { e.stopPropagation(); if (!disabled) handleOpenChange(true); }}
             onBlur={onBlur}
             onKeyDown={handleKeyDown}
             className={cn(
@@ -241,7 +312,7 @@ export function DatePicker({
             size="icon"
             className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink-primary disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={disabled}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenChange(!open); }}
             aria-label={open ? "Cerrar calendario" : "Abrir calendario"}
           >
             <Calendar className="size-4" />
@@ -265,78 +336,250 @@ export function DatePicker({
       <PopoverContent className="w-auto p-0" sideOffset={4} align="start">
         <div className="w-64 p-3">
           {/* Header mes/año */}
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between gap-1 mb-2">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7 shrink-0"
               onClick={prevMonth}
-              disabled={viewDate.getFullYear() <= minYear && viewDate.getMonth() === 0}
+              disabled={
+                pickerView !== "days" ||
+                (viewDate.getFullYear() <= minYear && viewDate.getMonth() === 0)
+              }
               aria-label="Mes anterior"
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <span className="font-heading text-sm font-medium text-ink-primary capitalize">
-              {MESES[viewDate.getMonth()]} {viewDate.getFullYear()}
-            </span>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setPickerView((v) => (v === "month" ? "days" : "month"));
+                  setMonthQuery("");
+                }}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-2 py-1 font-heading text-xs font-medium capitalize transition-colors",
+                  pickerView === "month"
+                    ? "bg-primary text-white"
+                    : "bg-slate-100 text-ink-primary hover:bg-slate-200/80"
+                )}
+                aria-label="Buscar o seleccionar mes"
+                aria-expanded={pickerView === "month"}
+              >
+                {MESES[viewDate.getMonth()]}
+                <ChevronDown
+                  className={cn(
+                    "size-3 opacity-70 transition-transform",
+                    pickerView === "month" && "rotate-180 opacity-100"
+                  )}
+                />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPickerView((v) => (v === "year" ? "days" : "year"));
+                  setYearQuery("");
+                }}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-2 py-1 font-data text-xs font-semibold transition-colors",
+                  pickerView === "year"
+                    ? "bg-primary text-white"
+                    : "bg-slate-100 text-ink-primary hover:bg-slate-200/80"
+                )}
+                aria-label="Buscar o seleccionar año"
+                aria-expanded={pickerView === "year"}
+              >
+                {viewDate.getFullYear()}
+                <ChevronDown
+                  className={cn(
+                    "size-3 opacity-70 transition-transform",
+                    pickerView === "year" && "rotate-180 opacity-100"
+                  )}
+                />
+              </button>
+            </div>
+
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7 shrink-0"
               onClick={nextMonth}
-              disabled={viewDate.getFullYear() >= maxYear && viewDate.getMonth() === 11}
+              disabled={
+                pickerView !== "days" ||
+                (viewDate.getFullYear() >= maxYear && viewDate.getMonth() === 11)
+              }
               aria-label="Mes siguiente"
             >
               <ChevronRight className="size-4" />
             </Button>
           </div>
 
-          {/* Días de la semana */}
-          <div className="grid grid-cols-7 gap-0.5 mb-1 text-center">
-            {DIAS_SEMANA.map((d) => (
-              <div key={d} className="font-sans text-[10px] font-medium text-ink-muted py-0.5">
-                {d}
+          {pickerView === "month" && (
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-ink-muted" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={monthQuery}
+                  onChange={(e) => setMonthQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && filteredMonths.length > 0) {
+                      e.preventDefault();
+                      handleMonthSelect(filteredMonths[0].index);
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setPickerView("days");
+                    }
+                  }}
+                  placeholder="Buscar mes (ej. marzo o 3)..."
+                  className="h-7 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2 text-xs text-ink-primary placeholder:text-ink-muted/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
               </div>
-            ))}
-          </div>
+              {filteredMonths.length > 0 ? (
+                <div className="grid grid-cols-3 gap-1">
+                  {filteredMonths.map(({ name, index }) => {
+                    const isCurrent = index === viewDate.getMonth();
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => handleMonthSelect(index)}
+                        className={cn(
+                          "h-8 rounded-md px-1.5 text-xs capitalize transition-colors",
+                          isCurrent
+                            ? "bg-primary font-semibold text-white"
+                            : "text-ink-secondary hover:bg-accent hover:text-ink-primary"
+                        )}
+                      >
+                        {name.slice(0, 3)}.
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="py-4 text-center text-xs text-ink-muted">
+                  Sin coincidencias
+                </p>
+              )}
+            </div>
+          )}
 
-          {/* Grid de días */}
-          <div className="grid grid-cols-7 gap-0.5">
-            {days.map((day, i) => {
-              const isCurrentMonth = day.getMonth() === viewDate.getMonth();
-              const isSelected = selectedDate && day.getTime() === selectedDate.getTime();
-              const isToday = day.getTime() === today.getTime();
-              const isDisabled =
-                !isCurrentMonth ||
-                day < new Date(minYear, 0, 1) ||
-                day > new Date(maxYear, 11, 31);
-
-              return (
-                <button
-                  key={`${day.getTime()}-${i}`}
-                  type="button"
-                  onClick={() => handleDayClick(day)}
-                  disabled={isDisabled}
-                  className={cn(
-                    "h-8 w-full rounded-md font-data text-[12px] transition-colors",
-                    "focus:outline-none focus:ring-2 focus:ring-primary/30",
-                    isDisabled
-                      ? "text-ink-muted/30 cursor-not-allowed"
-                      : isSelected
-                      ? "bg-primary text-white hover:bg-primary/90"
-                      : isToday
-                      ? "font-bold text-primary ring-1 ring-primary hover:bg-primary/5"
-                      : "text-ink-secondary hover:bg-accent hover:text-ink-primary"
-                  )}
-                  aria-selected={isSelected ? "true" : "false"}
-                  aria-current={isToday ? "date" : undefined}
-                  aria-disabled={isDisabled}
+          {pickerView === "year" && (
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-ink-muted" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus
+                  value={yearQuery}
+                  onChange={(e) => setYearQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && filteredYears.length > 0) {
+                      e.preventDefault();
+                      const exact = Number(yearQuery.trim());
+                      if (filteredYears.includes(exact)) {
+                        handleYearSelect(exact);
+                      } else {
+                        handleYearSelect(filteredYears[0]);
+                      }
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setPickerView("days");
+                    }
+                  }}
+                  placeholder="Buscar año (ej. 2016)..."
+                  className="h-7 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2 font-data text-xs text-ink-primary placeholder:font-sans placeholder:text-ink-muted/60 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              {filteredYears.length > 0 ? (
+                <div
+                  ref={yearListRef}
+                  className="grid max-h-48 grid-cols-3 gap-1 overflow-y-auto pr-1"
                 >
-                  {day.getDate()}
-                </button>
-              );
-            })}
-          </div>
+                  {filteredYears.map((y) => {
+                    const isCurrent = y === viewDate.getFullYear();
+                    return (
+                      <button
+                        key={y}
+                        type="button"
+                        data-active={isCurrent ? "true" : undefined}
+                        onClick={() => handleYearSelect(y)}
+                        className={cn(
+                          "h-8 rounded-md font-data text-xs transition-colors",
+                          isCurrent
+                            ? "bg-primary font-semibold text-white"
+                            : "text-ink-secondary hover:bg-accent hover:text-ink-primary"
+                        )}
+                      >
+                        {y}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="py-4 text-center text-xs text-ink-muted">
+                  Sin coincidencias
+                </p>
+              )}
+            </div>
+          )}
+
+          {pickerView === "days" && (
+            <>
+              {/* Días de la semana */}
+              <div className="grid grid-cols-7 gap-0.5 mb-1 text-center">
+                {DIAS_SEMANA.map((d) => (
+                  <div key={d} className="font-sans text-[10px] font-medium text-ink-muted py-0.5">
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid de días */}
+              <div className="grid grid-cols-7 gap-0.5">
+                {days.map((day, i) => {
+                  const isCurrentMonth = day.getMonth() === viewDate.getMonth();
+                  const isSelected = selectedDate && day.getTime() === selectedDate.getTime();
+                  const isToday = day.getTime() === today.getTime();
+                  const isDisabled =
+                    !isCurrentMonth ||
+                    day < new Date(minYear, 0, 1) ||
+                    day > new Date(maxYear, 11, 31);
+
+                  return (
+                    <button
+                      key={`${day.getTime()}-${i}`}
+                      type="button"
+                      onClick={() => handleDayClick(day)}
+                      disabled={isDisabled}
+                      className={cn(
+                        "h-8 w-full rounded-md font-data text-[12px] transition-colors",
+                        "focus:outline-none focus:ring-2 focus:ring-primary/30",
+                        isDisabled
+                          ? "text-ink-muted/30 cursor-not-allowed"
+                          : isSelected
+                          ? "bg-primary text-white hover:bg-primary/90"
+                          : isToday
+                          ? "font-bold text-primary ring-1 ring-primary hover:bg-primary/5"
+                          : "text-ink-secondary hover:bg-accent hover:text-ink-primary"
+                      )}
+                      aria-selected={isSelected ? "true" : "false"}
+                      aria-current={isToday ? "date" : undefined}
+                      aria-disabled={isDisabled}
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </PopoverContent>
     </Popover>
