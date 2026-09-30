@@ -197,9 +197,11 @@ export function dossierToFormValues(d: EducaDossierData): CorrectionFormValues {
       allergies: [...d.medical.allergies],
       diseases: [...d.medical.diseases],
       insurance: [...d.medical.insurance],
-      has_been_operated: d.medical.has_been_operated,
+      has_been_operated:
+        d.medical.has_been_operated || Boolean(s(d.medical.operation_reason).trim()),
       operation_reason: s(d.medical.operation_reason),
-      has_been_hospitalized: d.medical.has_been_hospitalized,
+      has_been_hospitalized:
+        d.medical.has_been_hospitalized || Boolean(s(d.medical.hospitalization_reason).trim()),
       hospitalization_reason: s(d.medical.hospitalization_reason),
       vaccines: [...d.medical.vaccines],
       medications: [...d.medical.medications],
@@ -272,9 +274,13 @@ export function formValuesToDossier(
       diseases: values.medical.diseases,
       insurance: values.medical.insurance,
       has_been_operated: values.medical.has_been_operated,
-      operation_reason: emptyToNull(values.medical.operation_reason),
+      operation_reason: values.medical.has_been_operated
+        ? emptyToNull(values.medical.operation_reason)
+        : null,
       has_been_hospitalized: values.medical.has_been_hospitalized,
-      hospitalization_reason: emptyToNull(values.medical.hospitalization_reason),
+      hospitalization_reason: values.medical.has_been_hospitalized
+        ? emptyToNull(values.medical.hospitalization_reason)
+        : null,
       vaccines: values.medical.vaccines,
       medications: values.medical.medications,
     },
