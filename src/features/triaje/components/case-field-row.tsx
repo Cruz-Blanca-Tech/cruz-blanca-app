@@ -118,6 +118,8 @@ interface CaseFieldRowProps {
   locked?: boolean;
   /** Match MDM: bloquea las filas padre/madre del editor de adultos. */
   parentsLocked?: boolean;
+  /** Familiares registrados en el MDM para emparejar por DNI en el editor de adultos. */
+  mdmAdults?: Array<{ dni: string; full_name: string; relationship?: string }>;
   /**
    * Línea ancla bajo el campo DNI. El botón de la acción hereda el `disabled` del
    * fieldset que envuelve al formulario, así que en un expediente cerrado no se
@@ -143,6 +145,7 @@ export function CaseFieldRow({
   disabled = false,
   locked = false,
   parentsLocked = false,
+  mdmAdults = [],
   dniInline = null,
   isMdmMatching = false,
 }: CaseFieldRowProps) {
@@ -299,7 +302,7 @@ export function CaseFieldRow({
           }}
         />
       ) : field.control === 'adults_list' ? (
-        <AdultsListControl parentsLocked={parentsLocked} />
+        <AdultsListControl parentsLocked={parentsLocked} mdmAdults={mdmAdults} />
       ) : field.control === 'date' ? (
         // Selector día/mes/año en español: el `<input type="date">` nativo
         // mostraba el formato del idioma del navegador (mm/dd/yyyy en inglés).

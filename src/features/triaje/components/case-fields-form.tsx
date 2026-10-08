@@ -44,6 +44,8 @@ interface CaseFieldsFormProps {
    * quedan bloqueadas (solo el tutor/OTHER se puede editar/agregar/eliminar).
    */
   parentsLocked?: boolean;
+  /** Familiares registrados en el MDM para emparejar por DNI en el editor de adultos. */
+  mdmAdults?: Array<{ dni: string; full_name: string; relationship?: string }>;
   /**
    * Línea ancla bajo el campo DNI (info con match MDM / warning por agrupación
    * del lote, con la acción de un clic que lo resuelve). Reactiva al valor del DNI;
@@ -85,6 +87,7 @@ export function CaseFieldsForm({
   disabled = false,
   lockedFieldIds = null,
   parentsLocked = false,
+  mdmAdults = [],
   dniInline = null,
   isMdmMatching = false,
 }: CaseFieldsFormProps) {

@@ -46,3 +46,9 @@ CLAUDE.md
 CLAUDE.md
 CLAUDE.md
 CLAUDE.md
+
+# pruebas (Vitest / Playwright)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

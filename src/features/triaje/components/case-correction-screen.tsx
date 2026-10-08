@@ -469,7 +469,8 @@ export function CaseCorrectionScreen({
                       onFocusField={vm.focusField}
                       fieldRefs={vm.fieldRefs}
                         lockedFieldIds={vm.mdmLockedFieldIds}
-                        parentsLocked={Boolean(vm.mdmMatch)}
+                        parentsLocked={false}
+                        mdmAdults={vm.mdmMatch?.relatives ?? []}
                         dniInline={vm.dniInline}
                         isMdmMatching={vm.isMdmMatching}
                     />

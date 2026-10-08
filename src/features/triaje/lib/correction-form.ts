@@ -14,6 +14,7 @@ import type {
   EducaDossierData,
 } from '../schemas/educa-case-schema';
 import { getRelationshipLabel } from '@/lib/domain/enum-labels';
+import { separateChildNameAndSurnames } from './name-separator';
 
 /** Grupos que se renderizan como PESTAÑAS en el formulario de corrección. */
 export const CORRECTION_GROUPS = [
@@ -176,11 +177,25 @@ const dniFromRef = (values: CorrectionFormValues, ref: string): string | null =>
 
 /** `EducaDossierData` (respuesta) → valores iniciales del formulario. */
 export function dossierToFormValues(d: EducaDossierData): CorrectionFormValues {
+  const father = d.related_adults?.adults?.find(
+    (a) => a.relationship === 'FATHER' || (a.relationship as string) === 'PADRE'
+  );
+  const mother = d.related_adults?.adults?.find(
+    (a) => a.relationship === 'MOTHER' || (a.relationship as string) === 'MADRE'
+  );
+
+  const separated = separateChildNameAndSurnames(
+    d.beneficiary.first_name,
+    d.beneficiary.last_name,
+    father?.full_name,
+    mother?.full_name
+  );
+
   return {
     beneficiary: {
       dni: s(d.beneficiary.dni),
-      first_name: s(d.beneficiary.first_name),
-      last_name: s(d.beneficiary.last_name),
+      first_name: s(separated.firstName),
+      last_name: s(separated.lastName),
       birth_date: s(d.beneficiary.birth_date),
       gender: s(d.beneficiary.gender),
       address: s(d.beneficiary.address),
@@ -217,7 +232,7 @@ export function dossierToFormValues(d: EducaDossierData): CorrectionFormValues {
     adults: d.related_adults.adults.map((a) => ({
       relationship: a.relationship,
       dni: s(a.dni),
-      full_name: s(a.full_name),
+      full_name: s(a.full_name).replace(/[0-9]+/g, ' ').replace(/\s+/g, ' ').trim(),
       phone: s(a.phone),
     })),
     guardian_ref: refFromDni(d.related_adults.adults, d.related_adults.guardian_dni),
