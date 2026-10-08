@@ -354,6 +354,7 @@ export function useCaseCorrection({
       form.setValue('beneficiary.gender', mdmGenderToForm(snap.gender), { shouldDirty: true });
       form.setValue('beneficiary.address', snap.address ?? '', { shouldDirty: true });
       // Padre/madre (por rol): misma persona → datos del maestro.
+      // Emparejar a lo sumo a una sola fila del mismo rol para no generar duplicados accidentales.
       const parents: Record<
         string,
         { full_name: string; dni: string; phone?: string | null } | undefined
@@ -362,10 +363,29 @@ export function useCaseCorrection({
         MOTHER: snap.relatives.find((r) => r.relationship === 'MOTHER'),
       };
       const adults = form.getValues('adults');
+      const assignedRoles = new Set<string>();
+
+      // 1ra pasada: emparejar por DNI exacto si coincide con el del maestro
       adults.forEach((adult, i) => {
-        if (adult.relationship !== 'FATHER' && adult.relationship !== 'MOTHER') return;
-        const parent = parents[adult.relationship];
+        const role = adult.relationship;
+        if (role !== 'FATHER' && role !== 'MOTHER') return;
+        const parent = parents[role];
+        if (parent && adult.dni && adult.dni.trim() === parent.dni.trim()) {
+          assignedRoles.add(role);
+          form.setValue(`adults.${i}.full_name`, parent.full_name, { shouldDirty: true });
+          form.setValue(`adults.${i}.dni`, parent.dni, { shouldDirty: true });
+          form.setValue(`adults.${i}.phone`, parent.phone ?? '', { shouldDirty: true });
+        }
+      });
+
+      // 2da pasada: para roles no emparejados por DNI, asignar a lo sumo a una sola fila del mismo rol
+      adults.forEach((adult, i) => {
+        const role = adult.relationship;
+        if (role !== 'FATHER' && role !== 'MOTHER') return;
+        if (assignedRoles.has(role)) return;
+        const parent = parents[role];
         if (!parent) return;
+        assignedRoles.add(role);
         form.setValue(`adults.${i}.full_name`, parent.full_name, { shouldDirty: true });
         form.setValue(`adults.${i}.dni`, parent.dni, { shouldDirty: true });
         form.setValue(`adults.${i}.phone`, parent.phone ?? '', { shouldDirty: true });
@@ -392,10 +412,29 @@ export function useCaseCorrection({
           MOTHER: base.adults.find((a) => a.relationship === 'MOTHER'),
         };
         const adults = form.getValues('adults');
+        const restoredRoles = new Set<string>();
+
+        // 1ra pasada: emparejar por DNI exacto
         adults.forEach((adult, i) => {
-          if (adult.relationship !== 'FATHER' && adult.relationship !== 'MOTHER') return;
-          const parent = parents[adult.relationship];
+          const role = adult.relationship;
+          if (role !== 'FATHER' && role !== 'MOTHER') return;
+          const parent = parents[role];
+          if (parent && adult.dni && adult.dni.trim() === parent.dni.trim()) {
+            restoredRoles.add(role);
+            form.setValue(`adults.${i}.full_name`, parent.full_name, { shouldDirty: true });
+            form.setValue(`adults.${i}.dni`, parent.dni, { shouldDirty: true });
+            form.setValue(`adults.${i}.phone`, parent.phone, { shouldDirty: true });
+          }
+        });
+
+        // 2da pasada: asignar a lo sumo a una fila por rol
+        adults.forEach((adult, i) => {
+          const role = adult.relationship;
+          if (role !== 'FATHER' && role !== 'MOTHER') return;
+          if (restoredRoles.has(role)) return;
+          const parent = parents[role];
           if (!parent) return;
+          restoredRoles.add(role);
           form.setValue(`adults.${i}.full_name`, parent.full_name, { shouldDirty: true });
           form.setValue(`adults.${i}.dni`, parent.dni, { shouldDirty: true });
           form.setValue(`adults.${i}.phone`, parent.phone, { shouldDirty: true });
@@ -413,14 +452,6 @@ export function useCaseCorrection({
       'beneficiary.last_name',
       'beneficiary.gender',
       'beneficiary.address',
-      'padre.full_name',
-      'padre.dni',
-      'padre.phone',
-      'padre.empty',
-      'madre.full_name',
-      'madre.dni',
-      'madre.phone',
-      'madre.empty',
     ]);
     // La fecha de nacimiento se bloquea SOLO si el maestro la tiene. Sin fecha en el
     // maestro, bloquear en vacío dejaría el caso con el ERROR "fecha obligatoria"
