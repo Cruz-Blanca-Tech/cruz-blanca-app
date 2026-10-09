@@ -34,6 +34,7 @@ import {
   isBeneficiaryMinor,
   isValidDni,
   validateAdultsOnSubmit,
+  validateBeneficiaryName,
 } from '@/lib/domain/beneficiary-rules';
 import type {
   EnrichedDiscrepancy,
@@ -682,6 +683,16 @@ export function useCaseCorrection({
       toast.error(
         `No se puede guardar ni aprobar: Faltan documentos requeridos (${names}). Debe adjuntarlos para continuar.`
       );
+      return;
+    }
+
+    // 0. HU-004: nombres y apellido paterno en sus propios campos
+    const beneficiaryNameError = validateBeneficiaryName(
+      values.beneficiary.first_name,
+      values.beneficiary.last_name
+    );
+    if (beneficiaryNameError) {
+      toast.error(`No se puede guardar: ${beneficiaryNameError}`);
       return;
     }
 

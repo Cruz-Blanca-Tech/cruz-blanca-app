@@ -99,14 +99,17 @@ export function BeneficiarioRow({ beneficiary, masked }: BeneficiarioRowProps) {
       {/* Acciones */}
       <TableCell className="px-4 py-3 text-right align-middle">
         <div className="flex items-center justify-end gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => router.push(`/beneficiarios/${beneficiary.id}`)}
-          >
-            <Eye className="mr-1 h-4 w-4" />
-            Perfil
-          </Button>
+          {/* La ficha muestra datos sin enmascarar: no disponible para el Visualizador. */}
+          {!masked && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => router.push(`/beneficiarios/${beneficiary.id}`)}
+            >
+              <Eye className="mr-1 h-4 w-4" />
+              Perfil
+            </Button>
+          )}
         </div>
       </TableCell>
     </TableRow>

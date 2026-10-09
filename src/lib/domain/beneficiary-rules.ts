@@ -9,6 +9,8 @@
  * Las funciones son puras (sin dependencias de React ni de features).
  */
 
+import { hasGivenNameAndSurname, splitSurnames } from '@/shared/names/name-parts';
+
 /** DNI peruano válido: exactamente 8 dígitos numéricos. */
 export const BENEFICIARY_DNI_REGEX = /^\d{8}$/;
 
@@ -137,6 +139,23 @@ export function validateAdultDni(
 }
 
 /**
+ * HU-004: el beneficiario debe tener nombres y apellido paterno en sus propios
+ * campos. Devuelve el mensaje de error o `null` si es válido.
+ */
+export function validateBeneficiaryName(
+  firstName: string | null | undefined,
+  lastName: string | null | undefined
+): string | null {
+  if (!(firstName ?? '').trim()) {
+    return 'Los nombres del beneficiario son obligatorios.';
+  }
+  if (!splitSurnames(lastName).paternal) {
+    return 'Ingrese el apellido paterno del beneficiario en su propio campo (no junto a los nombres).';
+  }
+  return null;
+}
+
+/**
  * Valida la lista completa de adultos para el submit (ambos canales).
  * Devuelve el primer mensaje de error encontrado, o `null` si todo es válido.
  *
@@ -179,6 +198,11 @@ export function validateAdultsOnSubmit(
 
     if (!adName) {
       return `El familiar con DNI ${adDni} debe tener nombre completo.`;
+    }
+
+    // HU-004: nombres y apellido paterno separados (no todo en un solo campo).
+    if (!hasGivenNameAndSurname(adName)) {
+      return `El familiar '${label}' debe tener nombres y apellido paterno en sus propios campos.`;
     }
 
     if (beneficiaryDni && adDni === beneficiaryDni) {

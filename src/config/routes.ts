@@ -7,7 +7,18 @@ export const DEFAULT_PRIVATE_ROUTE = '/dashboard';
 interface RouteAccess {
   prefix: string;
   allowedRoles: Role[];
+  /** Si es true, la regla aplica solo a la ruta exacta (no a sus subrutas). */
+  exact?: boolean;
 }
+
+const ALL_STAFF: Role[] = [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR, ROLES.VISUALIZADOR];
+const OPERATIONS: Role[] = [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR];
+
+/**
+ * Matriz de acceso del frontend (RF-02). Espeja las políticas del backend
+ * (security_access/infrastructure/api/dependencies/policies.py).
+ * El orden importa: gana la primera regla que coincide.
+ */
 
 export const PRIVATE_ROUTES: RouteAccess[] = [
   {
@@ -15,8 +26,15 @@ export const PRIVATE_ROUTES: RouteAccess[] = [
     allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR, ROLES.VISUALIZADOR],
   },
   {
+    // Listado (enmascarado para el Visualizador).
     prefix: '/beneficiarios',
-    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR, ROLES.VISUALIZADOR],
+    allowedRoles: ALL_STAFF,
+    exact: true,
+  },
+  {
+    // Ficha completa, alta y edición: datos personales sin enmascarar.
+    prefix: '/beneficiarios',
+    allowedRoles: OPERATIONS,
   },
   {
     prefix: '/carga-datos',
@@ -27,11 +45,16 @@ export const PRIVATE_ROUTES: RouteAccess[] = [
     allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR],
   },
   {
+    // Exportaciones CSV con DNI y nombres.
     prefix: '/reportes',
-    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR, ROLES.VISUALIZADOR],
+    allowedRoles: OPERATIONS,
   },
   {
     prefix: '/usuarios',
+    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO],
+  },
+  {
+    prefix: '/mdm',
     allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO],
   },
 ];
@@ -41,8 +64,10 @@ export function isPublicRoute(pathname: string): boolean {
 }
 
 export function findRouteAccess(pathname: string): RouteAccess | undefined {
-  return PRIVATE_ROUTES.find(
-    (r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`)
+  return PRIVATE_ROUTES.find((r) =>
+    r.exact
+      ? pathname === r.prefix
+      : pathname === r.prefix || pathname.startsWith(`${r.prefix}/`)
   );
 }
 

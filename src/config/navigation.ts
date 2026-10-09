@@ -46,7 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Reportes',
     href: '/reportes',
     icon: BarChart3,
-    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR, ROLES.VISUALIZADOR],
+    allowedRoles: [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR],
   },
   {
     label: 'Usuarios',

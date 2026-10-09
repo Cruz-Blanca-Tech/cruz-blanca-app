@@ -66,7 +66,7 @@ test.describe('Control de acceso por rol (RBAC)', () => {
     expect(pathnameOf(location)).toBe('/dashboard');
   });
 
-  for (const route of ['/usuarios', '/carga-datos', '/triaje']) {
+  for (const route of ['/usuarios', '/carga-datos', '/triaje', '/reportes', '/beneficiarios/nuevo', '/mdm/colegios']) {
     test(`VISUALIZADOR no puede entrar a ${route}`, async ({ request }) => {
       const { status, location } = await locationOf(request, route, cookieHeader(fakeAccessToken('visualizador')));
       expect(status).toBe(307);
@@ -74,18 +74,20 @@ test.describe('Control de acceso por rol (RBAC)', () => {
     });
   }
 
-  for (const route of ['/dashboard', '/beneficiarios', '/reportes']) {
+  for (const route of ['/dashboard', '/beneficiarios']) {
     test(`VISUALIZADOR sí puede entrar a ${route}`, async ({ request }) => {
       const res = await request.get(route, { headers: cookieHeader(fakeAccessToken('visualizador')), maxRedirects: 0 });
       expect(res.status()).toBe(200);
     });
   }
 
-  test('REVISOR no puede entrar a /usuarios', async ({ request }) => {
-    const { status, location } = await locationOf(request, '/usuarios', cookieHeader(fakeAccessToken('revisor')));
-    expect(status).toBe(307);
-    expect(pathnameOf(location)).toBe('/dashboard');
-  });
+  for (const route of ['/usuarios', '/mdm/actividades']) {
+    test(`REVISOR no puede entrar a ${route}`, async ({ request }) => {
+      const { status, location } = await locationOf(request, route, cookieHeader(fakeAccessToken('revisor')));
+      expect(status).toBe(307);
+      expect(pathnameOf(location)).toBe('/dashboard');
+    });
+  }
 
   test('ADMIN puede entrar a todas las rutas privadas', async ({ request }) => {
     const token = fakeAccessToken('admin');
@@ -95,3 +97,4 @@ test.describe('Control de acceso por rol (RBAC)', () => {
     }
   });
 });
+

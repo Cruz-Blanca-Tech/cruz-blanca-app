@@ -36,8 +36,10 @@ import {
   hasConflictingExclusiveRole,
   validateAdultDni,
   validateAdultsOnSubmit,
+  validateBeneficiaryName,
   BENEFICIARY_MAX_ADULTS,
 } from '@/lib/domain/beneficiary-rules';
+import { SurnameInputs } from '@/shared/names/name-inputs';
 
 import {
   beneficiarioFormSchema,
@@ -253,6 +255,9 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function doSave(data: BeneficiarioFormData, sectionId: SectionId | 'all') {
     // Shared validations that always apply
+    // HU-004: nombres y apellido paterno en sus propios campos.
+    const nameError = validateBeneficiaryName(data.first_name, data.last_name);
+    if (nameError) { toast.error(nameError); return false; }
     if (!isValidDni(data.dni)) { toast.error('El DNI debe tener exactamente 8 dígitos numéricos.'); return false; }
     const minor = isBeneficiaryMinor(data.birth_date);
     if (minor === null) { toast.error('La fecha de nacimiento es obligatoria.'); return false; }
@@ -443,7 +448,15 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
               <FieldSlot label="Apellidos" required={isEditing('personal')} editing={isEditing('personal')}
                 view={<p className="text-sm font-medium">{b?.last_name || '—'}</p>}>
                 <>
-                  <Input {...register('last_name')} placeholder="Ej: Pérez Gómez" />
+                  {/* HU-004: apellido paterno y materno en campos separados. */}
+                  <Controller control={control} name="last_name" render={({ field }) => (
+                    <SurnameInputs
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      invalid={Boolean(errors.last_name)}
+                    />
+                  )} />
                   {errors.last_name && <p className="text-xs text-destructive mt-1">{errors.last_name.message}</p>}
                 </>
               </FieldSlot>
@@ -882,8 +895,16 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
                               <Input {...register(`related_adults.${index}.first_name`)} placeholder="Nombres" className="h-7 text-xs" />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-[10px] font-semibold text-muted-foreground">Apellidos *</Label>
-                              <Input {...register(`related_adults.${index}.last_name`)} placeholder="Apellidos" className="h-7 text-xs" />
+                              <Label className="text-[10px] font-semibold text-muted-foreground">Apellido paterno * · Apellido materno</Label>
+                              {/* HU-004: apellidos separados. */}
+                              <Controller control={control} name={`related_adults.${index}.last_name`} render={({ field }) => (
+                                <SurnameInputs
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  onBlur={field.onBlur}
+                                  inputClassName="h-7 text-xs"
+                                />
+                              )} />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-[10px] font-semibold text-muted-foreground">DNI</Label>

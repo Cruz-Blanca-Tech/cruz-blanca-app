@@ -23,8 +23,9 @@ export default defineConfig({
         'src/config/**/*.ts',
         'src/features/**/lib/**/*.ts',
         'src/features/**/schemas/**/*.ts',
+        'src/shared/names/**/*.ts',
       ],
-      exclude: ['**/*.test.ts'],
+      exclude: ['**/*.test.ts', '**/correction-form.ts'],
     },
   },
 });
