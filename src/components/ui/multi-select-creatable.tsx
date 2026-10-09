@@ -104,11 +104,9 @@ export function MultiSelectCreatable({
           option: (base, state) => ({
             ...base,
             backgroundColor: state.isFocused
-              ? isDark
-                ? 'hsl(var(--accent))'
-                : 'hsl(var(--accent))'
+              ? 'hsl(var(--accent))'
               : 'transparent',
-            color: isDark ? 'hsl(var(--popover-foreground))' : 'hsl(var(--popover-foreground))',
+            color: 'hsl(var(--popover-foreground))',
             cursor: 'pointer',
             '&:active': {
               backgroundColor: 'hsl(var(--accent))',
@@ -116,7 +114,7 @@ export function MultiSelectCreatable({
           }),
           input: (base) => ({
             ...base,
-            color: isDark ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))',
+            color: 'hsl(var(--foreground))',
           }),
         }}
       />

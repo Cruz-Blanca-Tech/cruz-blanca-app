@@ -184,7 +184,15 @@ export function CaseFieldRow({
   return (
     <div
       ref={registerRef}
+      role="button"
+      tabIndex={0}
       onClick={onFocus}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onFocus();
+        }
+      }}
       className={cn(
         'cursor-pointer rounded-md border bg-white p-2.5 transition-colors',
         isActive
