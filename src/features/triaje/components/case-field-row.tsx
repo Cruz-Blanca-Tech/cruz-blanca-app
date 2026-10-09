@@ -38,6 +38,7 @@ import { BoolToggle } from './bool-toggle';
 import { MultiSelect } from './multi-select';
 import { AdultsListControl } from './adults-list-control';
 import { SchoolSelect } from '@/features/mdm/components/school-select';
+import { FullNameInputs, SurnameInputs } from '@/shared/names/name-inputs';
 import { isBeneficiaryMinor } from '@/lib/domain/beneficiary-rules';
 
 interface StatusMeta {
@@ -303,6 +304,32 @@ export function CaseFieldRow({
         />
       ) : field.control === 'adults_list' ? (
         <AdultsListControl parentsLocked={parentsLocked} mdmAdults={mdmAdults} />
+      ) : field.control === 'surnames' || field.control === 'person_name' ? (
+        // HU-004: apellidos (y nombres de adultos) en campos separados.
+        <Controller
+          control={control}
+          name={fieldName(field.name!)}
+          render={({ field: rhf }) => {
+            const NameInputs = field.control === 'surnames' ? SurnameInputs : FullNameInputs;
+            return (
+              <div onClick={(e) => e.stopPropagation()}>
+                <NameInputs
+                  value={(rhf.value as string) ?? ''}
+                  onChange={rhf.onChange}
+                  onBlur={rhf.onBlur}
+                  onFocus={onFocus}
+                  disabled={effectiveDisabled}
+                  invalid={flagged}
+                  inputClassName={cn(
+                    'h-8 font-data text-[12.5px]',
+                    locked && 'bg-slate-50 text-ink-muted/80',
+                    flagged && meta.border
+                  )}
+                />
+              </div>
+            );
+          }}
+        />
       ) : field.control === 'date' ? (
         // Selector día/mes/año en español: el `<input type="date">` nativo
         // mostraba el formato del idioma del navegador (mm/dd/yyyy en inglés).

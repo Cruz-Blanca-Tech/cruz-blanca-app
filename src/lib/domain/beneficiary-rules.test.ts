@@ -6,6 +6,7 @@ import {
   isValidDni,
   validateAdultDni,
   validateAdultsOnSubmit,
+  validateBeneficiaryName,
 } from './beneficiary-rules';
 
 /** Fecha local "YYYY-MM-DDT12:00:00" a `years` años y `days` días de hoy (sin desfase de zona horaria). */
@@ -109,13 +110,34 @@ describe('validateAdultsOnSubmit', () => {
   });
 
   it('rechaza DNI del beneficiario y DNIs repetidos', () => {
-    expect(validateAdultsOnSubmit([{ dni: '99999999', full_name: 'Ana' }], '99999999')).toContain(
+    expect(validateAdultsOnSubmit([{ dni: '99999999', full_name: 'Ana Quispe' }], '99999999')).toContain(
       'coincide con el DNI del beneficiario'
     );
     const repetidos = [
-      { dni: '11111111', full_name: 'Ana' },
-      { dni: '11111111', full_name: 'Luis' },
+      { dni: '11111111', full_name: 'Ana Quispe' },
+      { dni: '11111111', full_name: 'Luis Rojas' },
     ];
     expect(validateAdultsOnSubmit(repetidos, '99999999')).toContain('está repetido');
+  });
+});
+
+describe('HU-004: nombres y apellidos en campos separados', () => {
+  it('exige nombres y apellido paterno del beneficiario', () => {
+    expect(validateBeneficiaryName('Luis', 'Quispe Flores')).toBeNull();
+    expect(validateBeneficiaryName('Luis', 'Quispe')).toBeNull();
+    expect(validateBeneficiaryName('', 'Quispe')).toBe('Los nombres del beneficiario son obligatorios.');
+    expect(validateBeneficiaryName('Luis Quispe Flores', '')).toContain('apellido paterno');
+  });
+
+  it('rechaza un familiar con nombre y apellidos escritos solo en un campo incompleto', () => {
+    expect(validateAdultsOnSubmit([{ dni: '11111111', full_name: 'Juan' }], '99999999')).toContain(
+      'nombres y apellido paterno'
+    );
+    expect(
+      validateAdultsOnSubmit([{ dni: '11111111', first_name: 'Rosa', last_name: '' }], '99999999')
+    ).toContain('nombres y apellido paterno');
+    expect(
+      validateAdultsOnSubmit([{ dni: '11111111', first_name: 'Rosa', last_name: 'Flores' }], '99999999')
+    ).toBeNull();
   });
 });

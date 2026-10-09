@@ -23,17 +23,34 @@ describe('canAccess (RBAC del frontend)', () => {
     expect(canAccess('/dashboard', null)).toBe(false);
   });
 
-  it('todos los roles ven dashboard, beneficiarios y reportes', () => {
+  it('todos los roles ven el dashboard y el listado de beneficiarios', () => {
     for (const role of Object.values(ROLES)) {
       expect(canAccess('/dashboard', role)).toBe(true);
+      expect(canAccess('/beneficiarios', role)).toBe(true);
+    }
+  });
+
+  it('el visualizador no carga datos, no hace triaje ni descarga reportes', () => {
+    expect(canAccess('/carga-datos', ROLES.VISUALIZADOR)).toBe(false);
+    expect(canAccess('/triaje/lote-1', ROLES.VISUALIZADOR)).toBe(false);
+    expect(canAccess('/reportes', ROLES.VISUALIZADOR)).toBe(false);
+  });
+
+  it('el visualizador no abre fichas ni registra beneficiarios (datos sin enmascarar)', () => {
+    expect(canAccess('/beneficiarios/123', ROLES.VISUALIZADOR)).toBe(false);
+    expect(canAccess('/beneficiarios/nuevo', ROLES.VISUALIZADOR)).toBe(false);
+    expect(canAccess('/beneficiarios/123/editar', ROLES.VISUALIZADOR)).toBe(false);
+    for (const role of [ROLES.ADMIN, ROLES.OPERATIVO, ROLES.REVISOR]) {
       expect(canAccess('/beneficiarios/123', role)).toBe(true);
       expect(canAccess('/reportes', role)).toBe(true);
     }
   });
 
-  it('el visualizador no carga datos ni hace triaje', () => {
-    expect(canAccess('/carga-datos', ROLES.VISUALIZADOR)).toBe(false);
-    expect(canAccess('/triaje/lote-1', ROLES.VISUALIZADOR)).toBe(false);
+  it('los datos maestros (MDM) son solo para admin y operativo', () => {
+    expect(canAccess('/mdm/colegios', ROLES.ADMIN)).toBe(true);
+    expect(canAccess('/mdm/actividades', ROLES.OPERATIVO)).toBe(true);
+    expect(canAccess('/mdm/colegios', ROLES.REVISOR)).toBe(false);
+    expect(canAccess('/mdm/actividades', ROLES.VISUALIZADOR)).toBe(false);
   });
 
   it('solo admin y operativo gestionan usuarios', () => {

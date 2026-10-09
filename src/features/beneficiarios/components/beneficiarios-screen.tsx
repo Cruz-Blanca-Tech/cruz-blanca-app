@@ -50,14 +50,17 @@ export function BeneficiariosScreen() {
               : 'Gestión y consulta de registros'}
           </p>
         </div>
-        <Button
-          size="lg"
-          className="shrink-0"
-          onClick={() => router.push('/beneficiarios/nuevo')}
-        >
-          <UserPlus />
-          Nuevo registro
-        </Button>
+        {/* El Visualizador solo consulta el listado enmascarado (RF-02, RF-11). */}
+        {!masked && (
+          <Button
+            size="lg"
+            className="shrink-0"
+            onClick={() => router.push('/beneficiarios/nuevo')}
+          >
+            <UserPlus />
+            Nuevo registro
+          </Button>
+        )}
       </header>
 
       {/* Aviso de enmascarado (solo rol Visualizador) */}

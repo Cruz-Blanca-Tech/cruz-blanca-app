@@ -49,6 +49,10 @@ export interface SelectOption {
 
 export type FieldControl =
   | 'text'
+  /** HU-004: apellido paterno y materno en dos campos (valor: "PATERNO MATERNO"). */
+  | 'surnames'
+  /** HU-004: nombres, apellido paterno y materno en tres campos (valor: nombre completo). */
+  | 'person_name'
   | 'date'
   | 'select'
   | 'school_select'
@@ -181,7 +185,7 @@ export function buildCorrectionFields(
         name: `${base}.full_name`,
         label: labels.name,
         group,
-        control: 'text',
+        control: 'person_name',
         placeholder: 'No registrado',
         note: extra?.nameNote,
       },
@@ -230,7 +234,7 @@ export function buildCorrectionFields(
       name: 'beneficiary.last_name',
       label: 'Apellidos',
       group: 'Beneficiario',
-      control: 'text',
+      control: 'surnames',
     },
     {
       id: 'beneficiary.dni',

@@ -5,6 +5,7 @@ import { Lock, Plus, X, OctagonAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { FullNameInputs } from '@/shared/names/name-inputs';
 import {
   Select,
   SelectContent,
@@ -180,7 +181,7 @@ export function AdultsListControl({
                 control={control}
                 name={`adults.${index}.full_name`}
                 render={({ field: rhf }) => (
-                  <div className="flex flex-col gap-1.5">
+                  <div className="col-span-2 flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
                       <label className="font-sans text-[10.5px] font-semibold text-ink-secondary">Nombre completo</label>
                       {isNameLocked && (
@@ -190,11 +191,13 @@ export function AdultsListControl({
                         </span>
                       )}
                     </div>
-                    <Input
-                      {...rhf}
+                    {/* HU-004: nombres y apellidos en campos separados. */}
+                    <FullNameInputs
+                      value={(rhf.value as string) ?? ''}
+                      onChange={rhf.onChange}
+                      onBlur={rhf.onBlur}
                       disabled={isNameLocked}
-                      placeholder="Ej. Juan Pérez"
-                      className={cn(
+                      inputClassName={cn(
                         "h-8 font-data text-[12.5px] shadow-sm transition-all focus:ring-primary/20",
                         isNameLocked && "bg-slate-50 text-ink-muted/80 cursor-not-allowed"
                       )}
