@@ -312,7 +312,7 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
   function saveSection(sectionId: SectionId) {
     setSavingSection(sectionId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handleSubmit(async (data) => {
+    void handleSubmit(async (data) => {
       await doSave(data as BeneficiarioFormData, sectionId);
       setSavingSection(null);
     }, () => {
@@ -324,7 +324,7 @@ export function BeneficiarioProfileCard({ mode = 'profile', data: raw, id, onSav
   function saveAll() {
     setSavingSection('personal'); // any truthy value — signals "saving"
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handleSubmit(async (data) => {
+    void handleSubmit(async (data) => {
       await doSave(data as BeneficiarioFormData, 'all');
       setSavingSection(null);
     }, () => {

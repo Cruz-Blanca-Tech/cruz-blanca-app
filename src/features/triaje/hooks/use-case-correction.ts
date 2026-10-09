@@ -123,7 +123,7 @@ export function useCaseCorrection({
   useEffect(() => {
     // If pending documents dropped to 0 (meaning async OCR finished), refetch the Triage Case to get the new data
     if (previousPendingRef.current > 0 && pendingDocuments.length === 0) {
-      caseQuery.refetch();
+      void caseQuery.refetch();
       // Notificar al usuario que la IA terminó
       toast.success('¡El reprocesamiento con IA ha finalizado!');
     }

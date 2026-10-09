@@ -64,7 +64,6 @@ export function BatchRowAction({
         </span>
       );
 
-    case 'PENDING':
     case 'FAILED':
       return (
         <Button
