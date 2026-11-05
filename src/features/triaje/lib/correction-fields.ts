@@ -623,6 +623,19 @@ function normalizeKey(value: string): string {
  *  3. `matchDocCodes`: por `document_code` del documento (p. ej. `DNIBE`).
  * Todo se compara sobre la forma normalizada (acentos/mayúsculas/espacios).
  */
+/**
+ * Prioridad de severidad para emparejamiento visual de discrepancias (D14):
+ * Si un campo tiene multiples discrepancias asociadas (ej. un ERROR de formato
+ * y una sugerencia AI_INSIGHT o WARNING), el ERROR DEBE mandar siempre para que
+ * no quede tapado ni diluido a nivel visual en la etiqueta del campo.
+ */
+const SEVERITY_RANK: Record<string, number> = {
+  ERROR: 1,
+  WARNING: 2,
+  AI_INSIGHT: 3,
+  INFO: 4,
+};
+
 export function matchDiscrepancy(
   field: CorrectionFieldDescriptor,
   discrepancies: TriageDiscrepancy[]
@@ -632,18 +645,29 @@ export function matchDiscrepancy(
     .map(normalizeKey);
   const fieldNameKeys = (field.matchFieldNames ?? []).map(normalizeKey);
   const docCodeKeys = (field.matchDocCodes ?? []).map(normalizeKey);
-  return (
-    discrepancies.find((d) => {
-      const nameKey = normalizeKey(d.field_name);
-      if (selfKeys.includes(nameKey) || fieldNameKeys.includes(nameKey)) {
-        return true;
-      }
-      return (
-        d.document_code != null &&
-        docCodeKeys.includes(normalizeKey(d.document_code))
-      );
-    }) ?? null
-  );
+
+  const matched = discrepancies.filter((d) => {
+    const nameKey = normalizeKey(d.field_name);
+    if (selfKeys.includes(nameKey) || fieldNameKeys.includes(nameKey)) {
+      return true;
+    }
+    return (
+      d.document_code != null &&
+      docCodeKeys.includes(normalizeKey(d.document_code))
+    );
+  });
+
+  if (matched.length === 0) return null;
+  if (matched.length === 1) return matched[0];
+
+  // Priorizar ERROR sobre WARNING, AI_INSIGHT e INFO (D14)
+  matched.sort((a, b) => {
+    const rankA = SEVERITY_RANK[a.severity?.toUpperCase()] ?? 99;
+    const rankB = SEVERITY_RANK[b.severity?.toUpperCase()] ?? 99;
+    return rankA - rankB;
+  });
+
+  return matched[0];
 }
 
 /** ¿El valor actual del campo está en blanco? (según su control). */
