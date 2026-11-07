@@ -24,5 +24,5 @@ export function buildSavedMessage(
   const header = `Correcciones guardadas. Quedan ${blocking.length} ${
     blocking.length === 1 ? 'observación' : 'observaciones'
   } por resolver:`;
-  return [header, ...listed, ...(extra > 0 ? [`… y ${extra} más`] : [])].join('\n');
+  return [header, ...listed, ...(extra > 0 ? [`… y ${extra} más`] : [])].join(' ');
 }
