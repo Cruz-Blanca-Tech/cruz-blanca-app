@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { matchDiscrepancy, deriveFieldValidation, type CorrectionFieldDescriptor } from './correction-fields';
+import {
+  matchDiscrepancy,
+  deriveFieldValidation,
+  buildCorrectionFields,
+  type CorrectionFieldDescriptor,
+} from './correction-fields';
+import type { EducaCase } from '../schemas/educa-case-schema';
 import type { TriageDiscrepancy } from '../schemas/triage-discrepancy-schema';
 
 describe('correction-fields (D14: Prioridad de severidad)', () => {
@@ -108,5 +114,29 @@ describe('correction-fields (D14: Prioridad de severidad)', () => {
 
     const matched = matchDiscrepancy(dummyField, [otherDisc]);
     expect(matched).toBeNull();
+  });
+});
+
+const EMPTY_CASE = {
+  dossier_data: { related_adults: { adults: [], guardian_dni: null, emergency_contact_dni: null } },
+} as unknown as EducaCase;
+
+describe('D5: sabe leer / sabe escribir sin dato', () => {
+  const findField = (name: string) => {
+    const field = buildCorrectionFields(EMPTY_CASE).find((f) => f.name === name);
+    if (!field) throw new Error(`campo ${name} no encontrado`);
+    return field;
+  };
+
+  it.each(['education.knows_read', 'education.knows_write'])(
+    '%s en null queda «por completar», no «ok»',
+    (name) => {
+      expect(deriveFieldValidation(findField(name), null, []).status).toBe('empty');
+    }
+  );
+
+  it('con valor leído queda ok (sí o no)', () => {
+    expect(deriveFieldValidation(findField('education.knows_read'), true, []).status).toBe('ok');
+    expect(deriveFieldValidation(findField('education.knows_read'), false, []).status).toBe('ok');
   });
 });
