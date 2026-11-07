@@ -330,6 +330,8 @@ export function buildCorrectionFields(
       label: '¿Sabe leer?',
       group: 'Educación',
       control: 'bool',
+      // D5: si el OCR no leyó la casilla llega null y se muestra «Por completar».
+      nullableBool: true,
     },
     {
       id: 'education.knows_write',
@@ -337,6 +339,7 @@ export function buildCorrectionFields(
       label: '¿Sabe escribir?',
       group: 'Educación',
       control: 'bool',
+      nullableBool: true,
     },
     {
       id: 'education.repeated_grade',

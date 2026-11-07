@@ -64,8 +64,8 @@ export interface CorrectionFormValues {
   education: {
     school: string;
     grade: string;
-    knows_read: boolean;
-    knows_write: boolean;
+    knows_read: boolean | null;
+    knows_write: boolean | null;
     repeated_grade: boolean;
     learning_difficulties: boolean | null;
   };
@@ -118,8 +118,8 @@ export function emptyCorrectionValues(): CorrectionFormValues {
     education: {
       school: '',
       grade: '',
-      knows_read: true,
-      knows_write: true,
+      knows_read: null,
+      knows_write: null,
       repeated_grade: false,
       learning_difficulties: null,
     },
