@@ -30,6 +30,7 @@ import {
   type CorrectionGroup,
 } from '../lib/correction-form';
 import { isEducaCaseApproved } from '../schemas/educa-case-schema';
+import { buildSavedMessage } from '../lib/saved-message';
 import {
   isBeneficiaryMinor,
   isValidDni,
@@ -765,7 +766,7 @@ export function useCaseCorrection({
         if (isEducaCaseApproved(res)) {
           toast.success('Expediente aprobado. No quedan observaciones.');
         } else {
-          toast.success('Correcciones guardadas.');
+          toast.success(buildSavedMessage(res.discrepancies));
         }
       },
       onError: (error) => {
