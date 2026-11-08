@@ -8,7 +8,7 @@ interface FileNamingHelpProps {
   documents: ExpectedDocument[];
 }
 
-const KEY_DEMO = '90000106';
+const KEY_DEMO = '90000001';
 
 interface FileNamingHelpProps {
   /** Documentos de la actividad seleccionada; definen los sufijos relevantes. */
