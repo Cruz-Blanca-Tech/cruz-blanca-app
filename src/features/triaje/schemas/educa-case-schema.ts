@@ -48,12 +48,12 @@ const familySchema = z.object({
   validation_issues: z.array(z.string()),
 });
 
-/** Datos educativos. Los booleanos NO son nullable (default `false`). */
+/** Datos educativos. `knows_read` / `knows_write` son nullable (D5): null = el OCR no leyó la casilla. */
 const educationSchema = z.object({
   school: z.string().nullable(),
   grade: z.string().nullable(),
-  knows_read: z.boolean(),
-  knows_write: z.boolean(),
+  knows_read: z.boolean().nullable(),
+  knows_write: z.boolean().nullable(),
   repeated_grade: z.boolean(),
   learning_difficulties: z.boolean().nullable(),
 });
