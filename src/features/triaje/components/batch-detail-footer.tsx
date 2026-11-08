@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { BatchListItem } from '../schemas/batches-list-schema';
 import type { BatchDetailSummary } from '../schemas/batch-detail-summary-schema';
 import { TRIAGE_VERDICT_LIST } from '../lib/triage-verdict-config';
+import { getPdfFailureDetail } from '../lib/batch-pdf-failure';
 
 interface BatchDetailFooterProps {
   batch?: BatchListItem;
@@ -32,11 +33,22 @@ export function BatchDetailFooter({
   const isSyncFailed = batch?.status === 'SYNC_FAILED';
   const syncErrorMessage = batch?.failure_reason;
   const isFinalized = batch?.status === 'FINALIZED';
+  const pdfFailureDetail = getPdfFailureDetail(batch?.failure_reason);
 
   const verdicts = summary?.verdicts ?? {};
 
   return (
     <div className="flex flex-col gap-3">
+      {pdfFailureDetail && (
+        <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-light/50 px-4 py-3 text-error-dark">
+          <OctagonAlert className="size-4 shrink-0 text-error" />
+          <div className="text-xs">
+            <span className="font-semibold">No se generó el PDF consolidado de los expedientes: </span>
+            <span>{pdfFailureDetail}</span>
+          </div>
+        </div>
+      )}
+
       {isSyncFailed && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 bg-error-light/50 px-4 py-3 text-error-dark">
           <div className="flex items-center gap-2">
