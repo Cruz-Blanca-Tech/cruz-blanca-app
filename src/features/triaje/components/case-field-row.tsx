@@ -165,6 +165,12 @@ export function CaseFieldRow({
   // de aquí sus opciones, para que reflejen DNIs/nombres recién corregidos. Sin
   // genérico explícito: el tipo (AdultFormValue[]) se infiere del `control`.
   const adults = useWatch({ control, name: 'adults' });
+  // D17: el nombre de un adulto (`adults.N.full_name`) se reparte anclado en los
+  // apellidos del menor y en su parentesco, igual que al guardar en el maestro.
+  const childLastName = useWatch({ control, name: 'beneficiary.last_name' }) || '';
+  const adultIndex = /^adults\.(\d+)\.full_name$/.exec(field.name ?? '')?.[1];
+  const adultRelationship = adultIndex !== undefined ? adults?.[Number(adultIndex)]?.relationship ?? '' : '';
+  const isParentAdult = adultRelationship === 'FATHER' || adultRelationship === 'MOTHER';
 
   const isBool = field.control === 'bool';
 
@@ -318,22 +324,26 @@ export function CaseFieldRow({
           control={control}
           name={fieldName(field.name!)}
           render={({ field: rhf }) => {
-            const NameInputs = field.control === 'surnames' ? SurnameInputs : FullNameInputs;
+            const nameProps = {
+              value: (rhf.value as string) ?? '',
+              onChange: rhf.onChange,
+              onBlur: rhf.onBlur,
+              onFocus,
+              disabled: effectiveDisabled,
+              invalid: flagged,
+              inputClassName: cn(
+                'h-8 font-data text-[12.5px]',
+                locked && 'bg-slate-50 text-ink-muted/80',
+                flagged && meta.border
+              ),
+            };
             return (
               <div onClick={(e) => e.stopPropagation()}>
-                <NameInputs
-                  value={(rhf.value as string) ?? ''}
-                  onChange={rhf.onChange}
-                  onBlur={rhf.onBlur}
-                  onFocus={onFocus}
-                  disabled={effectiveDisabled}
-                  invalid={flagged}
-                  inputClassName={cn(
-                    'h-8 font-data text-[12.5px]',
-                    locked && 'bg-slate-50 text-ink-muted/80',
-                    flagged && meta.border
-                  )}
-                />
+                {field.control === 'surnames' ? (
+                  <SurnameInputs {...nameProps} />
+                ) : (
+                  <FullNameInputs {...nameProps} childLastName={childLastName} isParent={isParentAdult} />
+                )}
               </div>
             );
           }}

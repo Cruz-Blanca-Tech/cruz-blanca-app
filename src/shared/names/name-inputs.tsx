@@ -38,14 +38,24 @@ interface BaseProps {
 
 const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
 
-function useSyncedParts<T>(value: string | null | undefined, split: (v: string) => T, compose: (p: T) => string) {
+function useSyncedParts<T>(
+  value: string | null | undefined,
+  split: (v: string) => T,
+  compose: (p: T) => string,
+  splitKey = ''
+) {
   const [parts, setParts] = useState<T>(() => split(norm(value)));
   const [synced, setSynced] = useState(norm(value));
+  const [syncedKey, setSyncedKey] = useState(splitKey);
   // Patrón "ajustar estado cuando cambia una prop" (sin efecto): si el valor
   // externo cambió y no coincide con lo que estas partes producen, se re-divide.
-  if (norm(value) !== synced) {
+  // D17: si cambia el ancla de la división (apellidos del menor o parentesco),
+  // también se re-divide, para mostrar el mismo reparto que guardará el maestro.
+  if (norm(value) !== synced || splitKey !== syncedKey) {
+    const keyChanged = splitKey !== syncedKey;
     setSynced(norm(value));
-    if (compose(parts) !== norm(value)) setParts(split(norm(value)));
+    setSyncedKey(splitKey);
+    if (keyChanged || compose(parts) !== norm(value)) setParts(split(norm(value)));
   }
   return [parts, setParts] as const;
 }
@@ -117,9 +127,19 @@ export function FullNameInputs({
   invalid,
   inputClassName,
   showLabels,
-}: BaseProps) {
-  const [parts, setParts] = useSyncedParts<FullNameParts>(value, splitFullName, (p) =>
-    composeFullName(p.givenNames, p.paternal, p.maternal)
+  childLastName,
+  isParent = false,
+}: BaseProps & {
+  /** D17: apellidos del menor; anclan el reparto nombres/apellidos como en el maestro. */
+  childLastName?: string | null;
+  /** D17: parentesco padre/madre (FATHER/MOTHER) del adulto. */
+  isParent?: boolean;
+}) {
+  const [parts, setParts] = useSyncedParts<FullNameParts>(
+    value,
+    (v) => splitFullName(v, { childLastName, isParent }),
+    (p) => composeFullName(p.givenNames, p.paternal, p.maternal),
+    `${norm(childLastName)}|${isParent ? 'P' : ''}`
   );
 
   const update = (next: FullNameParts) => {

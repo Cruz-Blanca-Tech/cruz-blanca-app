@@ -51,12 +51,48 @@ export interface FullNameParts extends SurnameParts {
   givenNames: string;
 }
 
+/** Datos del expediente que sirven de ancla para separar el nombre de un adulto (D17). */
+export interface AdultNameAnchor {
+  /** Apellidos del menor beneficiario ("PATERNO MATERNO"). */
+  childLastName?: string | null;
+  /** Parentesco padre/madre (FATHER/MOTHER), no el rol de apoderado o contacto. */
+  isParent?: boolean;
+}
+
+/** Clave de comparación exacta de una unidad de apellido: sin tildes y en mayúsculas. */
+const unitKey = (unit: string) =>
+  clean(unit.normalize('NFD').replace(/[̀-ͯ]/g, '')).toUpperCase();
+
+/**
+ * D17 (misma regla B2 que el backend, `educa_dossier_mapper.py`): con 3 o más
+ * unidades, decide entre 1 y 2 apellidos anclando en los apellidos del menor.
+ * Coincidencia exacta por unidad; máximo 2 unidades de apellido y al menos 1 de
+ * nombre. La penúltima unidad vale para cualquier adulto; la última, solo para
+ * padre/madre. Devuelve null si no hay ancla (se usa la regla de respaldo).
+ */
+function anchorOnChildSurnames(units: string[], anchor: AdultNameAnchor | undefined): FullNameParts | null {
+  if (units.length < 3 || !anchor || typeof anchor.childLastName !== 'string') return null;
+  const childKeys = new Set(groupNameUnits(anchor.childLastName).map(unitKey).filter(Boolean));
+  if (childKeys.size === 0) return null;
+  const candidates = [units.length - 2, ...(anchor.isParent ? [units.length - 1] : [])];
+  for (const i of candidates) {
+    if (childKeys.has(unitKey(units[i]))) {
+      return { givenNames: units.slice(0, i).join(' '), paternal: units[i], maternal: units.slice(i + 1).join(' ') };
+    }
+  }
+  return null;
+}
+
 /**
  * "Juan Carlos Quispe Mamani" → nombres "Juan Carlos", paterno "Quispe", materno "Mamani".
  * Con dos palabras se asume nombre + apellido paterno; con una, solo nombre.
+ * Con `anchor` (apellidos del menor y parentesco), el reparto ambiguo de 3
+ * unidades se resuelve igual que al guardar en el maestro (D17).
  */
-export function splitFullName(fullName: string | null | undefined): FullNameParts {
+export function splitFullName(fullName: string | null | undefined, anchor?: AdultNameAnchor): FullNameParts {
   const units = groupNameUnits(fullName);
+  const anchored = anchorOnChildSurnames(units, anchor);
+  if (anchored) return anchored;
   if (units.length === 0) return { givenNames: '', paternal: '', maternal: '' };
   if (units.length === 1) return { givenNames: units[0], paternal: '', maternal: '' };
   if (units.length === 2) return { givenNames: units[0], paternal: units[1], maternal: '' };
