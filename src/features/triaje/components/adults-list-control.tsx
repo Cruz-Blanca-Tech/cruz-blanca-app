@@ -35,6 +35,8 @@ export function AdultsListControl({
   const emergencyRef = useWatch({ control, name: 'emergency_contact_ref' });
   const watchedAdults = useWatch({ control, name: 'adults' }) || [];
   const beneficiaryDni = useWatch({ control, name: 'beneficiary.dni' }) || '';
+  // D17: los apellidos del menor anclan el reparto nombres/apellidos del adulto.
+  const childLastName = useWatch({ control, name: 'beneficiary.last_name' }) || '';
 
   // Calcular roles ya ocupados (ignorando la fila actual para que el usuario pueda ver su propio rol seleccionado)
   const getRoleDisabled = (role: string, currentIndex: number) => {
@@ -194,6 +196,8 @@ export function AdultsListControl({
                     {/* HU-004: nombres y apellidos en campos separados. */}
                     <FullNameInputs
                       value={(rhf.value as string) ?? ''}
+                      childLastName={childLastName}
+                      isParent={['FATHER', 'MOTHER'].includes(watchedAdults[index]?.relationship ?? '')}
                       onChange={rhf.onChange}
                       onBlur={rhf.onBlur}
                       disabled={isNameLocked}
